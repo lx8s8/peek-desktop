@@ -31,6 +31,7 @@ class _DemoState extends State<Demo> {
   List<PeekRemoteDiscovered> desktops = [];
   PeekRemoteDiscovered? selectedDesktop;
   String? error;
+  bool emitting = false;
   @override
   void initState() {
     super.initState();
@@ -110,7 +111,70 @@ class _DemoState extends State<Demo> {
         ),
       ),
     );
-    talker.info('已生成合成网络记录');
+    bridge!.record(
+      DiagnosticRecord(
+        message: '合成请求完成 · 显式关联',
+        source: 'synthetic-demo',
+        tag: 'request',
+        relatedNetworkEntryId: id.value,
+        attributes: const {'durationMs': 42, 'status': 200},
+      ),
+    );
+  }
+
+  void reviewSamples() {
+    for (var i = 0; i < 3; i++) {
+      bridge!.record(
+        const DiagnosticRecord(
+          message: '重复异常 · 合成数据',
+          level: 'error',
+          source: 'synthetic-review',
+          tag: 'retry',
+          exception: DiagnosticException(
+            type: 'SyntheticError',
+            message: '固定异常用于验证指纹分组',
+            stackTrace:
+                '#0 syntheticOperation (synthetic.dart:10:3)\n'
+                '#1 syntheticCaller (synthetic.dart:20:5)',
+          ),
+        ),
+      );
+    }
+    bridge!.record(
+      const DiagnosticRecord(
+        message: '空堆栈异常 · 合成数据',
+        level: 'error',
+        source: 'synthetic-review',
+        tag: 'empty-stack',
+        exception: DiagnosticException(type: 'SyntheticEmpty', stackTrace: ''),
+      ),
+    );
+    bridge!.record(
+      DiagnosticRecord(
+        message: '截断属性 · 合成数据',
+        source: 'synthetic-review',
+        tag: 'truncated',
+        attributes: {'oversized': 'x' * 40000},
+        relatedNetworkEntryId: 'synthetic-missing-request',
+      ),
+    );
+  }
+
+  Future<void> burst() async {
+    if (emitting) return;
+    setState(() => emitting = true);
+    for (var i = 1; i <= 120 && mounted; i++) {
+      bridge!.record(
+        DiagnosticRecord(
+          message: '跟随测试 $i / 120 · 合成数据',
+          source: 'synthetic-burst',
+          tag: i.isEven ? 'even' : 'odd',
+          level: i % 10 == 0 ? 'warn' : 'info',
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    if (mounted) setState(() => emitting = false);
   }
 
   @override
@@ -193,6 +257,14 @@ class _DemoState extends State<Demo> {
               runSpacing: 8,
               children: [
                 FilledButton(onPressed: network, child: const Text('生成合成请求')),
+                OutlinedButton(
+                  onPressed: reviewSamples,
+                  child: const Text('P2 分组 / 空堆栈 / 截断'),
+                ),
+                OutlinedButton(
+                  onPressed: emitting ? null : () => unawaited(burst()),
+                  child: Text(emitting ? '正在发送合成日志…' : '连续 120 条日志'),
+                ),
                 OutlinedButton(
                   onPressed: () => talker.info('普通业务日志 · 合成数据'),
                   child: const Text('INFO 日志'),

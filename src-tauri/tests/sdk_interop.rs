@@ -1,6 +1,7 @@
 // Opt-in cross-language check. Requires `flutter` and the package's dependencies.
 #[allow(dead_code)]
 mod support;
+use peek_desktop_lib::query::{ReviewQuery, Scope};
 use std::{
     path::Path,
     process::{Command, Stdio},
@@ -66,6 +67,55 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
                 assert!(raw.contains("originalSyntheticFrame"));
                 assert!(!raw.contains("synthetic-secret"));
                 assert!(raw.contains("[REDACTED]"));
+                // P2 queries must expose the same official-client/SDK records after reconnect.
+                let review = serde_json::to_value(
+                    remote
+                        .review_diagnostics(
+                            &run.id,
+                            &ReviewQuery {
+                                exceptions: true,
+                                grouped: true,
+                                tag: "interop-review".into(),
+                                limit: 300,
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap(),
+                )
+                .unwrap();
+                assert_eq!(review["total"], 1);
+                assert_eq!(review["groups"][0]["count"], 1);
+                let scope = Scope::Network { id: id.clone() };
+                let timeline = serde_json::to_value(
+                    remote
+                        .timeline(
+                            &scope,
+                            remote.network_rows(&id).unwrap(),
+                            &ReviewQuery {
+                                limit: 300,
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap(),
+                )
+                .unwrap();
+                assert_eq!(timeline["total"], 5);
+                let exception = timeline["rows"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|row| row["kind"] == "exception")
+                    .unwrap();
+                assert_eq!(exception["association"], "explicit");
+                assert_eq!(exception["relatedNetworkEntryId"], "interop-request");
+                assert_eq!(exception["runId"], run.id);
+                let exported = dir.path().join("interop-diagnostics.jsonl");
+                peek_desktop_lib::storage::save_diagnostics(&exported, std::slice::from_ref(&raw))
+                    .unwrap();
+                assert_eq!(
+                    std::fs::read_to_string(exported).unwrap(),
+                    format!("{raw}\n")
+                );
                 // Export after on-demand body loading retains the original JSON text.
                 let output = dir.path().join("interop.peek");
                 peek_desktop_lib::storage::save(&output, &remote.export(&id).unwrap()).unwrap();
@@ -108,6 +158,6 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
         std::fs::read_to_string(log).unwrap()
     );
     println!(
-        "Official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK verified."
+        "Official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified."
     );
 }

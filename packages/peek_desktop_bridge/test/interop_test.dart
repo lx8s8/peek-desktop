@@ -70,6 +70,8 @@ void main() {
         const DiagnosticRecord(
           level: 'error',
           message: 'interop-exception',
+          tag: 'interop-review',
+          relatedNetworkEntryId: 'interop-request',
           attributes: {'token': 'synthetic-secret'},
           exception: DiagnosticException(
             stackTrace: '#0 originalSyntheticFrame\n#1 syntheticMain',

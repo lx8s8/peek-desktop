@@ -18,7 +18,7 @@ export function TimeRangeBar({
   range: TimeRange;
   onChange: (range: TimeRange) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [from, setFrom] = useState(localInput(range.from));
   const [to, setTo] = useState(localInput(range.to));
   useEffect(() => {
@@ -35,7 +35,7 @@ export function TimeRangeBar({
       <summary>
         {t("timeRange")} ·{" "}
         {range.from || range.to
-          ? `${range.from ? new Date(range.from).toLocaleString() : "…"} – ${range.to ? new Date(range.to).toLocaleString() : "…"}`
+          ? `${range.from ? new Date(range.from).toLocaleString(i18n.language) : "…"} – ${range.to ? new Date(range.to).toLocaleString(i18n.language) : "…"}`
           : t("resetRange")}
       </summary>
       <form
