@@ -99,5 +99,5 @@ it("can jump directly to the last record of a large query using the keyboard", a
   await waitFor(() => expect(count).toHaveBeenCalledWith(100000));
   fireEvent.keyDown(screen.getByRole("grid"), { key: "End" });
   await waitFor(() => expect(select).toHaveBeenCalledWith(entry));
-  expect(api.query).toHaveBeenCalledWith("large", "", "all", 99999, 0, 1);
+  expect(api.query).toHaveBeenCalledWith("large", "", "all", 99999, 0, 1, {});
 });

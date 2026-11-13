@@ -1125,3 +1125,94 @@ button.diagnostic-grid.selected {
   min-height: 260px;
   display: flex;
 }
+
+.review-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.review-actions .checkbox-label {
+  margin: 0 auto 0 0;
+}
+.review-actions .button {
+  font-size: 10px;
+  padding: 0 7px;
+}
+.facet-filters {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.facet-filters select {
+  width: 100%;
+}
+.group-grid {
+  grid-template-columns: 78px minmax(50px, 1fr) 48px 66px 66px;
+}
+.detail-actions {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.event-meta {
+  font:
+    10px/1.6 ui-monospace,
+    monospace;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.event-meta > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  padding: 3px 0;
+}
+.event-meta dt {
+  color: var(--muted);
+}
+.event-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.event-reference {
+  display: block;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.diagnostic-detail .log-message {
+  max-height: 260px;
+  flex-shrink: 0;
+  overflow: auto;
+}
+.time-range {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+}
+.time-range summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.time-range form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: end;
+}
+.time-range label {
+  display: grid;
+  gap: 5px;
+}
+.time-range input {
+  background: var(--bg);
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-width: 195px;
+}
+.time-range [role="alert"] {
+  width: 100%;
+  color: var(--warning);
+}

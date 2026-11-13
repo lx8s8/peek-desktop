@@ -8,6 +8,12 @@ import type {
   EntryRow,
   RemoteSnapshot,
   DiagnosticPage,
+  ReviewQuery,
+  ReviewPage,
+  Scope,
+  TimelinePage,
+  DiagnosticRef,
+  TimeRange,
 } from "./types";
 
 export const desktop = isTauri();
@@ -23,6 +29,16 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  review: (runId: string, query: ReviewQuery) =>
+    invoke<ReviewPage>("review_diagnostics", { runId, query }),
+  timeline: (scope: Scope, query: ReviewQuery) =>
+    invoke<TimelinePage>("query_timeline", { scope, query }),
+  copyDiagnostics: (
+    selection: DiagnosticRef[],
+    kind: "message" | "stack" | "raw",
+  ) => invoke<string>("copy_diagnostics", { selection, kind }),
+  exportDiagnostics: (selection: DiagnosticRef[]) =>
+    invoke<boolean>("export_diagnostics", { selection }),
   remote: () =>
     desktop
       ? invoke<RemoteSnapshot>("remote_snapshot")
@@ -99,6 +115,7 @@ export const api = {
     offset: number,
     revision: number,
     limit = 300,
+    range: TimeRange = {},
   ) =>
     invoke<QueryPage>("query_entries", {
       sessionId,
@@ -107,6 +124,7 @@ export const api = {
       offset,
       limit,
       revision,
+      range,
     }),
   metadata: (sessionId: string, entryId: string) =>
     invoke<string>("get_entry_metadata", { sessionId, entryId }),

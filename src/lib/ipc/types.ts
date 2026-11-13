@@ -58,6 +58,9 @@ export interface DiagnosticRun {
   }[];
 }
 export interface DiagnosticRow {
+  fingerprint?: string | null;
+  exceptionType?: string | null;
+  relatedNetworkEntryId?: string | null;
   eventId: string;
   sequence: string;
   occurredAt: string;
@@ -68,6 +71,68 @@ export interface DiagnosticRow {
   message: string;
   emitterId: string;
   truncated: boolean;
+}
+
+export interface TimeRange {
+  from?: string | null;
+  to?: string | null;
+}
+export interface ReviewQuery {
+  search: string;
+  level?: string;
+  source?: string;
+  tag?: string;
+  emitter?: string;
+  exceptions?: boolean;
+  grouped?: boolean;
+  fingerprint?: string | null;
+  range: TimeRange;
+  offset: number;
+  limit: number;
+  revision: number;
+}
+export interface ExceptionGroup {
+  fingerprint: string;
+  exceptionType: string;
+  message: string;
+  count: number;
+  firstAt: string;
+  lastAt: string;
+  latestEventId: string;
+}
+export interface ReviewPage extends DiagnosticPage {
+  groups: ExceptionGroup[];
+  facets: {
+    sources: string[];
+    tags: string[];
+    emitters: string[];
+    limited: boolean;
+  };
+}
+export type Scope = { kind: "network" | "diagnostic"; id: string };
+export interface TimelineRow {
+  id: string;
+  kind: "network" | "log" | "exception";
+  occurredAt: string;
+  level: string;
+  source: string;
+  message: string;
+  sessionId: string | null;
+  entryId: string | null;
+  runId: string | null;
+  eventId: string | null;
+  association: "time" | "explicit" | "unavailable";
+  relatedNetworkEntryId: string | null;
+}
+export interface TimelinePage {
+  total: number;
+  offset: number;
+  revision: number;
+  rows: TimelineRow[];
+}
+export interface DiagnosticRef {
+  runId: string;
+  eventId: string;
 }
 export interface DiagnosticPage {
   total: number;

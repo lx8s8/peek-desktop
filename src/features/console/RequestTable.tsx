@@ -9,7 +9,12 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { SearchX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../lib/ipc/client";
-import type { EntryRow, Filter, QueryPage } from "../../lib/ipc/types";
+import type {
+  EntryRow,
+  Filter,
+  QueryPage,
+  TimeRange,
+} from "../../lib/ipc/types";
 import { formatBytes } from "../../lib/preferences";
 
 export function RequestTable({
@@ -18,6 +23,7 @@ export function RequestTable({
   live,
   search,
   filter,
+  range,
   selectedId,
   onSelect,
   onCount,
@@ -28,12 +34,14 @@ export function RequestTable({
   live?: boolean;
   search: string;
   filter: Filter;
+  range?: TimeRange;
   selectedId?: string;
   onSelect: (entry: EntryRow) => void;
   onCount: (count: number) => void;
   onError: (error: string) => void;
 }) {
   const { t, i18n } = useTranslation();
+  const rangeKey = JSON.stringify(range ?? {});
   const scroll = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<QueryPage>({
     total: 0,
@@ -62,7 +70,7 @@ export function RequestTable({
     setLoading(true);
     scroll.current?.scrollTo({ top: 0 });
     ++navRevision.current;
-  }, [sessionId, search, filter]);
+  }, [sessionId, search, filter, rangeKey]);
   useEffect(() => {
     setOffset(Math.max(0, Math.floor(start / 100) * 100 - 100));
   }, [start]);
@@ -72,7 +80,15 @@ export function RequestTable({
     setLoading(true);
     setFailure(false);
     void api
-      .query(sessionId, search, filter, offset, request)
+      .query(
+        sessionId,
+        search,
+        filter,
+        offset,
+        request,
+        300,
+        JSON.parse(rangeKey),
+      )
       .then((result) => {
         if (
           !active ||
@@ -94,7 +110,17 @@ export function RequestTable({
     return () => {
       active = false;
     };
-  }, [sessionId, search, filter, offset, retry, version, onCount, onError]);
+  }, [
+    sessionId,
+    search,
+    filter,
+    offset,
+    retry,
+    version,
+    rangeKey,
+    onCount,
+    onError,
+  ]);
 
   const columns = useMemo<ColumnDef<EntryRow>[]>(
     () => [
@@ -177,7 +203,15 @@ export function RequestTable({
     const request = ++navRevision.current;
     virtualizer.scrollToIndex(next, { align: "auto" });
     try {
-      const result = await api.query(sessionId, search, filter, next, 0, 1);
+      const result = await api.query(
+        sessionId,
+        search,
+        filter,
+        next,
+        0,
+        1,
+        JSON.parse(rangeKey),
+      );
       if (request === navRevision.current && result.rows[0])
         onSelect(result.rows[0]);
     } catch (error) {

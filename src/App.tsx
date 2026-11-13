@@ -25,10 +25,20 @@ import {
   type LogSelection,
 } from "./features/diagnostics/DiagnosticsTable";
 import { DiagnosticDetail } from "./features/diagnostics/DiagnosticDetail";
+import { TimeRangeBar } from "./features/console/TimeRangeBar";
+import {
+  emptyDiagnosticView,
+  type DiagnosticView,
+} from "./features/diagnostics/view";
 import { RequestTable } from "./features/console/RequestTable";
 import { DetailPane } from "./features/detail/DetailPane";
 import { api, desktop } from "./lib/ipc/client";
-import type { EntryRow, Filter, ImportProgress } from "./lib/ipc/types";
+import type {
+  EntryRow,
+  Filter,
+  ImportProgress,
+  TimeRange,
+} from "./lib/ipc/types";
 import {
   formatBytes,
   readPreference,
@@ -37,19 +47,36 @@ import {
 import "./lib/i18n";
 import "./App.css";
 
+interface DiagnosticPaneState {
+  view: DiagnosticView;
+  selected: LogSelection | null;
+  selection: LogSelection[];
+}
+const emptyDiagnosticPane: DiagnosticPaneState = {
+  view: emptyDiagnosticView,
+  selected: null,
+  selection: [],
+};
 interface ViewState {
   search: string;
   filter: Filter;
   selected: EntryRow | null;
   tab: "network" | "logs" | "exceptions";
-  log: LogSelection | null;
+  logs: DiagnosticPaneState;
+  exceptions: DiagnosticPaneState;
+  range: TimeRange;
 }
 const emptyView: ViewState = {
   search: "",
   filter: "all",
   selected: null,
   tab: "network",
-  log: null,
+  logs: emptyDiagnosticPane,
+  exceptions: {
+    ...emptyDiagnosticPane,
+    view: { ...emptyDiagnosticView, grouped: true },
+  },
+  range: {},
 };
 function readLayout(): Layout | undefined {
   try {
@@ -73,9 +100,6 @@ function readLayout(): Layout | undefined {
 export default function App() {
   const { t, i18n } = useTranslation();
   const [independent, setIndependent] = useState<string | null>(null);
-  const [independentLog, setIndependentLog] = useState<LogSelection | null>(
-    null,
-  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [views, setViews] = useState<Record<string, ViewState>>({});
   const [theme, setTheme] = useState(() =>
@@ -100,7 +124,10 @@ export default function App() {
   const searchInput = useRef<HTMLInputElement>(null);
   const [layout] = useState(readLayout);
 
-  const view = activeId ? (views[activeId] ?? emptyView) : emptyView;
+  const scopeId = independent ?? activeId;
+  const view = scopeId ? (views[scopeId] ?? emptyView) : emptyView;
+  const currentTab = independent && view.tab === "network" ? "logs" : view.tab;
+  const diagnostic = currentTab === "exceptions" ? view.exceptions : view.logs;
   const [search, setSearch] = useState({ sessionId: activeId, value: "" });
 
   const reportError = useCallback(
@@ -130,7 +157,6 @@ export default function App() {
   useEffect(() => {
     if (independent && !independentRun) {
       setIndependent(null);
-      setIndependentLog(null);
     }
   }, [independent, independentRun]);
   const generation = useRef<string>("");
@@ -164,13 +190,64 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [view.search, activeId]);
   const updateView = (update: Partial<ViewState>) => {
-    if (activeId)
+    if (scopeId)
       setViews((previous) => ({
         ...previous,
-        [activeId]: { ...(previous[activeId] ?? emptyView), ...update },
+        [scopeId]: { ...(previous[scopeId] ?? emptyView), ...update },
       }));
   };
 
+  const changeDiagnostic = (update: Partial<DiagnosticPaneState>) => {
+    if (scopeId)
+      setViews((previous) => {
+        const value = previous[scopeId] ?? emptyView;
+        const key = currentTab === "exceptions" ? "exceptions" : "logs";
+        return {
+          ...previous,
+          [scopeId]: { ...value, [key]: { ...value[key], ...update } },
+        };
+      });
+  };
+  const changeDiagnosticView = (update: Partial<DiagnosticView>) => {
+    if (scopeId)
+      setViews((previous) => {
+        const value = previous[scopeId] ?? emptyView;
+        const key = currentTab === "exceptions" ? "exceptions" : "logs";
+        return {
+          ...previous,
+          [scopeId]: {
+            ...value,
+            [key]: { ...value[key], view: { ...value[key].view, ...update } },
+          },
+        };
+      });
+  };
+  const navigation = useRef(0);
+  useEffect(() => {
+    ++navigation.current;
+  }, [scopeId, active?.generation]);
+  const openNetwork = async (sessionId: string, entryId: string) => {
+    const request = ++navigation.current;
+    try {
+      const entry = await api.entryInfo(sessionId, entryId);
+      if (request !== navigation.current) return;
+      setViews((previous) => ({
+        ...previous,
+        [sessionId]: {
+          ...(previous[sessionId] ?? emptyView),
+          tab: "network",
+          selected: entry,
+        },
+      }));
+      setIndependent(null);
+      setActiveId(sessionId);
+    } catch (error) {
+      if (request === navigation.current) reportError(String(error));
+    }
+  };
+  const selectedRun = remote.diagnosticRuns.find(
+    (run) => run.id === diagnostic.selected?.runId,
+  );
   const open = useCallback(async () => {
     if (!desktop || busyRef.current || saveRef.current) return;
     busyRef.current = true;
@@ -195,12 +272,12 @@ export default function App() {
     }
   }, [t, reportError, refresh]);
   const save = useCallback(async () => {
-    if (!activeId || saveRef.current || busyRef.current || !desktop) return;
+    if (!active || saveRef.current || busyRef.current || !desktop) return;
     saveRef.current = true;
     setSaving(true);
     setNotice(null);
     try {
-      if (await api.save(activeId))
+      if (await api.save(active.id))
         setNotice({ text: t("saved"), error: false });
     } catch (error) {
       reportError(String(error));
@@ -208,7 +285,7 @@ export default function App() {
       saveRef.current = false;
       setSaving(false);
     }
-  }, [activeId, t, reportError]);
+  }, [active, t, reportError]);
   async function close(id: string) {
     try {
       await api.close(id);
@@ -346,8 +423,11 @@ export default function App() {
             </div>
             <div className="device-placeholder">
               <span className="offline-dot" />
-              {remote.sessions.filter((session) => session.online).length ||
-                t("noConnectedDevice")}
+              {new Set(
+                remote.sessions
+                  .filter((session) => session.online)
+                  .map((session) => session.deviceId),
+              ).size || t("noConnectedDevice")}
             </div>
             <div className="sidebar-section-title files-title">
               <FileStack size={13} />
@@ -401,6 +481,19 @@ export default function App() {
                             : session.header.platform}{" "}
                           · {session.entryCount.toLocaleString()}{" "}
                           {t("requests")}
+                          {session.deviceId && (
+                            <>
+                              {" "}
+                              ·{" "}
+                              {t(
+                                session.diagnosticsOnline
+                                  ? "diagnosticsLive"
+                                  : session.diagnosticCount
+                                    ? "diagnosticsRetained"
+                                    : "diagnosticsNotConnected",
+                              )}
+                            </>
+                          )}
                         </small>
                       </span>
                     </button>
@@ -447,7 +540,6 @@ export default function App() {
                           className="session-select"
                           onClick={() => {
                             setIndependent(run.id);
-                            setIndependentLog(null);
                           }}
                         >
                           <Activity size={16} />
@@ -478,7 +570,7 @@ export default function App() {
               </>
             )}
             <div className="sidebar-bottom">
-              <span className="development-label">P1 · {t("previewOnly")}</span>
+              <span className="development-label">P2 · {t("previewOnly")}</span>
               <p>{t("connectionReady")}</p>
             </div>
           </nav>
@@ -489,62 +581,61 @@ export default function App() {
             <div className="console-heading">
               <span>
                 <Activity size={14} />
-                {t(
-                  independent
-                    ? "logs"
-                    : active?.deviceId
-                      ? view.tab
-                      : "network",
-                )}
+                {t(independent || active?.deviceId ? currentTab : "network")}
               </span>
               {active && (
                 <span className="muted filename">{active.filename}</span>
               )}
             </div>
-            {independentRun ? (
-              <DiagnosticsTable
-                key={independentRun.id}
-                runs={[independentRun]}
-                exceptions={false}
-                selected={independentLog}
-                onSelect={setIndependentLog}
-                onError={reportError}
-              />
-            ) : active ? (
+            {independentRun || active ? (
               <>
-                {active.deviceId && (
+                <TimeRangeBar
+                  range={view.range}
+                  onChange={(range) => updateView({ range })}
+                />
+                {(independentRun || active?.deviceId) && (
                   <div className="live-tabs segmented">
-                    {(["network", "logs", "exceptions"] as const).map((tab) => (
+                    {(independentRun
+                      ? (["logs", "exceptions"] as const)
+                      : (["network", "logs", "exceptions"] as const)
+                    ).map((tab) => (
                       <button
                         key={tab}
-                        className={view.tab === tab ? "active" : ""}
-                        aria-pressed={view.tab === tab}
+                        className={currentTab === tab ? "active" : ""}
+                        aria-pressed={currentTab === tab}
                         onClick={() => updateView({ tab })}
                       >
                         {t(tab)}
                         {tab === "logs"
-                          ? ` (${active.diagnosticCount ?? 0})`
+                          ? ` (${independentRun?.count ?? active?.diagnosticCount ?? 0})`
                           : ""}
                       </button>
                     ))}
                   </div>
                 )}
-                {view.tab !== "network" && active.deviceId ? (
+                {currentTab !== "network" ? (
                   <DiagnosticsTable
-                    key={active.id}
-                    runs={runs}
-                    exceptions={view.tab === "exceptions"}
-                    selected={view.log}
-                    onSelect={(log) => updateView({ log })}
+                    key={`${scopeId}:${currentTab}`}
+                    runs={independentRun ? [independentRun] : runs}
+                    exceptions={currentTab === "exceptions"}
+                    selected={diagnostic.selected}
+                    selection={diagnostic.selection}
+                    view={diagnostic.view}
+                    range={view.range}
+                    onViewChange={changeDiagnosticView}
+                    onSelect={(selected, selection) =>
+                      changeDiagnostic({ selected, selection })
+                    }
                     onError={reportError}
                   />
-                ) : (
+                ) : active ? (
                   <>
                     <div className="filter-toolbar">
                       <label className="search-field">
                         <Search size={14} />
                         <input
                           ref={searchInput}
+                          data-search
                           aria-label={t("search")}
                           placeholder={t("search")}
                           value={view.search}
@@ -606,6 +697,7 @@ export default function App() {
                           : view.search
                       }
                       filter={view.filter}
+                      range={view.range}
                       selectedId={view.selected?.id}
                       onSelect={(entry) => updateView({ selected: entry })}
                       onCount={setCount}
@@ -628,7 +720,7 @@ export default function App() {
                       </div>
                     )}
                   </>
-                )}
+                ) : null}
               </>
             ) : (
               <div className="welcome">
@@ -654,9 +746,21 @@ export default function App() {
         </Panel>
         <Separator className="panel-separator" />
         <Panel id="detail" defaultSize="34%" minSize={300}>
-          {independent || (active?.deviceId && view.tab !== "network") ? (
+          {currentTab !== "network" ? (
             <DiagnosticDetail
-              selected={independent ? independentLog : view.log}
+              selected={diagnostic.selected}
+              evictionVersion={selectedRun?.evicted}
+              networkSessionId={
+                selectedRun?.networkSessionKey &&
+                sessions.some(
+                  (session) => session.id === selectedRun.networkSessionKey,
+                )
+                  ? selectedRun.networkSessionKey
+                  : null
+              }
+              onNetwork={(sessionId, entryId) =>
+                void openNetwork(sessionId, entryId)
+              }
               theme={theme}
             />
           ) : (
