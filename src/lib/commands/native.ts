@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   Menu,
   Submenu,
@@ -26,7 +27,31 @@ export function commandItem(id: CommandId, snapshot: MenuSnapshot) {
       ? { accelerator: definition.accelerator }
       : {}),
     ...(id in snapshot.checked ? { checked: snapshot.checked[id] } : {}),
-    action: commands.capture(id),
+  };
+}
+// Tauri's per-item JS channels are keyed by menu ID. Dropping an old menu with
+// the same IDs can remove the new channels; use one Rust event bridge instead.
+const contextActions = new Map<string, () => void>();
+let contextSequence = 0;
+export function routeNativeCommand(id: string) {
+  if (Object.prototype.hasOwnProperty.call(definitions, id))
+    commands.dispatch(id as CommandId);
+  else contextActions.get(id)?.();
+}
+export function contextItems(ids: CommandId[], snapshot: MenuSnapshot) {
+  const prefix = `context.${++contextSequence}.`;
+  const items = ids.map((id) => {
+    const { accelerator: _, ...item } = {
+      accelerator: undefined,
+      ...commandItem(id, snapshot),
+    };
+    const nativeId = prefix + id;
+    contextActions.set(nativeId, commands.capture(id));
+    return { ...item, id: nativeId };
+  });
+  return {
+    items,
+    close: () => items.forEach((item) => contextActions.delete(item.id)),
   };
 }
 export function menuItems(snapshot: MenuSnapshot): Items {
@@ -242,8 +267,14 @@ export function useNativeMenu(
   report.current = onError;
   useEffect(() => {
     if (!desktop) return;
+    const subscription = listen<string>("peek-menu-command", (event) =>
+      routeNativeCommand(event.payload),
+    );
     const sync = new MenuSynchronizer(
-      buildMenu,
+      async (snapshot) => {
+        await subscription;
+        return buildMenu(snapshot);
+      },
       () => setReady(true),
       (value) => report.current(value),
     );
@@ -251,6 +282,7 @@ export function useNativeMenu(
     return () => {
       sync.dispose();
       reference.current = null;
+      void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, []);
   useEffect(() => {
@@ -278,15 +310,22 @@ export function useContextMenu(
     menu: Menu | null;
     revision: number;
     disposed: boolean;
+    closeActions: () => void;
   } | null>(null);
   const error = useRef(onError);
   error.current = onError;
   useEffect(() => {
-    const state = { menu: null as Menu | null, revision: 0, disposed: false };
+    const state = {
+      menu: null as Menu | null,
+      revision: 0,
+      disposed: false,
+      closeActions: () => {},
+    };
     reference.current = state;
     return () => {
       state.disposed = true;
       ++state.revision;
+      state.closeActions();
       void state.menu?.close().catch(() => {});
     };
   }, []);
@@ -300,7 +339,9 @@ export function useContextMenu(
     setTimeout(
       () =>
         void (async () => {
+          if (state.disposed || request !== state.revision) return;
           let menu: Menu | null = null;
+          let actions: ReturnType<typeof contextItems> | null = null;
           try {
             const snapshot: MenuSnapshot = {
               language: i18n.language,
@@ -310,18 +351,21 @@ export function useContextMenu(
               checked: {},
               mac: /Mac/.test(navigator.platform),
             };
-            menu = await Menu.new({
-              items: ids.map((id) => commandItem(id, snapshot)),
-            });
+            actions = contextItems(ids, snapshot);
+            menu = await Menu.new({ items: actions.items });
             if (state.disposed || request !== state.revision) {
+              actions.close();
               await menu.close();
               return;
             }
             const previous = state.menu;
+            state.closeActions();
+            state.closeActions = actions.close;
             state.menu = menu;
             await previous?.close();
             await menu.popup();
           } catch (value) {
+            if (menu !== state.menu) actions?.close();
             if (menu !== state.menu) await menu?.close().catch(() => {});
             if (!state.disposed) error.current(String(value));
           }

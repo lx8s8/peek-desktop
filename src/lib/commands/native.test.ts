@@ -3,7 +3,8 @@ import { waitFor } from "@testing-library/react";
 import {
   MenuSynchronizer,
   menuItems,
-  commandItem,
+  contextItems,
+  routeNativeCommand,
   type BuiltMenu,
   type MenuSnapshot,
 } from "./native";
@@ -44,18 +45,26 @@ it("uses stable ids and shared translations and keeps unavailable actions disabl
     en.filter((item) => item.id).map((item) => item.id),
   );
 });
-it("ignores a menu action captured from a previous selection context", () => {
+it("routes rebuilt app menus to current commands and isolates stale context actions", () => {
   const old = vi.fn(),
     current = vi.fn();
   const removeOld = commands.register("session.open", old);
-  const item = commandItem("session.open", snapshot("en"));
+  const context = contextItems(["session.open"], snapshot("en"));
   const removeNew = commands.register("session.open", current);
-  item.action();
+  routeNativeCommand(context.items[0].id);
   expect(old).not.toHaveBeenCalled();
   expect(current).not.toHaveBeenCalled();
-  commandItem("session.open", snapshot("en")).action();
+  // No per-item JS channels can be removed by a previous menu's resource drop.
+  expect(flatten(menuItems(snapshot("en"))).every((item) => !item.action)).toBe(
+    true,
+  );
+  routeNativeCommand("session.open");
   expect(current).toHaveBeenCalledOnce();
+  context.close();
   removeNew();
+  routeNativeCommand(context.items[0].id);
+  expect(old).not.toHaveBeenCalled();
+  routeNativeCommand("unknown-command");
   removeOld();
 });
 it("installs only the latest language and closes superseded and disposed menu references", async () => {

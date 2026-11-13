@@ -7,10 +7,15 @@ pub mod session;
 pub mod storage;
 
 pub fn run() {
+    use tauri::Emitter;
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
+        .on_menu_event(|app, event| {
+            // Stable command IDs outlive menu rebuilds and JS resource disposal.
+            let _ = app.emit_to("main", "peek-menu-command", event.id().as_ref());
+        })
         .invoke_handler(tauri::generate_handler![
             commands::open_peek,
             commands::cancel_import,
