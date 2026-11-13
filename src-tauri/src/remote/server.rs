@@ -168,6 +168,20 @@ impl Remote {
             .raw
             .clone())
     }
+    pub fn entry_info(&self, id: &str, entry: &str) -> Result<crate::protocol::session::EntryRow> {
+        Ok(self
+            .store
+            .lock()
+            .map_err(|_| "internalError")?
+            .sessions
+            .get(id)
+            .ok_or("sessionNotFound")?
+            .current
+            .entry(entry)
+            .ok_or("entryNotFound")?
+            .row
+            .clone())
+    }
     pub fn export(&self, id: &str) -> Result<Arc<Session>> {
         Ok(Arc::new(
             self.store
@@ -657,14 +671,14 @@ impl Remote {
                     #[serde(borrow)]
                     entry: &'a RawValue,
                 }
-                if let Ok(frame) = serde_json::from_str::<Frame>(text) {
-                    if let Ok(entry) = StoredEntry::parse(frame.entry.get()) {
-                        let mut store = self.store.lock().map_err(|_| "internalError")?;
-                        if store.upsert(key, connection, entry).is_err() {
-                            if let Some(s) = store.active_mut(key, connection) {
-                                s.staging.as_mut().unwrap_or(&mut s.current).skipped += 1;
-                            }
-                        }
+                if let Ok(frame) = serde_json::from_str::<Frame>(text)
+                    && let Ok(entry) = StoredEntry::parse(frame.entry.get())
+                {
+                    let mut store = self.store.lock().map_err(|_| "internalError")?;
+                    if store.upsert(key, connection, entry).is_err()
+                        && let Some(s) = store.active_mut(key, connection)
+                    {
+                        s.staging.as_mut().unwrap_or(&mut s.current).skipped += 1;
                     }
                 }
             }
@@ -758,10 +772,10 @@ impl Remote {
     fn body_response(&self, connection: &str, value: &Value) -> Result<()> {
         let request_id = value["requestId"].as_str().unwrap_or("");
         let mut store = self.store.lock().map_err(|_| "internalError")?;
-        if !store
+        if store
             .pending
             .get(request_id)
-            .is_some_and(|p| p.connection_id == connection)
+            .is_none_or(|p| p.connection_id != connection)
         {
             return Ok(());
         }

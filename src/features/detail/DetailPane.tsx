@@ -8,20 +8,58 @@ import {
   TabsContent,
 } from "../../components/ui/tabs";
 import { api } from "../../lib/ipc/client";
+import { Button } from "../../components/ui/button";
 import type { BodyView, EntryRow } from "../../lib/ipc/types";
 import { formatBytes } from "../../lib/preferences";
 import { JsonViewer } from "./JsonViewer";
 
 export function DetailPane({
   sessionId,
-  entry,
+  entry: selected,
+  version,
   theme,
 }: {
   sessionId: string | null;
   entry: EntryRow | null;
   theme: string;
+  version?: number;
 }) {
   const { t } = useTranslation();
+  const [liveEntry, setLiveEntry] = useState<{
+    sessionId: string;
+    row: EntryRow;
+  } | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const entry =
+    sessionId?.startsWith("live-") &&
+    liveEntry?.sessionId === sessionId &&
+    liveEntry?.row.id === selected?.id
+      ? liveEntry.row
+      : selected;
+  useEffect(() => setMissing(false), [sessionId, selected?.id]);
+  useEffect(() => {
+    let active = true;
+    if (sessionId?.startsWith("live-") && selected)
+      void api
+        .entryInfo(sessionId, selected.id)
+        .then((value) => {
+          if (active) {
+            setLiveEntry({ sessionId, row: value });
+            setMissing(false);
+          }
+        })
+        .catch((error) => {
+          if (active) {
+            setError(String(error));
+            if (["entryNotFound", "sessionNotFound"].includes(String(error)))
+              setMissing(true);
+          }
+        });
+    return () => {
+      active = false;
+    };
+  }, [sessionId, selected?.id, version, retry]);
   const [tab, setTab] = useState("overview");
   const [metadata, setMetadata] = useState("");
   const [body, setBody] = useState<BodyView | null>(null);
@@ -42,7 +80,7 @@ export function DetailPane({
     return () => {
       active = false;
     };
-  }, [sessionId, entry?.id]);
+  }, [sessionId, entry?.id, entry?.contentRevision, retry]);
   useEffect(() => {
     let active = true;
     setBody(null);
@@ -59,7 +97,13 @@ export function DetailPane({
     return () => {
       active = false;
     };
-  }, [sessionId, entry?.id, tab]);
+  }, [sessionId, entry?.id, entry?.contentRevision, tab, retry]);
+  if (missing)
+    return (
+      <aside className="detail-empty" role="status">
+        {t("entryNotFound")}
+      </aside>
+    );
   if (!entry)
     return (
       <aside className="detail-empty">
@@ -114,6 +158,9 @@ export function DetailPane({
         {error && (
           <div className="inline-note warning" role="alert">
             {t("unexpected", { error })}
+            <Button onClick={() => setRetry((value) => value + 1)}>
+              {t("retry")}
+            </Button>
           </div>
         )}
         <TabsContent value="overview" className="tab-content">

@@ -14,6 +14,8 @@ import { formatBytes } from "../../lib/preferences";
 
 export function RequestTable({
   sessionId,
+  version,
+  live,
   search,
   filter,
   selectedId,
@@ -22,6 +24,8 @@ export function RequestTable({
   onError,
 }: {
   sessionId: string;
+  version?: number;
+  live?: boolean;
   search: string;
   filter: Filter;
   selectedId?: string;
@@ -90,7 +94,7 @@ export function RequestTable({
     return () => {
       active = false;
     };
-  }, [sessionId, search, filter, offset, retry, onCount, onError]);
+  }, [sessionId, search, filter, offset, retry, version, onCount, onError]);
 
   const columns = useMemo<ColumnDef<EntryRow>[]>(
     () => [
@@ -244,7 +248,9 @@ export function RequestTable({
                 {t(
                   search || filter !== "all"
                     ? "noMatchesHint"
-                    : "emptySessionHint",
+                    : live
+                      ? "liveEmptyHint"
+                      : "emptySessionHint",
                 )}
               </p>
             )}

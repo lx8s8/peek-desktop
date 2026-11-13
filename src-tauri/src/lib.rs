@@ -18,6 +18,18 @@ pub fn run() {
             commands::get_entry_metadata,
             commands::get_body,
             commands::save_peek,
+            commands::remote_snapshot,
+            commands::start_listener,
+            commands::stop_listener,
+            commands::issue_pairing_code,
+            commands::revoke_device,
+            commands::subscribe_remote,
+            commands::acknowledge_remote,
+            commands::unsubscribe_remote,
+            commands::get_entry_info,
+            commands::query_diagnostics,
+            commands::get_diagnostic,
+            commands::close_diagnostic,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Peek Desktop");

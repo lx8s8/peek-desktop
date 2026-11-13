@@ -26,7 +26,12 @@ pub struct StoredEntry {
 impl StoredEntry {
     pub fn parse(raw: &str) -> Result<Self> {
         let value: Value = serde_json::from_str(raw).map_err(|_| "invalidEntry")?;
-        let row = parse_entry(&value)?;
+        let mut row = parse_entry(&value)?;
+        use sha2::{Digest, Sha256};
+        row.content_revision = Sha256::digest(raw.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
         let search = format!(
             "{} {} {} {}",
             row.method,

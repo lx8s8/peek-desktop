@@ -56,6 +56,7 @@ impl Header {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EntryRow {
+    pub content_revision: String,
     pub id: String,
     pub source: String,
     pub method: String,
@@ -131,6 +132,7 @@ pub fn parse_entry(value: &Value) -> Result<EntryRow> {
         }
     }
     Ok(EntryRow {
+        content_revision: String::new(),
         id: id.into(),
         source: required_string(value, "source")?.into(),
         method: method.into(),

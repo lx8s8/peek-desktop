@@ -1,3 +1,4 @@
+import { remoteZh, remoteEn } from "./remote";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { readPreference } from "../preferences";
@@ -191,7 +192,10 @@ const en: Record<keyof typeof zh, string> = {
 };
 
 void i18n.use(initReactI18next).init({
-  resources: { "zh-CN": { translation: zh }, en: { translation: en } },
+  resources: {
+    "zh-CN": { translation: { ...zh, ...remoteZh } },
+    en: { translation: { ...en, ...remoteEn } },
+  },
   lng: readPreference("language", "zh-CN") === "en" ? "en" : "zh-CN",
   fallbackLng: "zh-CN",
   interpolation: { escapeValue: false },

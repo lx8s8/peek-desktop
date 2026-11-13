@@ -11,7 +11,7 @@ import { api } from "../../lib/ipc/client";
 import type { BodyView, EntryRow } from "../../lib/ipc/types";
 
 vi.mock("../../lib/ipc/client", () => ({
-  api: { metadata: vi.fn(), body: vi.fn() },
+  api: { metadata: vi.fn(), body: vi.fn(), entryInfo: vi.fn() },
 }));
 vi.mock("./JsonViewer", () => ({
   JsonViewer: ({ text }: { text: string }) => <pre>{text}</pre>,
@@ -91,4 +91,39 @@ it("does not write old metadata into a different session with the same entry id"
   await screen.findByText("new metadata");
   await act(async () => resolveOld("stale metadata"));
   expect(screen.queryByText("stale metadata")).toBeNull();
+});
+
+it("refreshes a selected live entry only when its content changes and clears evicted details", async () => {
+  vi.mocked(api.metadata).mockResolvedValue("live metadata");
+  vi.mocked(api.entryInfo).mockResolvedValue({
+    ...entry,
+    contentRevision: "one",
+  });
+  const { rerender } = render(
+    <DetailPane sessionId="live-one" entry={entry} version={1} theme="light" />,
+  );
+  await screen.findByText("live metadata");
+  await waitFor(() => expect(api.entryInfo).toHaveBeenCalledTimes(1));
+  const reads = vi.mocked(api.metadata).mock.calls.length;
+  rerender(
+    <DetailPane sessionId="live-one" entry={entry} version={2} theme="light" />,
+  );
+  await waitFor(() => expect(api.entryInfo).toHaveBeenCalledTimes(2));
+  expect(api.metadata).toHaveBeenCalledTimes(reads);
+  vi.mocked(api.entryInfo).mockResolvedValue({
+    ...entry,
+    status: 500,
+    contentRevision: "two",
+  });
+  rerender(
+    <DetailPane sessionId="live-one" entry={entry} version={3} theme="light" />,
+  );
+  await screen.findByText("500");
+  await waitFor(() => expect(api.metadata).toHaveBeenCalledTimes(reads + 1));
+  vi.mocked(api.entryInfo).mockRejectedValue("entryNotFound");
+  rerender(
+    <DetailPane sessionId="live-one" entry={entry} version={4} theme="light" />,
+  );
+  await screen.findByText("记录不存在。");
+  expect(screen.queryByText("live metadata")).toBeNull();
 });

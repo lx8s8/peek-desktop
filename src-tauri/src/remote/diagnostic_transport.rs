@@ -66,10 +66,10 @@ impl Remote {
                     if text.len() > 16 * 1024 {
                         return Err("helloTooLarge".into());
                     }
-                    if let Ok(value) = serde_json::from_str::<Value>(&text) {
-                        if value["type"] == "diagnostics.hello" {
-                            break value;
-                        }
+                    if let Ok(value) = serde_json::from_str::<Value>(&text)
+                        && value["type"] == "diagnostics.hello"
+                    {
+                        break value;
                     }
                 }
                 Some(Ok(Message::Ping(bytes))) => {
@@ -180,11 +180,11 @@ impl Remote {
                 }
             }Ok(())
         }.await;
-        if let Ok(mut store) = self.diagnostics.lock() {
-            if let Ok(run) = store.active(&id, &connection) {
-                run.online = false;
-                run.version += 1;
-            }
+        if let Ok(mut store) = self.diagnostics.lock()
+            && let Ok(run) = store.active(&id, &connection)
+        {
+            run.online = false;
+            run.version += 1;
         }
         self.changed();
         let _ = timeout(Duration::from_secs(1), socket.close(None)).await;

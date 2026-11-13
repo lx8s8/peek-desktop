@@ -134,11 +134,11 @@ impl LiveStore {
         }
     }
     pub fn synced(&mut self, key: &str, connection_id: &str) {
-        if let Some(s) = self.active_mut(key, connection_id) {
-            if let Some(staging) = s.staging.take() {
-                s.current = staging;
-                s.version += 1;
-            }
+        if let Some(s) = self.active_mut(key, connection_id)
+            && let Some(staging) = s.staging.take()
+        {
+            s.current = staging;
+            s.version += 1;
         }
     }
     pub fn clear(&mut self, key: &str, connection_id: &str) {

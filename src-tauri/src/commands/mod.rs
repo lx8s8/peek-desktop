@@ -1,6 +1,7 @@
 use crate::{
     body::{self, BodyView},
     protocol::session::Result,
+    remote::server::Remote,
     session::{Library, QueryPage, SessionSummary},
     storage,
 };
@@ -18,6 +19,8 @@ use tauri_plugin_dialog::DialogExt;
 
 #[derive(Default)]
 pub struct AppState {
+    remote: Arc<Remote>,
+    subscriptions: Mutex<std::collections::HashMap<String, Subscription>>,
     library: Arc<Mutex<Library>>,
     import: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 }
@@ -101,16 +104,21 @@ pub fn cancel_import(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionSummary>> {
-    Ok(state
+pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionSummary>> {
+    let mut sessions = state
         .library
         .lock()
         .map_err(|_| "internalError")?
-        .summaries())
+        .summaries();
+    sessions.extend(state.remote.summaries()?);
+    Ok(sessions)
 }
 
 #[tauri::command]
 pub fn close_session(state: State<'_, AppState>, session_id: String) -> Result<()> {
+    if session_id.starts_with("live-") {
+        return state.remote.close(&session_id);
+    }
     state
         .library
         .lock()
@@ -130,6 +138,14 @@ pub async fn query_entries(
     limit: usize,
     revision: u32,
 ) -> Result<QueryPage> {
+    if session_id.starts_with("live-") {
+        let remote = state.remote.clone();
+        return tauri::async_runtime::spawn_blocking(move || {
+            remote.query(&session_id, &search, &filter, offset, limit, revision)
+        })
+        .await
+        .map_err(|_| "internalError")?;
+    }
     let session = state
         .library
         .lock()
@@ -148,14 +164,21 @@ pub async fn get_entry_metadata(
     session_id: String,
     entry_id: String,
 ) -> Result<String> {
-    let session = state
-        .library
-        .lock()
-        .map_err(|_| "internalError")?
-        .get(&session_id)?;
+    let raw = if session_id.starts_with("live-") {
+        state.remote.entry(&session_id, &entry_id)?
+    } else {
+        state
+            .library
+            .lock()
+            .map_err(|_| "internalError")?
+            .get(&session_id)?
+            .entry(&entry_id)
+            .ok_or("entryNotFound")?
+            .raw
+            .clone()
+    };
     tauri::async_runtime::spawn_blocking(move || {
-        let entry = session.entry(&entry_id).ok_or("entryNotFound")?;
-        let mut value: Value = serde_json::from_str(&entry.raw).map_err(|e| e.to_string())?;
+        let mut value: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
         for side in ["request", "response"] {
             if let Some(object) = value[side].as_object_mut() {
                 object.remove("body");
@@ -177,6 +200,9 @@ pub async fn get_body(
     if !matches!(side.as_str(), "request" | "response") {
         return Err("invalidSide".into());
     }
+    if session_id.starts_with("live-") {
+        return state.remote.body(session_id, entry_id, side).await;
+    }
     let session = state
         .library
         .lock()
@@ -197,11 +223,15 @@ pub async fn save_peek(
     state: State<'_, AppState>,
     session_id: String,
 ) -> Result<bool> {
-    let session = state
-        .library
-        .lock()
-        .map_err(|_| "internalError")?
-        .get(&session_id)?;
+    let session = if session_id.starts_with("live-") {
+        state.remote.export(&session_id)?
+    } else {
+        state
+            .library
+            .lock()
+            .map_err(|_| "internalError")?
+            .get(&session_id)?
+    };
     tauri::async_runtime::spawn_blocking(move || {
         let Some(path) = app
             .dialog()
@@ -221,4 +251,182 @@ pub async fn save_peek(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+struct Subscription {
+    cancel: tokio_util::sync::CancellationToken,
+    ack: tokio::sync::mpsc::Sender<()>,
+    awaiting: Arc<std::sync::atomic::AtomicU64>,
+}
+#[derive(Clone, Serialize)]
+pub struct RemoteUpdate {
+    revision: u64,
+}
+
+#[tauri::command]
+pub async fn remote_snapshot(
+    state: State<'_, AppState>,
+) -> Result<crate::remote::server::RemoteSnapshot> {
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || remote.snapshot())
+        .await
+        .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn start_listener(
+    state: State<'_, AppState>,
+    host: String,
+    port: u16,
+    advertise: bool,
+) -> Result<crate::remote::server::RemoteSnapshot> {
+    state.remote.start(host, port, advertise).await
+}
+#[tauri::command]
+pub async fn stop_listener(state: State<'_, AppState>) -> Result<()> {
+    state.remote.stop().await
+}
+#[tauri::command]
+pub async fn issue_pairing_code(
+    state: State<'_, AppState>,
+    diagnostics: bool,
+) -> Result<crate::remote::server::RemoteSnapshot> {
+    state.remote.issue_code(diagnostics).await
+}
+#[tauri::command]
+pub async fn revoke_device(
+    state: State<'_, AppState>,
+    device_id: String,
+    diagnostics: Option<bool>,
+) -> Result<()> {
+    state.remote.revoke(device_id, diagnostics).await
+}
+
+#[tauri::command]
+pub fn subscribe_remote(
+    state: State<'_, AppState>,
+    subscription_id: String,
+    updates: Channel<RemoteUpdate>,
+) -> Result<()> {
+    if uuid::Uuid::parse_str(&subscription_id).is_err() {
+        return Err("invalidSubscription".into());
+    }
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let (ack, mut acked) = tokio::sync::mpsc::channel(1);
+    let awaiting = Arc::new(std::sync::atomic::AtomicU64::new(u64::MAX));
+    {
+        let mut subscriptions = state.subscriptions.lock().map_err(|_| "internalError")?;
+        for (_, old) in subscriptions.drain() {
+            old.cancel.cancel();
+        }
+        subscriptions.insert(
+            subscription_id,
+            Subscription {
+                cancel: cancel.clone(),
+                ack,
+                awaiting: awaiting.clone(),
+            },
+        );
+    }
+    let mut changes = state.remote.changes.subscribe();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let revision = *changes.borrow_and_update();
+            awaiting.store(revision, Ordering::Release);
+            if updates.send(RemoteUpdate { revision }).is_err() {
+                break;
+            }
+            tokio::select! {_=cancel.cancelled()=>break,value=acked.recv()=>if value.is_none(){break;}}
+            tokio::select! {_=cancel.cancelled()=>break,result=changes.changed()=>if result.is_err(){break;}}
+            tokio::select! {_=cancel.cancelled()=>break,_=tokio::time::sleep(Duration::from_millis(50))=>{}}
+        }
+    });
+    Ok(())
+}
+#[tauri::command]
+pub fn acknowledge_remote(
+    state: State<'_, AppState>,
+    subscription_id: String,
+    revision: u64,
+) -> Result<()> {
+    if let Some(subscription) = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "internalError")?
+        .get(&subscription_id)
+        && subscription
+            .awaiting
+            .compare_exchange(revision, u64::MAX, Ordering::AcqRel, Ordering::Relaxed)
+            .is_ok()
+    {
+        let _ = subscription.ack.try_send(());
+    }
+    Ok(())
+}
+#[tauri::command]
+pub fn unsubscribe_remote(state: State<'_, AppState>, subscription_id: String) -> Result<()> {
+    if let Some(subscription) = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "internalError")?
+        .remove(&subscription_id)
+    {
+        subscription.cancel.cancel();
+    }
+    Ok(())
+}
+#[tauri::command]
+pub async fn get_entry_info(
+    state: State<'_, AppState>,
+    session_id: String,
+    entry_id: String,
+) -> Result<crate::protocol::session::EntryRow> {
+    if session_id.starts_with("live-") {
+        return state.remote.entry_info(&session_id, &entry_id);
+    }
+    Ok(state
+        .library
+        .lock()
+        .map_err(|_| "internalError")?
+        .get(&session_id)?
+        .entry(&entry_id)
+        .ok_or("entryNotFound")?
+        .row
+        .clone())
+}
+#[tauri::command]
+// IPC keeps each query option explicit, matching the network query command.
+#[allow(clippy::too_many_arguments)]
+pub async fn query_diagnostics(
+    state: State<'_, AppState>,
+    run_id: String,
+    search: String,
+    level: String,
+    exceptions: bool,
+    offset: usize,
+    limit: usize,
+    revision: u32,
+) -> Result<crate::remote::diagnostics::DiagnosticPage> {
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        remote.diagnostic_query(
+            &run_id, &search, &level, exceptions, offset, limit, revision,
+        )
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub fn get_diagnostic(
+    state: State<'_, AppState>,
+    run_id: String,
+    event_id: String,
+) -> Result<String> {
+    Ok(state
+        .remote
+        .diagnostic_detail(&run_id, &event_id)?
+        .to_string())
+}
+#[tauri::command]
+pub fn close_diagnostic(state: State<'_, AppState>, run_id: String) -> Result<()> {
+    state.remote.close_diagnostic(&run_id)
 }

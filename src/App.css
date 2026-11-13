@@ -878,3 +878,250 @@ h2 {
     animation: none;
   }
 }
+
+select {
+  font: inherit;
+  color: inherit;
+}
+.is-live {
+  color: var(--green);
+}
+.live-tabs {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #0006;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.connection-dialog {
+  width: min(600px, 100%);
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 80px #0004;
+}
+.connection-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.connection-dialog p {
+  line-height: 1.8;
+}
+.connection-dialog h3 {
+  font-size: 12px;
+  margin: 18px 0 8px;
+}
+.connection-fields {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px;
+  margin: 18px 0 12px;
+}
+.connection-fields label {
+  display: grid;
+  gap: 7px;
+}
+.connection-fields input,
+.connection-fields select,
+.diagnostic-filters input,
+.diagnostic-filters select {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: var(--bg);
+  min-width: 0;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+}
+.listener-addresses {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-top: 12px;
+}
+.listener-addresses strong {
+  color: var(--green);
+}
+.listener-addresses small {
+  color: var(--muted);
+}
+.pairing-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 16px 0;
+  border-block: 1px solid var(--border);
+}
+.pairing-block > label {
+  width: 100%;
+  margin: 0;
+}
+.pairing-code {
+  font:
+    650 30px ui-monospace,
+    monospace;
+  letter-spacing: 6px;
+  color: var(--accent);
+  margin-left: 10px;
+}
+.paired-devices > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.paired-devices > div > span {
+  flex: 1;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.paired-devices small,
+.small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.diagnostics-console,
+.diagnostic-table {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.diagnostic-filters {
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.diagnostic-filters > select {
+  width: 100%;
+}
+.diagnostic-filters > div {
+  display: flex;
+  gap: 8px;
+}
+.diagnostic-filters input {
+  flex: 1;
+}
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: 74px 66px minmax(80px, 1fr) 90px;
+  text-align: left;
+  align-items: center;
+}
+.diagnostic-grid > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 7px;
+}
+button.diagnostic-grid {
+  height: 36px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+button.diagnostic-grid:hover {
+  background: var(--subtle);
+}
+button.diagnostic-grid.selected {
+  background: var(--accent-soft);
+}
+.log-level {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.level-warning {
+  color: var(--warning);
+}
+.level-error,
+.level-critical {
+  color: var(--red);
+}
+.level-info {
+  color: var(--green);
+}
+.diagnostic-stats {
+  padding: 8px 12px;
+  display: grid;
+  gap: 4px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+}
+.diagnostic-stats details {
+  max-height: 110px;
+  overflow: auto;
+}
+.diagnostic-stats code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 3px 0;
+}
+.diagnostic-empty {
+  flex: 1;
+}
+.diagnostic-detail {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--panel);
+}
+.diagnostic-detail .detail-heading {
+  border-bottom: 1px solid var(--border);
+}
+.log-message,
+.stack-section pre {
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    11px/1.8 ui-monospace,
+    monospace;
+}
+.stack-section {
+  border-block: 1px solid var(--border);
+}
+.stack-section .section-label {
+  justify-content: space-between;
+}
+.stack-section pre {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre;
+}
+.stack-section > p {
+  padding: 0 12px;
+  color: var(--muted);
+}
+.diagnostic-json {
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+}
