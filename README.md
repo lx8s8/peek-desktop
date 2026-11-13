@@ -66,7 +66,7 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml --test sdk_interop -- -
 pnpm tauri build --debug --bundles app
 ```
 
-2026 年 11 月 13 日本机 macOS 已通过前端检查/测试/构建、Rust 测试/格式/Clippy 和原生 `.app` 编译；实际窗口验证了官方样例导入、过滤、Headers/JSON、主题语言、保存回读与十万条合成会话。P1 另通过真实官方 Dart 客户端与 Rust 的跨语言测试、macOS 原生配对、网络与日志展示、诊断授权撤销/恢复。Windows 构建、真实移动设备互操作和完整性能矩阵尚未验收。
+2026 年 11 月 13 日本机 macOS 已通过前端检查/测试/构建、Rust 测试/格式/Clippy 和原生 `.app` 编译；实际窗口验证了官方样例导入、过滤、Headers/JSON、主题语言、保存回读与十万条合成会话。P1 另通过真实官方 Dart 客户端与 Rust 的跨语言测试、macOS 原生配对、Keychain 授权后既有凭据免码恢复、官方 Bonjour 发现、多桌面身份切换、网络与日志展示及诊断授权撤销/恢复。Windows 构建、真实移动设备互操作和完整性能矩阵尚未验收。
 
 JSON 编辑器约 1 MiB 的懒加载 chunk 仍会触发 Vite 大包提示；它不随空工作区加载，后续需继续评估组件拆分和实际 WebView 开销。
 
