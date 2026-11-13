@@ -29,6 +29,7 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  writeClipboard: (text: string) => invoke<void>("write_clipboard", { text }),
   review: (runId: string, query: ReviewQuery) =>
     invoke<ReviewPage>("review_diagnostics", { runId, query }),
   timeline: (scope: Scope, query: ReviewQuery) =>

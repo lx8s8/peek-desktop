@@ -1,3 +1,4 @@
+import { writeClipboard } from "../../lib/clipboard";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -42,7 +43,7 @@ export function JsonViewer({
   }, [text, json]);
   async function copy() {
     try {
-      await navigator.clipboard.writeText(text);
+      await writeClipboard(text);
       setCopyState("copied");
     } catch {
       setCopyState("copyFailed");

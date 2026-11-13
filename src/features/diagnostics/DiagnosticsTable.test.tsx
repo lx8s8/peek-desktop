@@ -20,6 +20,7 @@ vi.mock("../../lib/ipc/client", () => ({
   api: {
     review: vi.fn(),
     copyDiagnostics: vi.fn(),
+    writeClipboard: vi.fn(async () => {}),
     exportDiagnostics: vi.fn(),
   },
 }));

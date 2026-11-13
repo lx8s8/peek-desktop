@@ -9,6 +9,7 @@ pub mod storage;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::open_peek,
@@ -35,6 +36,7 @@ pub fn run() {
             commands::query_timeline,
             commands::copy_diagnostics,
             commands::export_diagnostics,
+            commands::write_clipboard,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Peek Desktop");

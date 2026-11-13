@@ -1,3 +1,7 @@
+import { commands } from "../../lib/commands/dispatcher";
+import { useCommand } from "../../lib/commands/react";
+import { useContextMenu } from "../../lib/commands/native";
+import { useDiagnosticActions } from "../diagnostics/actions";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -42,6 +46,24 @@ export function TimelineTable({
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [notice, setNotice] = useState("");
+  const selectedDiagnostics =
+    selected?.runId && selected.eventId
+      ? [{ runId: selected.runId, eventId: selected.eventId }]
+      : [];
+  useDiagnosticActions(selectedDiagnostics, setNotice, onError);
+  useCommand("view.follow", () => onViewChange({ following: !view.following }));
+  useCommand("edit.clearSelection", () => onSelect(null), !!selected);
+  const contextMenu = useContextMenu(
+    [
+      "edit.copyMessage",
+      "edit.copyStack",
+      "edit.copyRaw",
+      "diagnostics.export",
+      "edit.clearSelection",
+    ],
+    onError,
+  );
   const scroll = useRef<HTMLDivElement>(null),
     grid = useRef<HTMLDivElement>(null);
   const revision = useRef(0),
@@ -160,12 +182,17 @@ export function TimelineTable({
           />
           <Button
             aria-pressed={view.following}
-            onClick={() => onViewChange({ following: !view.following })}
+            onClick={() => commands.dispatch("view.follow")}
           >
             {t(view.following ? "pauseFollow" : "followLatest")}
           </Button>
         </div>
       </div>
+      {notice && (
+        <div role="status" className="inline-note">
+          {notice}
+        </div>
+      )}
       <div className="inline-note">
         {t("wallClockHint")}
         {networkOnly && <> {t("timelineNetworkOnly")}</>}
@@ -176,6 +203,7 @@ export function TimelineTable({
         aria-label={t("timeline")}
         aria-rowcount={page.total + 1}
         ref={grid}
+        onContextMenu={contextMenu}
         tabIndex={0}
         onKeyDown={(event) => {
           if (event.key === "ArrowUp" || event.key === "ArrowDown") {
@@ -195,7 +223,7 @@ export function TimelineTable({
             );
           } else if (event.key === "Escape" || event.key === "Delete") {
             event.preventDefault();
-            onSelect(null);
+            commands.dispatch("edit.clearSelection");
           }
         }}
       >
@@ -251,6 +279,9 @@ export function TimelineTable({
                     aria-selected={row.id === selected?.id}
                     className={`table-row timeline-grid ${row.id === selected?.id ? "selected" : ""}`}
                     style={{ transform: `translateY(${item.start}px)` }}
+                    onContextMenu={() => {
+                      if (row.id !== selected?.id) onSelect(row);
+                    }}
                     onClick={() => {
                       ++navigation.current;
                       onViewChange({ following: false });

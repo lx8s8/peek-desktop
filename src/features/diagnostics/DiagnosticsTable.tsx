@@ -1,3 +1,7 @@
+import { commands } from "../../lib/commands/dispatcher";
+import { useCommand } from "../../lib/commands/react";
+import { useContextMenu } from "../../lib/commands/native";
+import { useDiagnosticActions } from "./actions";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -174,23 +178,39 @@ export function DiagnosticsTable({
       onViewChange({ following: false });
     }
   }
-  async function copy(kind: "message" | "raw" = "message") {
-    try {
-      await navigator.clipboard.writeText(
-        await api.copyDiagnostics(selection, kind),
-      );
-      setNotice(t("copied"));
-    } catch (error) {
-      onError(String(error));
-    }
-  }
-  async function exportSelection() {
-    try {
-      if (await api.exportDiagnostics(selection)) setNotice(t("exportSaved"));
-    } catch (error) {
-      onError(String(error));
-    }
-  }
+  useDiagnosticActions(selection, setNotice, onError, !grouped);
+  useCommand(
+    "view.follow",
+    () => {
+      pauseMark.current = run?.received ?? 0;
+      onViewChange({ following: !view.following });
+    },
+    !!run && !grouped,
+  );
+  useCommand(
+    "edit.selectWindow",
+    selectWindow,
+    !!run && !grouped && page.rows.length > 0,
+  );
+  useCommand(
+    "edit.clearSelection",
+    () => {
+      onSelect(null, []);
+      setFocusedGroup(null);
+    },
+    selection.length > 0 || !!focusedGroup,
+  );
+  const contextMenu = useContextMenu(
+    [
+      "edit.copyMessage",
+      "edit.copyStack",
+      "edit.copyRaw",
+      "diagnostics.export",
+      "edit.selectWindow",
+      "edit.clearSelection",
+    ],
+    onError,
+  );
   function select(row: DiagnosticRow, index: number, toggle = false) {
     const item = { runId: run!.id, eventId: row.eventId };
     anchor.current = index;
@@ -386,10 +406,7 @@ export function DiagnosticsTable({
           {!grouped && (
             <Button
               aria-pressed={view.following}
-              onClick={() => {
-                pauseMark.current = run.received;
-                onViewChange({ following: !view.following });
-              }}
+              onClick={() => commands.dispatch("view.follow")}
             >
               {t(view.following ? "pauseFollow" : "followLatest")}
               {!view.following && run.received > pauseMark.current
@@ -400,16 +417,22 @@ export function DiagnosticsTable({
         </div>
         {!grouped && (
           <div className="review-actions">
-            <Button onClick={() => void copy()} disabled={!selection.length}>
+            <Button
+              onClick={() => commands.dispatch("edit.copyMessage")}
+              disabled={!selection.length}
+            >
               {t("copyMessage")}
             </Button>
             <Button
-              onClick={() => void exportSelection()}
+              onClick={() => commands.dispatch("diagnostics.export")}
               disabled={!desktop || !selection.length}
             >
               {t("exportSelected")}
             </Button>
-            <Button onClick={selectWindow} disabled={!page.rows.length}>
+            <Button
+              onClick={() => commands.dispatch("edit.selectWindow")}
+              disabled={!page.rows.length}
+            >
               {t("selectWindow")}
             </Button>
             <span className="muted">
@@ -431,6 +454,7 @@ export function DiagnosticsTable({
         aria-multiselectable={!grouped}
         aria-rowcount={page.total + 1}
         tabIndex={0}
+        onContextMenu={contextMenu}
         onKeyDown={(event) => {
           if (
             (event.metaKey || event.ctrlKey) &&
@@ -438,7 +462,7 @@ export function DiagnosticsTable({
             !grouped
           ) {
             event.preventDefault();
-            selectWindow();
+            commands.dispatch("edit.selectWindow");
           } else if (
             (event.metaKey || event.ctrlKey) &&
             event.key.toLowerCase() === "c" &&
@@ -446,7 +470,7 @@ export function DiagnosticsTable({
             selection.length
           ) {
             event.preventDefault();
-            void copy();
+            commands.dispatch("edit.copyMessage");
           } else if (
             event.key === "Escape" ||
             event.key === "Delete" ||
@@ -589,6 +613,10 @@ export function DiagnosticsTable({
                     aria-selected={selectedIds.has(row.eventId)}
                     className={`table-row diagnostic-grid ${selectedIds.has(row.eventId) ? "selected" : ""}`}
                     style={{ transform: `translateY(${item.start}px)` }}
+                    onContextMenu={() => {
+                      if (!selectedIds.has(row.eventId))
+                        select(row, item.index);
+                    }}
                     onClick={(event) => {
                       ++navigation.current;
                       pause();

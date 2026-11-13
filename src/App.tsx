@@ -1,3 +1,10 @@
+import {
+  commands,
+  commandForKey,
+  type CommandId,
+} from "./lib/commands/dispatcher";
+import { useCommand } from "./lib/commands/react";
+import { useNativeMenu, useContextMenu } from "./lib/commands/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -336,26 +343,99 @@ export default function App() {
       reportError(String(error));
     }
   }
+  useCommand("session.open", open, desktop && !busy && !saving);
+  useCommand("session.save", save, desktop && !!active && !busy && !saving);
+  useCommand(
+    "session.close",
+    async () => {
+      if (independentRun) {
+        await api.closeDiagnostic(independentRun.id);
+        await refresh();
+        setIndependent(null);
+      } else if (active) await close(active.id);
+    },
+    !!(active || independentRun) &&
+      !(active?.online || independentRun?.online) &&
+      !busy &&
+      !saving,
+  );
+  useCommand(
+    "edit.find",
+    () => {
+      const input = document.querySelector<HTMLInputElement>(
+        ".console [data-search]",
+      );
+      input?.focus();
+      input?.select();
+    },
+    !!scopeId,
+  );
+  useCommand("view.network", () => updateView({ tab: "network" }), !!active);
+  useCommand(
+    "view.logs",
+    () => updateView({ tab: "logs" }),
+    !!(active?.deviceId || independentRun),
+  );
+  useCommand(
+    "view.exceptions",
+    () => updateView({ tab: "exceptions" }),
+    !!(active?.deviceId || independentRun),
+  );
+  useCommand("view.timeline", () => updateView({ tab: "timeline" }), !!scopeId);
+  useCommand("view.theme", () =>
+    setTheme((value) => (value === "dark" ? "light" : "dark")),
+  );
+  useCommand("view.language", () =>
+    i18n.changeLanguage(i18n.language === "en" ? "zh-CN" : "en"),
+  );
+  useCommand("language.zh-CN", () => i18n.changeLanguage("zh-CN"));
+  useCommand("language.en", () => i18n.changeLanguage("en"));
+  useCommand("help.shortcuts", () =>
+    setNotice({ text: t("menuShortcutHint"), error: false }),
+  );
+  useCommand("help.retention", () =>
+    setNotice({ text: t("menuRetentionHint"), error: false }),
+  );
   useEffect(() => {
+    commands.onError = reportError;
+    return () => {
+      commands.onError = () => {};
+    };
+  }, [reportError]);
+  const nativeReady = useNativeMenu(
+    i18n.language,
+    {
+      "view.network": !!scopeId && currentTab === "network",
+      "view.logs": !!scopeId && currentTab === "logs",
+      "view.exceptions": !!scopeId && currentTab === "exceptions",
+      "view.timeline": !!scopeId && currentTab === "timeline",
+      "view.theme": theme === "dark",
+      "language.zh-CN": i18n.language !== "en",
+      "language.en": i18n.language === "en",
+      "view.follow":
+        !!scopeId &&
+        (currentTab === "timeline"
+          ? view.timeline.following
+          : currentTab === "logs" || currentTab === "exceptions"
+            ? diagnostic.view.following
+            : false),
+    },
+    reportError,
+  );
+  const sessionContextMenu = useContextMenu(
+    ["session.save", "session.close"],
+    reportError,
+  );
+  useEffect(() => {
+    if (nativeReady) return;
     const keydown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        void open();
-      }
-      if (event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        void save();
-      }
-      if (event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        searchInput.current?.focus();
-        searchInput.current?.select();
-      }
+      if (event.defaultPrevented || event.repeat || event.isComposing) return;
+      const id = commandForKey(event);
+      if (id && commands.dispatch(id)) event.preventDefault();
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [open, save]);
+  }, [nativeReady]);
   return (
     <main className="workspace">
       <header className="toolbar">
@@ -370,14 +450,14 @@ export default function App() {
         <div className="toolbar-divider" />
         <Button
           variant="primary"
-          onClick={() => void open()}
+          onClick={() => commands.dispatch("session.open")}
           disabled={!desktop || busy || saving}
         >
           <FolderOpen />
           {t("open")}
         </Button>
         <Button
-          onClick={() => void save()}
+          onClick={() => commands.dispatch("session.save")}
           disabled={!active || saving || busy}
         >
           <Save />
@@ -396,9 +476,7 @@ export default function App() {
           <Button
             size="icon"
             variant="ghost"
-            onClick={() =>
-              void i18n.changeLanguage(i18n.language === "en" ? "zh-CN" : "en")
-            }
+            onClick={() => commands.dispatch("view.language")}
             aria-label={t("language")}
             title={t("language")}
           >
@@ -407,9 +485,7 @@ export default function App() {
           <Button
             size="icon"
             variant="ghost"
-            onClick={() =>
-              setTheme((value) => (value === "dark" ? "light" : "dark"))
-            }
+            onClick={() => commands.dispatch("view.theme")}
             aria-label={t("theme")}
             title={t("theme")}
           >
@@ -473,7 +549,7 @@ export default function App() {
                 title={t("open")}
                 aria-label={t("open")}
                 disabled={!desktop || busy || saving}
-                onClick={() => void open()}
+                onClick={() => commands.dispatch("session.open")}
               >
                 <FolderOpen />
               </Button>
@@ -483,6 +559,11 @@ export default function App() {
                 sessions.map((session) => (
                   <div
                     key={session.id}
+                    onContextMenu={(event) => {
+                      setIndependent(null);
+                      setActiveId(session.id);
+                      sessionContextMenu(event);
+                    }}
                     className={`session-item ${session.id === active?.id ? "active" : ""}`}
                   >
                     <button
@@ -536,6 +617,7 @@ export default function App() {
                       variant="ghost"
                       size="icon"
                       aria-label={`${t("close")} ${session.filename}`}
+                      disabled={session.online || busy || saving}
                       onClick={() => void close(session.id)}
                     >
                       <X />
@@ -570,6 +652,10 @@ export default function App() {
                       <div
                         className={`session-item ${independent === run.id ? "active" : ""}`}
                         key={run.id}
+                        onContextMenu={(event) => {
+                          setIndependent(run.id);
+                          sessionContextMenu(event);
+                        }}
                       >
                         <button
                           className="session-select"
@@ -590,6 +676,7 @@ export default function App() {
                           variant="ghost"
                           size="icon"
                           aria-label={`${t("close")} ${run.runId}`}
+                          disabled={run.online || busy || saving}
                           onClick={() =>
                             void api
                               .closeDiagnostic(run.id)
@@ -645,7 +732,9 @@ export default function App() {
                         key={tab}
                         className={currentTab === tab ? "active" : ""}
                         aria-pressed={currentTab === tab}
-                        onClick={() => updateView({ tab })}
+                        onClick={() =>
+                          commands.dispatch(`view.${tab}` as CommandId)
+                        }
                       >
                         {t(tab)}
                         {tab === "logs"
@@ -799,7 +888,7 @@ export default function App() {
                 <Button
                   variant="primary"
                   disabled={!desktop || busy || saving}
-                  onClick={() => void open()}
+                  onClick={() => commands.dispatch("session.open")}
                 >
                   <FolderOpen />
                   {t("open")}

@@ -9,7 +9,10 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { TimelineTable } from "./TimelineTable";
 import { api } from "../../lib/ipc/client";
 import type { TimelinePage, TimelineRow } from "../../lib/ipc/types";
-vi.mock("../../lib/ipc/client", () => ({ api: { timeline: vi.fn() } }));
+vi.mock("../../lib/ipc/client", () => ({
+  desktop: true,
+  api: { timeline: vi.fn() },
+}));
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getVirtualItems: () =>

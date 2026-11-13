@@ -14,6 +14,10 @@ const data = vi.hoisted(() => ({
   sessions: [] as SessionSummary[],
   remote: { diagnosticRuns: [], sessions: [], listening: false },
 }));
+vi.mock("./lib/commands/native", () => ({
+  useNativeMenu: () => false,
+  useContextMenu: () => () => {},
+}));
 vi.mock("./features/connection/useWorkspace", () => ({
   useWorkspace: () => ({ ...data, refresh: vi.fn(async () => {}) }),
 }));
@@ -139,4 +143,21 @@ it("does not publish a delayed timeline entry after changing tabs", async () => 
       "no network selection",
     ),
   );
+});
+
+it("uses the same dispatcher for platform shortcuts, search focus and view buttons", async () => {
+  render(<App />);
+  await screen.findByRole("button", { name: "时间线" });
+  fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+  expect(document.activeElement).toBe(
+    screen.getByLabelText("搜索地址、方法、状态或来源…"),
+  );
+  fireEvent.keyDown(window, { key: "3", metaKey: true });
+  expect(
+    screen.getByRole("button", { name: "异常" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "时间线" }));
+  expect(
+    screen.getByRole("button", { name: "时间线" }).getAttribute("aria-pressed"),
+  ).toBe("true");
 });

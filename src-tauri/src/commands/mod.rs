@@ -520,3 +520,14 @@ pub async fn export_diagnostics(
     .await
     .map_err(|_| "internalError")?
 }
+
+#[tauri::command]
+pub fn write_clipboard(app: tauri::AppHandle, text: String) -> Result<()> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    if text.len() > 1024 * 1024 {
+        return Err("selectionTooLarge".into());
+    }
+    app.clipboard()
+        .write_text(text)
+        .map_err(|_| "clipboardUnavailable".into())
+}

@@ -1,3 +1,5 @@
+import { commands } from "../../lib/commands/dispatcher";
+import { useCommand, useModalCommands } from "../../lib/commands/react";
 import { useEffect, useRef, useState } from "react";
 import { Radio, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +19,7 @@ export function ConnectionPanel({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionBusy = useRef(false);
   const [host, setHost] = useState("127.0.0.1");
   const [port, setPort] = useState("9741");
   const [advertise, setAdvertise] = useState(true);
@@ -63,6 +66,8 @@ export function ConnectionPanel({
     };
   }, [open]);
   async function act(action: () => Promise<unknown>) {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
     setBusy(true);
     try {
       await action();
@@ -70,12 +75,32 @@ export function ConnectionPanel({
     } catch (error) {
       onError(String(error));
     } finally {
+      actionBusy.current = false;
       setBusy(false);
     }
   }
+  useCommand("connection.open", () => setOpen(true), desktop);
+  useCommand(
+    "connection.stop",
+    () => act(() => api.stop()),
+    remote.listening && !busy,
+  );
+  useCommand(
+    "connection.pair",
+    () => {
+      setOpen(true);
+      return act(() => api.pair(diagnostics));
+    },
+    remote.listening && !busy,
+  );
+  useModalCommands(open);
   return (
     <>
-      <Button ref={trigger} disabled={!desktop} onClick={() => setOpen(true)}>
+      <Button
+        ref={trigger}
+        disabled={!desktop}
+        onClick={() => commands.dispatch("connection.open")}
+      >
         <Radio />
         {t("connection")}
       </Button>
@@ -149,11 +174,9 @@ export function ConnectionPanel({
                     Number(port) > 65535))
               }
               onClick={() =>
-                void act(() =>
-                  remote.listening
-                    ? api.stop()
-                    : api.start(host, Number(port), advertise),
-                )
+                remote.listening
+                  ? commands.dispatch("connection.stop")
+                  : void act(() => api.start(host, Number(port), advertise))
               }
             >
               {t(remote.listening ? "stopListening" : "startListening")}
@@ -178,7 +201,7 @@ export function ConnectionPanel({
               </label>
               <Button
                 disabled={!remote.listening || busy}
-                onClick={() => void act(() => api.pair(diagnostics))}
+                onClick={() => commands.dispatch("connection.pair")}
               >
                 {t("newPairingCode")}
               </Button>

@@ -1,3 +1,4 @@
+import { writeClipboard } from "../../lib/clipboard";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, desktop } from "../../lib/ipc/client";
@@ -59,7 +60,7 @@ export function DiagnosticDetail({
   async function copy(text: string) {
     const request = generation.current;
     try {
-      await navigator.clipboard.writeText(text);
+      await writeClipboard(text);
       if (request === generation.current) setNotice(t("copied"));
     } catch {
       if (request === generation.current) setNotice(t("copyFailed"));
