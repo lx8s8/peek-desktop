@@ -1,0 +1,30 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #202124;
+  background: #f8f9fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+.workspace { display: flex; flex-direction: column; min-height: 100vh; }
+.toolbar { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 20px; border-bottom: 1px solid #e3e5e9; background: #fff; }
+.brand { font-size: 14px; font-weight: 600; }
+.stage { color: #696e78; font-size: 11px; padding: 3px 7px; border: 1px solid #e3e5e9; border-radius: 4px; }
+.empty-state { display: flex; flex: 1; align-items: center; justify-content: center; flex-direction: column; padding: 48px 24px; text-align: center; }
+.connection-mark { font-size: 36px; color: #d9582b; }
+h1 { font-size: 19px; font-weight: 600; margin: 20px 0 8px; }
+p { color: #646975; font-size: 13px; line-height: 1.7; margin: 0; }
+.hint { margin-top: 12px; font-size: 12px; }
+.status-bar { border-top: 1px solid #e3e5e9; padding: 7px 16px; color: #646975; font-size: 11px; }
+
+@media (prefers-color-scheme: dark) {
+  :root { color: #e5e7eb; background: #15171b; }
+  .toolbar { background: #1b1e23; }
+  .toolbar, .status-bar, .stage { border-color: #30343c; }
+  p, .stage, .status-bar { color: #a2a7b2; }
+  .connection-mark { color: #ff8b60; }
+}
