@@ -169,7 +169,7 @@ class _DemoState extends State<Demo> {
           message: '跟随测试 $i / 120 · 合成数据',
           source: 'synthetic-burst',
           tag: i.isEven ? 'even' : 'odd',
-          level: i % 10 == 0 ? 'warn' : 'info',
+          level: i % 10 == 0 ? 'warning' : 'info',
         ),
       );
       await Future<void>.delayed(const Duration(milliseconds: 25));
