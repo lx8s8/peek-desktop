@@ -29,6 +29,7 @@ class _DemoState extends State<Demo> {
   Timer? refresh;
   StreamSubscription<List<PeekRemoteDiscovered>>? discovery;
   List<PeekRemoteDiscovered> desktops = [];
+  PeekRemoteDiscovered? selectedDesktop;
   String? error;
   @override
   void initState() {
@@ -49,9 +50,15 @@ class _DemoState extends State<Demo> {
 
   Future<void> connect() async {
     try {
+      final endpoint = PeekRemoteEndpoint.parse(host.text);
+      final selected = selectedDesktop?.endpoint == endpoint
+          ? selectedDesktop
+          : null;
       await remote!.connect(
-        PeekRemoteEndpoint.parse(host.text),
+        endpoint,
         code: code.text.trim().isEmpty ? null : code.text.trim(),
+        serverId: selected?.serverId,
+        name: selected?.name,
       );
       if (mounted) setState(() => error = null);
     } on Object {
@@ -132,6 +139,7 @@ class _DemoState extends State<Demo> {
           else ...[
             TextField(
               controller: host,
+              onChanged: (_) => setState(() => selectedDesktop = null),
               decoration: const InputDecoration(labelText: '桌面地址（host:port）'),
             ),
             TextField(
@@ -163,10 +171,12 @@ class _DemoState extends State<Demo> {
             ),
             for (final desktop in desktops)
               TextButton(
-                onPressed: () => setState(
-                  () => host.text =
-                      '${desktop.endpoint.host}:${desktop.endpoint.port}',
-                ),
+                onPressed: () => setState(() {
+                  selectedDesktop = desktop;
+                  host.text =
+                      '${desktop.endpoint.host}:${desktop.endpoint.port}';
+                  code.clear();
+                }),
                 child: Text(
                   '${desktop.name} · ${desktop.endpoint.host}:${desktop.endpoint.port} · v${desktop.protocolVersion}',
                 ),
