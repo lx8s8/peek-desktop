@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Globe2,
   Monitor,
+  Ellipsis,
   Moon,
   Save,
   Search,
@@ -276,6 +277,9 @@ export default function App() {
     currentTab === "timeline" ? timelineLog : diagnostic.selected;
   const selectedRun = remote.diagnosticRuns.find(
     (run) => run.id === detailLog?.runId,
+  );
+  const boundNetwork = sessions.find(
+    (session) => session.id === selectedRun?.networkSessionKey,
   );
   const selectTimeline = async (row: TimelineRow | null) => {
     const request = ++navigation.current;
@@ -613,6 +617,21 @@ export default function App() {
                         </small>
                       </span>
                     </button>
+                    {desktop && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-haspopup="menu"
+                        aria-label={`${t("menuActions")} ${session.header.name || session.filename}`}
+                        onClick={(event) => {
+                          setIndependent(null);
+                          setActiveId(session.id);
+                          sessionContextMenu(event);
+                        }}
+                      >
+                        <Ellipsis />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -914,14 +933,8 @@ export default function App() {
             <DiagnosticDetail
               selected={detailLog}
               evictionVersion={selectedRun?.evicted}
-              networkSessionId={
-                selectedRun?.networkSessionKey &&
-                sessions.some(
-                  (session) => session.id === selectedRun.networkSessionKey,
-                )
-                  ? selectedRun.networkSessionKey
-                  : null
-              }
+              networkSessionId={boundNetwork?.id ?? null}
+              networkVersion={`${boundNetwork?.generation ?? 0}:${boundNetwork?.evicted ?? 0}`}
               onNetwork={(sessionId, entryId) =>
                 void openNetwork(sessionId, entryId)
               }

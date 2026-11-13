@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
 import {
   Menu,
   Submenu,
   type MenuOptions,
   type PredefinedMenuItemOptions,
 } from "@tauri-apps/api/menu";
-import { desktop } from "../ipc/client";
+import { api, desktop } from "../ipc/client";
 import i18n from "../i18n";
 import { commands, definitions, type CommandId } from "./dispatcher";
 import { useCommandRevision } from "./react";
@@ -332,6 +333,12 @@ export function useContextMenu(
   return (event: MouseEvent) => {
     if (!desktop) return;
     event.preventDefault();
+    const keyboard = event.clientX === 0 && event.clientY === 0;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = new LogicalPosition(
+      keyboard ? rect.left : event.clientX,
+      keyboard ? rect.bottom : event.clientY,
+    );
     const state = reference.current;
     if (!state) return;
     const request = ++state.revision;
@@ -363,7 +370,7 @@ export function useContextMenu(
             state.closeActions = actions.close;
             state.menu = menu;
             await previous?.close();
-            await menu.popup();
+            await api.popupContextMenu(menu.rid, position.x, position.y);
           } catch (value) {
             if (menu !== state.menu) actions?.close();
             if (menu !== state.menu) await menu?.close().catch(() => {});

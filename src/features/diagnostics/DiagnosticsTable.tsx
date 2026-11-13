@@ -438,6 +438,11 @@ export function DiagnosticsTable({
             <span className="muted">
               {t("selectedCount", { count: selection.length })}
             </span>
+            {desktop && (
+              <Button aria-haspopup="menu" onClick={contextMenu}>
+                {t("menuActions")}
+              </Button>
+            )}
           </div>
         )}
         {notice && <span role="status">{notice}</span>}

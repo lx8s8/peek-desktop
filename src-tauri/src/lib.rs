@@ -42,6 +42,7 @@ pub fn run() {
             commands::copy_diagnostics,
             commands::export_diagnostics,
             commands::write_clipboard,
+            commands::popup_context_menu,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Peek Desktop");

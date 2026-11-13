@@ -29,6 +29,8 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  popupContextMenu: (rid: number, x: number, y: number) =>
+    invoke<void>("popup_context_menu", { rid, x, y }),
   writeClipboard: (text: string) => invoke<void>("write_clipboard", { text }),
   review: (runId: string, query: ReviewQuery) =>
     invoke<ReviewPage>("review_diagnostics", { runId, query }),

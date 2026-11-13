@@ -10,12 +10,14 @@ export function DiagnosticDetail({
   theme,
   evictionVersion,
   networkSessionId,
+  networkVersion,
   onNetwork,
 }: {
   selected: LogSelection | null;
   theme: string;
   evictionVersion?: number;
   networkSessionId?: string | null;
+  networkVersion?: string;
   onNetwork?: (sessionId: string, entryId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -146,23 +148,17 @@ export function DiagnosticDetail({
           </dl>
           <pre className="log-message">{message}</pre>
           {event.relatedNetworkEntryId && (
-            <section className="inline-note">
-              <strong>{t("relatedRequest")}</strong>
-              <code className="event-reference">
-                {event.relatedNetworkEntryId}
-              </code>
-              {networkSessionId && onNetwork ? (
-                <Button
-                  onClick={() =>
-                    onNetwork(networkSessionId, event.relatedNetworkEntryId)
-                  }
-                >
-                  {t("openRelatedRequest")}
-                </Button>
-              ) : (
-                <span>{t("relationUnavailable")}</span>
-              )}
-            </section>
+            <RelatedRequest
+              key={JSON.stringify([
+                detailKey,
+                networkSessionId,
+                networkVersion,
+                event.relatedNetworkEntryId,
+              ])}
+              entryId={event.relatedNetworkEntryId}
+              sessionId={networkSessionId}
+              onOpen={onNetwork}
+            />
           )}
           {event.kind === "exception" || event.exception ? (
             <section className="stack-section">
@@ -183,5 +179,68 @@ export function DiagnosticDetail({
         </>
       )}
     </aside>
+  );
+}
+
+function RelatedRequest({
+  entryId,
+  sessionId,
+  onOpen,
+}: {
+  entryId: string;
+  sessionId?: string | null;
+  onOpen?: (sessionId: string, entryId: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const [state, setState] = useState<
+    "loading" | "available" | "unavailable" | "failed"
+  >("loading");
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const connected = !!(sessionId && onOpen);
+  useEffect(() => {
+    let active = true;
+    setState("loading");
+    if (sessionId && connected)
+      void api
+        .entryInfo(sessionId, entryId)
+        .then(() => {
+          if (active) setState("available");
+        })
+        .catch((error) => {
+          if (!active) return;
+          const message = String(error);
+          setError(message);
+          setState(
+            ["entryNotFound", "sessionNotFound"].includes(message)
+              ? "unavailable"
+              : "failed",
+          );
+        });
+    return () => {
+      active = false;
+    };
+  }, [sessionId, entryId, connected, retry]);
+  return (
+    <section className="inline-note">
+      <strong>{t("relatedRequest")}</strong>
+      <code className="event-reference">{entryId}</code>
+      {!connected || state === "unavailable" ? (
+        <span>{t("relationUnavailable")}</span>
+      ) : state === "loading" ? (
+        <span>{t("loading")}</span>
+      ) : state === "available" ? (
+        <Button onClick={() => onOpen?.(sessionId!, entryId)}>
+          {t("openRelatedRequest")}
+        </Button>
+      ) : (
+        <span role="alert">
+          {i18n.exists(error) ? t(error) : t("unexpected", { error })}{" "}
+          <Button onClick={() => setRetry((value) => value + 1)}>
+            {t("retryDetail")}
+          </Button>
+        </span>
+      )}
+    </section>
   );
 }

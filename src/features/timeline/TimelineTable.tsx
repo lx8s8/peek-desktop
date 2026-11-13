@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
-import { api } from "../../lib/ipc/client";
+import { api, desktop } from "../../lib/ipc/client";
 import type {
   Scope,
   TimelinePage,
@@ -186,6 +186,11 @@ export function TimelineTable({
           >
             {t(view.following ? "pauseFollow" : "followLatest")}
           </Button>
+          {desktop && (
+            <Button aria-haspopup="menu" onClick={contextMenu}>
+              {t("menuActions")}
+            </Button>
+          )}
         </div>
       </div>
       {notice && (

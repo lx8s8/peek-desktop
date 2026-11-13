@@ -4,7 +4,7 @@ import { api } from "../../lib/ipc/client";
 import { DiagnosticDetail } from "./DiagnosticDetail";
 vi.mock("../../lib/ipc/client", () => ({
   desktop: true,
-  api: { diagnostic: vi.fn(), exportDiagnostics: vi.fn() },
+  api: { diagnostic: vi.fn(), exportDiagnostics: vi.fn(), entryInfo: vi.fn() },
 }));
 vi.mock("../detail/JsonViewer", () => ({
   JsonViewer: ({ text }: { text: string }) => (
@@ -46,6 +46,9 @@ it("keeps original stack and numeric text while ignoring a previous run's detail
 
 it("shows uint64 metadata, truncation and empty stacks, and opens only an explicit request reference", async () => {
   const open = vi.fn();
+  vi.mocked(api.entryInfo).mockResolvedValue({ id: "request-one" } as Awaited<
+    ReturnType<typeof api.entryInfo>
+  >);
   vi.mocked(api.diagnostic).mockResolvedValue(
     JSON.stringify({
       message: "truncated event",
@@ -72,8 +75,56 @@ it("shows uint64 metadata, truncation and empty stacks, and opens only an explic
   expect(
     screen.getByText(/attributes.longValue/, { selector: '[role="status"]' }),
   ).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "打开关联请求" }));
+  fireEvent.click(await screen.findByRole("button", { name: "打开关联请求" }));
   expect(open).toHaveBeenCalledWith("live-one", "request-one");
+});
+
+it("marks a missing request unavailable before offering navigation", async () => {
+  vi.mocked(api.diagnostic).mockResolvedValue(
+    '{"message":"missing reference","relatedNetworkEntryId":"gone"}',
+  );
+  vi.mocked(api.entryInfo).mockRejectedValue("entryNotFound");
+  render(
+    <DiagnosticDetail
+      selected={{ runId: "run", eventId: "event" }}
+      theme="light"
+      networkSessionId="live"
+      onNetwork={vi.fn()}
+    />,
+  );
+  await screen.findByText("关联请求未保留或不在当前会话中。");
+  expect(screen.queryByRole("button", { name: "打开关联请求" })).toBeNull();
+});
+
+it("ignores old availability checks after the bound network generation changes", async () => {
+  vi.mocked(api.diagnostic).mockResolvedValue(
+    '{"message":"reference","relatedNetworkEntryId":"same"}',
+  );
+  let resolve!: (row: Awaited<ReturnType<typeof api.entryInfo>>) => void;
+  vi.mocked(api.entryInfo)
+    .mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    )
+    .mockRejectedValue("entryNotFound");
+  const props = {
+    selected: { runId: "run", eventId: "event" },
+    theme: "light",
+    networkSessionId: "live",
+    onNetwork: vi.fn(),
+  };
+  const { rerender } = render(
+    <DiagnosticDetail {...props} networkVersion="1:0" />,
+  );
+  await screen.findByText("reference", { selector: ".log-message" });
+  rerender(<DiagnosticDetail {...props} networkVersion="2:1" />);
+  await screen.findByText("关联请求未保留或不在当前会话中。");
+  await act(async () =>
+    resolve({ id: "same" } as Awaited<ReturnType<typeof api.entryInfo>>),
+  );
+  expect(screen.queryByRole("button", { name: "打开关联请求" })).toBeNull();
 });
 
 it("removes old raw content when the selected event is evicted", async () => {

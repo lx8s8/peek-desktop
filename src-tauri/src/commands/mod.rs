@@ -17,6 +17,31 @@ use std::{
 use tauri::{State, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;
 
+#[tauri::command]
+pub async fn popup_context_menu(
+    webview: tauri::Webview,
+    window: tauri::Window,
+    rid: u32,
+    x: f64,
+    y: f64,
+) -> Result<()> {
+    use tauri::{Manager, menu::ContextMenu};
+    // Native menu tracking runs a nested event loop on macOS. Release the
+    // resource table before entering it so concurrent IPC cannot deadlock it.
+    let menu = {
+        let resources = webview.resources_table();
+        resources
+            .get::<tauri::menu::Menu<tauri::Wry>>(rid)
+            .map_err(|error| error.to_string())?
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        menu.popup_at(window, tauri::LogicalPosition::new(x, y))
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "internalError".to_string())?
+}
+
 #[derive(Default)]
 pub struct AppState {
     remote: Arc<Remote>,
