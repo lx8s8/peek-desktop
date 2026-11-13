@@ -1,0 +1,63 @@
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+import { readPreference } from "../preferences";
+
+const zh = {
+  open: "打开文件", save: "保存会话", close: "关闭会话", sessions: "会话", files: "已打开文件",
+  devices: "设备", noDevice: "设备连接尚未接入", offline: "离线文件模式", network: "网络",
+  intro: "每一次请求，都清晰可见。", introHint: "打开 .peek 会话文件，检查请求、响应与原始正文。",
+  emptyFiles: "还没有打开的会话", fileHint: "支持 Peek 标准 JSON Lines 格式", browser: "当前为浏览器预览，文件操作请使用桌面应用。",
+  connectionHint: "设备配对、实时网络与日志同步将在后续连接阶段接入。",
+  search: "搜索地址、方法、状态或来源…", all: "全部", errors: "错误", pending: "进行中", pinned: "已固定",
+  method: "方法", status: "状态", url: "地址", duration: "耗时", size: "大小", time: "时间",
+  requests: "条请求", matches: "条匹配", noMatches: "没有匹配的请求", noMatchesHint: "试试其他关键词，或切换过滤条件。",
+  emptySession: "此会话没有请求", emptySessionHint: "文件头已读取，文件中没有可显示的有效请求。",
+  select: "选择一条请求", selectHint: "请求元信息和正文将在这里显示。", overview: "概览", request: "请求", response: "响应",
+  headers: "请求头 / 响应头", noHeaders: "没有记录 Headers", body: "正文", raw: "原文", tree: "树", formatted: "格式化",
+  copy: "复制原文", copied: "已复制", copyFailed: "复制失败，请选择文本手动复制", loading: "加载中…", processing: "正在读取会话…",
+  cancel: "取消", saved: "会话已保存", cancelled: "已取消导入", skipped: "已跳过 {{count}} 条无法读取的记录。",
+  future: "文件来自更新的 Peek 格式，已尽量读取支持的内容。", source: "来源", captured: "已采集", bytes: "字节",
+  truncated: "设备只采集了部分正文。", previewTruncated: "仅显示有限预览；保存会话可保留文件中已有的完整记录。",
+  emptyBody: "没有记录正文", remote: "正文未从设备加载，离线文件无法取回。", streamed: "流式正文未被缓冲。",
+  tooLarge: "正文超过设备采集上限。", notCaptured: "来源未采集正文，或正文格式尚不支持。", unreadable: "设备无法读取或解码正文。",
+  invalidJson: "无法解析为 JSON，保留原文：", rawHint: "原文是复制与导出的依据；格式化和树视图不会修改原始内容。",
+  binary: "二进制 Hex 预览", retained: "原文占用", theme: "切换深浅主题", language: "切换语言", dismiss: "关闭提示",
+  metadata: "元信息（不含正文）", fileOnly: "网络会话 · .peek", sessionCount: "个会话", shortcuts: "打开 ⌘/Ctrl O · 保存 ⌘/Ctrl S · 搜索 ⌘/Ctrl F",
+  unexpected: "操作失败：{{error}}", fileTooLarge: "文件超过 64 MiB 上限。", lineTooLarge: "单条记录超过 8 MiB 上限。",
+  tooManyEntries: "会话超过 100,000 条记录上限。", libraryFull: "已达到 4 个会话或 128 MiB 原文上限，请先关闭部分会话。",
+  invalidHeader: "文件头无效，无法作为 Peek 会话打开。", importBusy: "已有文件正在导入。", sessionNotFound: "会话已关闭。",
+  entryNotFound: "记录不存在。", internalError: "内部状态异常，请重新启动应用。", retry: "重试", previewOnly: "开发预览",
+};
+const en: Record<keyof typeof zh, string> = {
+  open: "Open file", save: "Save session", close: "Close session", sessions: "Sessions", files: "Opened files",
+  devices: "Devices", noDevice: "Device connection not available yet", offline: "Offline files", network: "Network",
+  intro: "Every request, in focus.", introHint: "Open a .peek session to inspect requests, responses, and original bodies.",
+  emptyFiles: "No open sessions", fileHint: "Peek standard JSON Lines format", browser: "Browser preview. Open the desktop app to work with files.",
+  connectionHint: "Pairing, live network traffic, and diagnostic sync are planned for the connection phase.",
+  search: "Search URL, method, status, or source…", all: "All", errors: "Errors", pending: "Pending", pinned: "Pinned",
+  method: "Method", status: "Status", url: "URL", duration: "Duration", size: "Size", time: "Time",
+  requests: "requests", matches: "matches", noMatches: "No matching requests", noMatchesHint: "Try another search or change the filter.",
+  emptySession: "No requests in this session", emptySessionHint: "The header was read, but there are no valid requests to display.",
+  select: "Select a request", selectHint: "Request metadata and bodies will appear here.", overview: "Overview", request: "Request", response: "Response",
+  headers: "Headers", noHeaders: "No headers recorded", body: "Body", raw: "Raw", tree: "Tree", formatted: "Formatted",
+  copy: "Copy original", copied: "Copied", copyFailed: "Copy failed. Select the text and copy it manually.", loading: "Loading…", processing: "Reading session…",
+  cancel: "Cancel", saved: "Session saved", cancelled: "Import cancelled", skipped: "Skipped {{count}} unreadable records.",
+  future: "This file uses a newer Peek format. Supported content was read where possible.", source: "Source", captured: "Captured", bytes: "bytes",
+  truncated: "The device captured only part of this body.", previewTruncated: "Limited preview. Save the session to retain the full records already in the file.",
+  emptyBody: "No body recorded", remote: "Body was not loaded from the device and cannot be fetched from an offline file.", streamed: "Streamed body was not buffered.",
+  tooLarge: "Body exceeded the device capture limit.", notCaptured: "Body was not captured, or its format is not supported.", unreadable: "The device could not read or decode this body.",
+  invalidJson: "Cannot parse JSON. Original text retained:", rawHint: "Copy and export use original text. Tree and formatting never change it.",
+  binary: "Binary Hex preview", retained: "Original data", theme: "Toggle light/dark theme", language: "Switch language", dismiss: "Dismiss",
+  metadata: "Metadata (without bodies)", fileOnly: "Network session · .peek", sessionCount: "sessions", shortcuts: "Open ⌘/Ctrl O · Save ⌘/Ctrl S · Search ⌘/Ctrl F",
+  unexpected: "Operation failed: {{error}}", fileTooLarge: "File exceeds the 64 MiB limit.", lineTooLarge: "A record exceeds the 8 MiB limit.",
+  tooManyEntries: "Session exceeds the 100,000 record limit.", libraryFull: "The 4 session or 128 MiB original-data limit was reached. Close a session first.",
+  invalidHeader: "Invalid header. This file cannot be opened as a Peek session.", importBusy: "A file is already being imported.", sessionNotFound: "The session is closed.",
+  entryNotFound: "Record not found.", internalError: "Internal state error. Please restart the app.", retry: "Retry", previewOnly: "Development preview",
+};
+
+void i18n.use(initReactI18next).init({
+  resources: { "zh-CN": { translation: zh }, en: { translation: en } },
+  lng: readPreference("language", "zh-CN") === "en" ? "en" : "zh-CN", fallbackLng: "zh-CN",
+  interpolation: { escapeValue: false },
+});
+export default i18n;
