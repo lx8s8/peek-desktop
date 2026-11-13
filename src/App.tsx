@@ -25,6 +25,10 @@ import {
   type LogSelection,
 } from "./features/diagnostics/DiagnosticsTable";
 import { DiagnosticDetail } from "./features/diagnostics/DiagnosticDetail";
+import {
+  TimelineTable,
+  type TimelineView,
+} from "./features/timeline/TimelineTable";
 import { TimeRangeBar } from "./features/console/TimeRangeBar";
 import {
   emptyDiagnosticView,
@@ -38,6 +42,7 @@ import type {
   Filter,
   ImportProgress,
   TimeRange,
+  TimelineRow,
 } from "./lib/ipc/types";
 import {
   formatBytes,
@@ -61,7 +66,10 @@ interface ViewState {
   search: string;
   filter: Filter;
   selected: EntryRow | null;
-  tab: "network" | "logs" | "exceptions";
+  tab: "network" | "logs" | "exceptions" | "timeline";
+  timeline: TimelineView;
+  timelineSelected: TimelineRow | null;
+  timelineEntry: EntryRow | null;
   logs: DiagnosticPaneState;
   exceptions: DiagnosticPaneState;
   range: TimeRange;
@@ -77,6 +85,9 @@ const emptyView: ViewState = {
     view: { ...emptyDiagnosticView, grouped: true },
   },
   range: {},
+  timeline: { search: "", following: true },
+  timelineSelected: null,
+  timelineEntry: null,
 };
 function readLayout(): Layout | undefined {
   try {
@@ -159,20 +170,22 @@ export default function App() {
       setIndependent(null);
     }
   }, [independent, independentRun]);
-  const generation = useRef<string>("");
+  const generations = useRef<Record<string, number>>({});
   useEffect(() => {
-    const next = `${active?.id ?? ""}:${active?.generation ?? 0}`;
-    if (generation.current !== next) {
-      generation.current = next;
-      if (active?.deviceId)
-        setViews((previous) => ({
-          ...previous,
-          [active.id]: {
-            ...(previous[active.id] ?? emptyView),
-            selected: null,
-          },
-        }));
-    }
+    if (!active?.deviceId) return;
+    const next = active.generation ?? 0,
+      previous = generations.current[active.id];
+    generations.current[active.id] = next;
+    if (previous !== undefined && previous !== next)
+      setViews((views) => ({
+        ...views,
+        [active.id]: {
+          ...(views[active.id] ?? emptyView),
+          selected: null,
+          timelineSelected: null,
+          timelineEntry: null,
+        },
+      }));
   }, [active?.id, active?.generation, active?.deviceId]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -225,7 +238,7 @@ export default function App() {
   const navigation = useRef(0);
   useEffect(() => {
     ++navigation.current;
-  }, [scopeId, active?.generation]);
+  }, [scopeId, active?.generation, currentTab]);
   const openNetwork = async (sessionId: string, entryId: string) => {
     const request = ++navigation.current;
     try {
@@ -245,9 +258,30 @@ export default function App() {
       if (request === navigation.current) reportError(String(error));
     }
   };
+  const timelineLog =
+    view.timelineSelected?.runId && view.timelineSelected.eventId
+      ? {
+          runId: view.timelineSelected.runId,
+          eventId: view.timelineSelected.eventId,
+        }
+      : null;
+  const detailLog =
+    currentTab === "timeline" ? timelineLog : diagnostic.selected;
   const selectedRun = remote.diagnosticRuns.find(
-    (run) => run.id === diagnostic.selected?.runId,
+    (run) => run.id === detailLog?.runId,
   );
+  const selectTimeline = async (row: TimelineRow | null) => {
+    const request = ++navigation.current;
+    updateView({ timelineSelected: row, timelineEntry: null });
+    if (row?.kind === "network" && row.sessionId && row.entryId)
+      try {
+        const entry = await api.entryInfo(row.sessionId, row.entryId);
+        if (request === navigation.current)
+          updateView({ timelineEntry: entry });
+      } catch (error) {
+        if (request === navigation.current) reportError(String(error));
+      }
+  };
   const open = useCallback(async () => {
     if (!desktop || busyRef.current || saveRef.current) return;
     busyRef.current = true;
@@ -289,6 +323,7 @@ export default function App() {
   async function close(id: string) {
     try {
       await api.close(id);
+      delete generations.current[id];
       await refresh();
       setViews((previous) => {
         const next = { ...previous };
@@ -581,7 +616,7 @@ export default function App() {
             <div className="console-heading">
               <span>
                 <Activity size={14} />
-                {t(independent || active?.deviceId ? currentTab : "network")}
+                {t(currentTab)}
               </span>
               {active && (
                 <span className="muted filename">{active.filename}</span>
@@ -593,11 +628,18 @@ export default function App() {
                   range={view.range}
                   onChange={(range) => updateView({ range })}
                 />
-                {(independentRun || active?.deviceId) && (
+                {(independentRun || active) && (
                   <div className="live-tabs segmented">
                     {(independentRun
-                      ? (["logs", "exceptions"] as const)
-                      : (["network", "logs", "exceptions"] as const)
+                      ? (["logs", "exceptions", "timeline"] as const)
+                      : active?.deviceId
+                        ? ([
+                            "network",
+                            "logs",
+                            "exceptions",
+                            "timeline",
+                          ] as const)
+                        : (["network", "timeline"] as const)
                     ).map((tab) => (
                       <button
                         key={tab}
@@ -613,7 +655,31 @@ export default function App() {
                     ))}
                   </div>
                 )}
-                {currentTab !== "network" ? (
+                {currentTab === "timeline" ? (
+                  <TimelineTable
+                    key={scopeId}
+                    scope={{
+                      kind: independentRun ? "diagnostic" : "network",
+                      id: scopeId!,
+                    }}
+                    range={view.range}
+                    view={view.timeline}
+                    selected={view.timelineSelected}
+                    networkOnly={!!active?.deviceId && !runs.length}
+                    version={`${active?.version ?? 0}:${(independentRun
+                      ? [independentRun]
+                      : runs
+                    )
+                      .map((run) => `${run.id}:${run.version}`)
+                      .sort()
+                      .join(",")}`}
+                    onViewChange={(update) =>
+                      updateView({ timeline: { ...view.timeline, ...update } })
+                    }
+                    onSelect={(row) => void selectTimeline(row)}
+                    onError={reportError}
+                  />
+                ) : currentTab !== "network" ? (
                   <DiagnosticsTable
                     key={`${scopeId}:${currentTab}`}
                     runs={independentRun ? [independentRun] : runs}
@@ -746,9 +812,18 @@ export default function App() {
         </Panel>
         <Separator className="panel-separator" />
         <Panel id="detail" defaultSize="34%" minSize={300}>
-          {currentTab !== "network" ? (
+          {currentTab === "timeline" && !view.timelineSelected ? (
+            <aside className="detail-empty">
+              <h2>{t("selectTimelineEvent")}</h2>
+              <p>{t("selectTimelineHint")}</p>
+            </aside>
+          ) : currentTab !== "network" &&
+            !(
+              currentTab === "timeline" &&
+              view.timelineSelected?.kind === "network"
+            ) ? (
             <DiagnosticDetail
-              selected={diagnostic.selected}
+              selected={detailLog}
               evictionVersion={selectedRun?.evicted}
               networkSessionId={
                 selectedRun?.networkSessionKey &&
@@ -765,10 +840,12 @@ export default function App() {
             />
           ) : (
             <DetailPane
-              key={`${activeId}:${active?.generation ?? 0}`}
+              key={`${activeId}:${active?.generation ?? 0}:${currentTab}`}
               version={active?.version}
               sessionId={active?.id ?? null}
-              entry={view.selected}
+              entry={
+                currentTab === "timeline" ? view.timelineEntry : view.selected
+              }
               theme={theme}
             />
           )}

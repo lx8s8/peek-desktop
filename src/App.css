@@ -1216,3 +1216,43 @@ button.diagnostic-grid.selected {
   width: 100%;
   color: var(--warning);
 }
+
+.timeline-console {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.timeline-grid {
+  display: grid;
+  grid-template-columns: 72px 48px minmax(80px, 1fr) 94px;
+  align-items: center;
+  text-align: left;
+}
+.timeline-grid > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 7px;
+}
+button.timeline-grid {
+  height: 36px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+button.timeline-grid:hover {
+  background: var(--subtle);
+}
+button.timeline-grid.selected {
+  background: var(--accent-soft);
+}
+.association-explicit {
+  color: var(--green);
+}
+.association-time {
+  color: var(--muted);
+}
+.association-unavailable {
+  color: var(--warning);
+}
