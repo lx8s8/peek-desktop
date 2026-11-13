@@ -9,6 +9,50 @@ use tokio_util::sync::CancellationToken;
 const MAX_EVENTS: usize = 2000;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn eviction_preserves_important_events_and_acknowledgement_after_overflow() {
+        let mut store = DiagnosticStore::default();
+        let key = store
+            .begin(
+                "device".into(),
+                "run".into(),
+                None,
+                "connection".into(),
+                CancellationToken::new(),
+            )
+            .unwrap();
+        let run = store.runs.get_mut(&key).unwrap();
+        for sequence in 1..=MAX_EVENTS + 10 {
+            let raw=json!({"eventId":format!("event-{sequence}"),"runId":"run","emitterId":"main","sequence":sequence.to_string(),"occurredAt":"2026-11-13T00:00:00Z","kind":"log","level":if sequence==1{"error"}else{"info"},"source":"synthetic","message":"synthetic"}).to_string();
+            run.batch("main", vec![StoredDiagnostic::parse(&raw).unwrap()])
+                .unwrap();
+        }
+        assert_eq!(run.count(), MAX_EVENTS);
+        assert_eq!(run.evicted, 10);
+        assert!(run.detail("event-1").is_ok());
+        assert!(run.detail("event-2").is_err());
+        assert_eq!(
+            run.accepted_strings()["main"],
+            (MAX_EVENTS + 10).to_string()
+        );
+        for sequence in MAX_EVENTS + 11..MAX_EVENTS + 90 {
+            run.gap(
+                "main",
+                sequence as u64,
+                sequence as u64,
+                "syntheticOverflow",
+            )
+            .unwrap();
+        }
+        assert_eq!(run.gaps.len(), 64);
+        assert_eq!(run.gap_count, 79);
+    }
+}
+
 pub struct StoredDiagnostic {
     pub event: DiagnosticEvent,
     pub raw: Arc<str>,

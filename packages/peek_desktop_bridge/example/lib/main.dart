@@ -27,6 +27,8 @@ class _DemoState extends State<Demo> {
   PeekRemote? remote;
   DesktopDiagnosticsBridge? bridge;
   Timer? refresh;
+  StreamSubscription<List<PeekRemoteDiscovered>>? discovery;
+  List<PeekRemoteDiscovered> desktops = [];
   String? error;
   @override
   void initState() {
@@ -55,6 +57,23 @@ class _DemoState extends State<Demo> {
     } on Object {
       if (mounted) setState(() => error = '连接参数无效，请检查地址与四位配对码。');
     }
+  }
+
+  void discover() {
+    unawaited(discovery?.cancel());
+    discovery = remote!.discover().listen(
+      (found) {
+        if (mounted) {
+          setState(() {
+            desktops = found;
+            error = null;
+          });
+        }
+      },
+      onError: (Object _) {
+        if (mounted) setState(() => error = '自动发现不可用，请手动填写桌面地址。');
+      },
+    );
   }
 
   void network() {
@@ -90,6 +109,7 @@ class _DemoState extends State<Demo> {
   @override
   void dispose() {
     refresh?.cancel();
+    unawaited(discovery?.cancel());
     unawaited(bridge?.dispose());
     remote?.dispose();
     peek?.dispose();
@@ -123,6 +143,10 @@ class _DemoState extends State<Demo> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton(
+                  onPressed: discover,
+                  child: const Text('发现局域网桌面'),
+                ),
                 FilledButton(
                   onPressed: () => unawaited(connect()),
                   child: const Text('连接 / 配对'),
@@ -137,6 +161,16 @@ class _DemoState extends State<Demo> {
                 ),
               ],
             ),
+            for (final desktop in desktops)
+              TextButton(
+                onPressed: () => setState(
+                  () => host.text =
+                      '${desktop.endpoint.host}:${desktop.endpoint.port}',
+                ),
+                child: Text(
+                  '${desktop.name} · ${desktop.endpoint.host}:${desktop.endpoint.port} · v${desktop.protocolVersion}',
+                ),
+              ),
             const SizedBox(height: 16),
             Text('网络：${remote!.state.name} · 日志：${bridge!.state.name}'),
             Text(

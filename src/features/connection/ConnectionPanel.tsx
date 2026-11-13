@@ -230,7 +230,11 @@ export function ConnectionPanel({
                 </div>
               ))}
               {!remote.pairing?.devices.length && (
-                <p className="muted">{t("noPairedDevices")}</p>
+                <p className="muted">
+                  {t(
+                    remote.pairing ? "noPairedDevices" : "pairingsLoadOnStart",
+                  )}
+                </p>
               )}
             </div>
             <p className="muted small">{t("pairingBoundary")}</p>

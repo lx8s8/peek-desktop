@@ -25,6 +25,50 @@ pub struct LiveSession {
     pub sender: mpsc::Sender<Value>,
     pub cancel: CancellationToken,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn retention_is_bounded_and_stale_connections_cannot_clear_a_replacement() {
+        let mut store = LiveStore::default();
+        let header =
+            json!({"peekVersion":"2.1.1","platform":"macos","startedAt":"2026-11-13T00:00:00Z"});
+        let (tx, _rx) = mpsc::channel(16);
+        let key = store
+            .begin(
+                "device",
+                "run",
+                "old",
+                header.clone(),
+                tx.clone(),
+                CancellationToken::new(),
+            )
+            .unwrap();
+        for index in 0..=MAX_LIVE_ENTRIES {
+            let raw = json!({"id":index.to_string(),"source":"synthetic","startedAt":"2026-11-13T00:00:00Z","request":{"method":"GET","url":"https://synthetic.example.test"}}).to_string();
+            store
+                .upsert(&key, "old", StoredEntry::parse(&raw).unwrap())
+                .unwrap();
+        }
+        store.synced(&key, "old");
+        let session = &store.sessions[&key];
+        assert!(session.current.entries.len() <= MAX_LIVE_ENTRIES);
+        assert!(session.current.raw_bytes <= MAX_LIVE_BYTES);
+        assert!(session.evicted > 0);
+        assert!(session.current.entry("0").is_none());
+        let retained = session.current.entries.len();
+        store
+            .begin("device", "run", "new", header, tx, CancellationToken::new())
+            .unwrap();
+        store.clear(&key, "old");
+        store.disconnect(&key, "old");
+        assert_eq!(store.sessions[&key].current.entries.len(), retained);
+        assert!(store.sessions[&key].online);
+        assert_eq!(store.sessions[&key].generation, 2);
+    }
+}
 pub struct PendingBody {
     pub session_id: String,
     pub entry_id: String,

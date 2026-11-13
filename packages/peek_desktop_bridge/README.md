@@ -46,6 +46,14 @@ flutter pub get
 flutter run -d macos --dart-define=PEEK_DESKTOP_DIAGNOSTICS=true
 ```
 
-示例默认关闭诊断，只在 debug + 显式 dart-define 时初始化。它提供地址/配对码输入、合成请求、INFO/WARN/异常、结构化脱敏和上下文重置。macOS 已提供工程；如需移动端示例壳，可在 example 使用 Flutter 工具添加目标平台并验证局域网权限。
+示例默认关闭诊断，只在 debug + 显式 dart-define 时初始化。它提供官方 Bonjour 自动发现、地址/配对码输入、合成请求、INFO/WARN/异常、结构化脱敏和上下文重置。macOS 已提供工程；如需移动端示例壳，可在 example 使用 Flutter 工具添加目标平台并验证局域网权限。
 
 诊断线上契约见仓库 `docs/诊断协议v1.md`。最终互操作与尚未验证事项见 `docs/P1实施记录.md`。
+
+跨语言回归从仓库根目录运行：
+
+```bash
+cargo test --locked --manifest-path src-tauri/Cargo.toml --test sdk_interop -- --ignored --nocapture
+```
+
+测试启动临时 Rust 服务并使用内存凭据，驱动真实官方 PeekRemote 与本 SDK 配对、重连、传输日志及大正文。它不读取系统配对库；默认 Rust/Flutter 测试会跳过此项，需显式执行。

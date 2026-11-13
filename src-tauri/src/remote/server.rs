@@ -718,9 +718,20 @@ impl Remote {
     }
     pub async fn body(&self, id: String, entry_id: String, side: String) -> Result<BodyView> {
         let raw = self.entry(&id, &entry_id)?;
-        let value: Value = serde_json::from_str(&raw).map_err(|_| "invalidEntry")?;
-        if value[&side]["body"]["kind"] != "remote" {
-            return body::view(&value[&side]["body"]);
+        let initial = raw.clone();
+        let initial_side = side.clone();
+        let cached = tokio::task::spawn_blocking(move || -> Result<Option<BodyView>> {
+            let value: Value = serde_json::from_str(&initial).map_err(|_| "invalidEntry")?;
+            if value[&initial_side]["body"]["kind"] == "remote" {
+                Ok(None)
+            } else {
+                body::view(&value[&initial_side]["body"]).map(Some)
+            }
+        })
+        .await
+        .map_err(|_| "internalError")??;
+        if let Some(body) = cached {
+            return Ok(body);
         }
         let request_id = Uuid::new_v4().to_string();
         let (reply, response) = oneshot::channel();
@@ -758,8 +769,12 @@ impl Remote {
                 .map_err(|_| "bodyTimeout")?
                 .map_err(|_| "deviceOffline")??;
             let raw = self.entry(&id, &entry_id)?;
-            let value: Value = serde_json::from_str(&raw).map_err(|_| "invalidEntry")?;
-            body::view(&value[&side]["body"])
+            tokio::task::spawn_blocking(move || {
+                let value: Value = serde_json::from_str(&raw).map_err(|_| "invalidEntry")?;
+                body::view(&value[&side]["body"])
+            })
+            .await
+            .map_err(|_| "internalError")?
         }
         .await;
         self.store
