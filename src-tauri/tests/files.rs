@@ -33,6 +33,13 @@ fn body_views_distinguish_missing_remote_truncation_and_unknown_kinds() {
     assert_eq!(unknown.kind, "unavailable");
     assert_eq!(unknown.reason.as_deref(), Some("notCaptured"));
     assert_eq!(unknown.size, Some(90));
+    assert_eq!(
+        body::view(&json!({"kind":"unavailable","reason":"future"}))
+            .unwrap()
+            .reason
+            .as_deref(),
+        Some("notCaptured")
+    );
     let truncated = body::view(&json!({"kind":"text","text":"中文","size":100})).unwrap();
     assert!(truncated.truncated);
     assert_eq!(truncated.captured_bytes, 6);

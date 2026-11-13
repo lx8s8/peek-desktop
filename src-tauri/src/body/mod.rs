@@ -71,13 +71,16 @@ pub fn view(body: &Value) -> Result<BodyView> {
         }
         "unavailable" => {
             view.reason = Some(
-                match body["reason"].as_str() {
-                    Some(reason @ ("streamed" | "tooLarge" | "notCaptured" | "unreadable")) => {
-                        reason
-                    }
-                    _ => "notCaptured",
-                }
-                .into(),
+                body["reason"]
+                    .as_str()
+                    .filter(|reason| {
+                        matches!(
+                            *reason,
+                            "streamed" | "tooLarge" | "notCaptured" | "unreadable"
+                        )
+                    })
+                    .unwrap_or("notCaptured")
+                    .into(),
             );
         }
         "remote" => view.reason = Some("remote".into()),

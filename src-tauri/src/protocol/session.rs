@@ -87,7 +87,7 @@ pub fn parse_entry(value: &Value) -> Result<EntryRow> {
     let response = &value["response"];
     let failure = &value["failure"];
     let finished = !response.is_null() || !failure.is_null();
-    if finished != !value["completedAt"].is_null() {
+    if finished == value["completedAt"].is_null() {
         return Err("completedAt must match response/failure".into());
     }
     let duration_ms = if finished {

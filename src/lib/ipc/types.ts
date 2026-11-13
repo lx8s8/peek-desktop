@@ -1,7 +1,13 @@
 export interface SessionSummary {
   id: string;
   filename: string;
-  header: { formatVersion: number; peekVersion: string; name: string | null; platform: string; startedAt: string };
+  header: {
+    formatVersion: number;
+    peekVersion: string;
+    name: string | null;
+    platform: string;
+    startedAt: string;
+  };
   entryCount: number;
   skipped: number;
   newerFormat: boolean;
@@ -22,8 +28,16 @@ export interface EntryRow {
 }
 
 export type Filter = "all" | "errors" | "pending" | "pinned";
-export interface QueryPage { total: number; offset: number; rows: EntryRow[]; revision: number }
-export interface ImportProgress { bytesRead: number; totalBytes: number }
+export interface QueryPage {
+  total: number;
+  offset: number;
+  rows: EntryRow[];
+  revision: number;
+}
+export interface ImportProgress {
+  bytesRead: number;
+  totalBytes: number;
+}
 export interface BodyView {
   kind: string;
   mediaType: string | null;

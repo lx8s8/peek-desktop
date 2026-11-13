@@ -1,8 +1,16 @@
 export function readPreference(key: string, fallback: string): string {
-  try { return localStorage.getItem(`peek.${key}`) ?? fallback; } catch { return fallback; }
+  try {
+    return localStorage.getItem(`peek.${key}`) ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 export function writePreference(key: string, value: string) {
-  try { localStorage.setItem(`peek.${key}`, value); } catch { /* Read-only storage keeps defaults. */ }
+  try {
+    localStorage.setItem(`peek.${key}`, value);
+  } catch {
+    /* Read-only storage keeps defaults. */
+  }
 }
 
 export function formatBytes(bytes: number | null): string {

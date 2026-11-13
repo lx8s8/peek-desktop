@@ -93,10 +93,10 @@ pub async fn open_peek(
 
 #[tauri::command]
 pub fn cancel_import(state: State<'_, AppState>) {
-    if let Ok(active) = state.import.lock() {
-        if let Some(active) = &*active {
-            active.store(true, Ordering::Relaxed);
-        }
+    if let Ok(active) = state.import.lock()
+        && let Some(active) = &*active
+    {
+        active.store(true, Ordering::Relaxed);
     }
 }
 
