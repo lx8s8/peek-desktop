@@ -16,12 +16,34 @@ pub const MAX_ENTRIES: usize = 100_000;
 pub const MAX_SESSIONS: usize = 4;
 pub const MAX_LIBRARY_BYTES: usize = 128 * 1024 * 1024;
 
+#[derive(Clone)]
 pub struct StoredEntry {
     pub row: EntryRow,
     pub raw: Arc<str>,
     search: String,
 }
 
+impl StoredEntry {
+    pub fn parse(raw: &str) -> Result<Self> {
+        let value: Value = serde_json::from_str(raw).map_err(|_| "invalidEntry")?;
+        let row = parse_entry(&value)?;
+        let search = format!(
+            "{} {} {} {}",
+            row.method,
+            row.url,
+            row.source,
+            row.status.map(|s| s.to_string()).unwrap_or_default()
+        )
+        .to_lowercase();
+        Ok(Self {
+            row,
+            raw: raw.into(),
+            search,
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct Session {
     pub header: Header,
     pub raw_header: Arc<str>,
@@ -32,6 +54,44 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn empty(header: Header, raw_header: String) -> Self {
+        Self {
+            raw_bytes: raw_header.len(),
+            header,
+            raw_header: raw_header.into(),
+            entries: Vec::new(),
+            skipped: 0,
+            index: HashMap::new(),
+        }
+    }
+    pub fn upsert(&mut self, entry: StoredEntry) {
+        self.raw_bytes += entry.raw.len();
+        if let Some(index) = self.index.get(&entry.row.id).copied() {
+            self.raw_bytes -= self.entries[index].raw.len();
+            self.entries[index] = entry;
+        } else {
+            self.index.insert(entry.row.id.clone(), self.entries.len());
+            self.entries.push(entry);
+        }
+    }
+    pub fn remove(&mut self, id: &str) {
+        if let Some(index) = self.index.remove(id) {
+            self.raw_bytes -= self.entries.remove(index).raw.len();
+            for index in index..self.entries.len() {
+                self.index.insert(self.entries[index].row.id.clone(), index);
+            }
+        }
+    }
+    pub fn evict_prefix(&mut self, count: usize) {
+        let count = count.min(self.entries.len());
+        for entry in self.entries.drain(..count) {
+            self.raw_bytes -= entry.raw.len();
+        }
+        self.index.clear();
+        for (index, entry) in self.entries.iter().enumerate() {
+            self.index.insert(entry.row.id.clone(), index);
+        }
+    }
     pub fn entry(&self, id: &str) -> Option<&StoredEntry> {
         self.index.get(id).map(|i| &self.entries[*i])
     }
@@ -209,6 +269,23 @@ pub struct SessionSummary {
     pub skipped: usize,
     pub newer_format: bool,
     pub raw_bytes: usize,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub live: Option<LiveInfo>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveInfo {
+    pub device_id: String,
+    pub network_session_id: String,
+    pub online: bool,
+    pub syncing: bool,
+    pub generation: u64,
+    pub version: u64,
+    pub dropped: u64,
+    pub evicted: u64,
+    pub diagnostic_count: usize,
+    pub diagnostics_online: bool,
 }
 
 impl Library {
@@ -227,6 +304,7 @@ impl Library {
             skipped: session.skipped,
             newer_format: session.header.format_version > 1,
             raw_bytes: session.raw_bytes,
+            live: None,
         };
         self.sessions.insert(id, (filename, Arc::new(session)));
         Ok(summary)
@@ -251,6 +329,7 @@ impl Library {
                 skipped: session.skipped,
                 newer_format: session.header.format_version > 1,
                 raw_bytes: session.raw_bytes,
+                live: None,
             })
             .collect();
         summaries.sort_by(|a, b| a.id.cmp(&b.id));
