@@ -41,7 +41,7 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-type Socket = WebSocketStream<BufReader<TcpStream>>;
+pub(super) type Socket = WebSocketStream<BufReader<TcpStream>>;
 
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +60,7 @@ pub struct RemoteSnapshot {
     pub pairing: Option<PairingInfo>,
     pub sessions: Vec<SessionSummary>,
     pub revision: u64,
+    pub diagnostic_runs: Vec<super::diagnostics::DiagnosticRunInfo>,
 }
 struct Running {
     cancel: CancellationToken,
@@ -70,6 +71,7 @@ struct Running {
 pub struct Remote {
     pub(super) store: Mutex<LiveStore>,
     pub(super) pairing: Arc<Mutex<Option<Pairing>>>,
+    pub(super) diagnostics: Mutex<super::diagnostics::DiagnosticStore>,
     vault: Arc<dyn SecretVault>,
     listener: Mutex<ListenerInfo>,
     running: AsyncMutex<Option<Running>>,
@@ -89,6 +91,7 @@ impl Remote {
             vault,
             store: Mutex::new(LiveStore::default()),
             pairing: Arc::new(Mutex::new(None)),
+            diagnostics: Mutex::new(super::diagnostics::DiagnosticStore::default()),
             listener: Mutex::new(ListenerInfo::default()),
             running: AsyncMutex::new(None),
             admission: AsyncMutex::new(()),
@@ -112,10 +115,29 @@ impl Remote {
             pairing,
             sessions: self.summaries()?,
             revision: self.revision.load(Ordering::Relaxed),
+            diagnostic_runs: self
+                .diagnostics
+                .lock()
+                .map_err(|_| "internalError")?
+                .summaries(),
         })
     }
     pub fn summaries(&self) -> Result<Vec<SessionSummary>> {
-        Ok(self.store.lock().map_err(|_| "internalError")?.summaries())
+        let mut summaries = self.store.lock().map_err(|_| "internalError")?.summaries();
+        let diagnostics = self.diagnostics.lock().map_err(|_| "internalError")?;
+        for summary in &mut summaries {
+            if let Some(info) = &mut summary.live {
+                for run in diagnostics
+                    .runs
+                    .values()
+                    .filter(|r| r.network_key.as_deref() == Some(&summary.id))
+                {
+                    info.diagnostic_count += run.count();
+                    info.diagnostics_online |= run.online;
+                }
+            }
+        }
+        Ok(summaries)
     }
     pub fn query(
         &self,
@@ -166,6 +188,18 @@ impl Remote {
         store.cancel_pending(id, "sessionNotFound");
         store.sessions.remove(id);
         drop(store);
+        self.diagnostics
+            .lock()
+            .map_err(|_| "internalError")?
+            .runs
+            .retain(|_, run| {
+                if run.network_key.as_deref() == Some(id) {
+                    run.cancel.cancel();
+                    false
+                } else {
+                    true
+                }
+            });
         self.changed();
         Ok(())
     }
@@ -295,6 +329,18 @@ impl Remote {
                 session.cancel.cancel();
             }
         }
+        if diagnostics != Some(true) {
+            for run in self
+                .diagnostics
+                .lock()
+                .map_err(|_| "internalError")?
+                .runs
+                .values()
+                .filter(|r| r.device_id == device_id)
+            {
+                run.cancel.cancel();
+            }
+        }
         self.changed();
         Ok(())
     }
@@ -377,8 +423,16 @@ impl Remote {
             .map_err(|_| "writeTimeout")?
             .map_err(|_| "writeFailed")?;
         let config = WebSocketConfig::default()
-            .max_message_size(Some(MAX_LINE_BYTES))
-            .max_frame_size(Some(MAX_LINE_BYTES));
+            .max_message_size(Some(if diagnostics {
+                256 * 1024
+            } else {
+                MAX_LINE_BYTES
+            }))
+            .max_frame_size(Some(if diagnostics {
+                256 * 1024
+            } else {
+                MAX_LINE_BYTES
+            }));
         let socket = WebSocketStream::from_raw_socket(stream, Role::Server, Some(config)).await;
         if diagnostics {
             return self.diagnostic_connection(socket, cancel).await;
@@ -386,18 +440,6 @@ impl Remote {
         self.network_connection(socket, cancel).await
     }
 
-    // Replaced by the diagnostics transport in the next implementation step.
-    async fn diagnostic_connection(
-        &self,
-        mut socket: Socket,
-        _cancel: CancellationToken,
-    ) -> Result<()> {
-        send(
-            &mut socket,
-            json!({"type":"diagnostics.denied","reason":"notReady"}),
-        )
-        .await
-    }
     async fn network_connection(
         self: &Arc<Self>,
         mut socket: Socket,
@@ -760,7 +802,7 @@ impl Remote {
     }
 }
 
-async fn send(socket: &mut Socket, value: Value) -> Result<()> {
+pub(super) async fn send(socket: &mut Socket, value: Value) -> Result<()> {
     timeout(
         Duration::from_secs(5),
         socket.send(Message::Text(value.to_string().into())),
