@@ -1,6 +1,7 @@
 pub mod body;
 mod commands;
 pub mod protocol;
+pub mod query;
 pub mod remote;
 pub mod session;
 pub mod storage;
@@ -30,6 +31,10 @@ pub fn run() {
             commands::query_diagnostics,
             commands::get_diagnostic,
             commands::close_diagnostic,
+            commands::review_diagnostics,
+            commands::query_timeline,
+            commands::copy_diagnostics,
+            commands::export_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Peek Desktop");

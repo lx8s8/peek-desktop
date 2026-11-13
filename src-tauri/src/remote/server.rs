@@ -69,9 +69,9 @@ struct Running {
 }
 
 pub struct Remote {
-    pub(super) store: Mutex<LiveStore>,
+    pub(crate) store: Mutex<LiveStore>,
     pub(super) pairing: Arc<Mutex<Option<Pairing>>>,
-    pub(super) diagnostics: Mutex<super::diagnostics::DiagnosticStore>,
+    pub(crate) diagnostics: Mutex<super::diagnostics::DiagnosticStore>,
     vault: Arc<dyn SecretVault>,
     listener: Mutex<ListenerInfo>,
     running: AsyncMutex<Option<Running>>,

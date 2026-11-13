@@ -56,9 +56,16 @@ mod tests {
 pub struct StoredDiagnostic {
     pub event: DiagnosticEvent,
     pub raw: Arc<str>,
-    search: String,
+    search: Arc<str>,
+    pub(crate) fingerprint: Option<String>,
 }
 impl StoredDiagnostic {
+    pub(crate) fn search_text(&self) -> Arc<str> {
+        self.search.clone()
+    }
+    pub(crate) fn matches_search(&self, search: &str) -> bool {
+        self.search.contains(search)
+    }
     pub fn parse(raw: &str) -> Result<Self> {
         let event = DiagnosticEvent::parse(raw)?;
         if [
@@ -72,11 +79,13 @@ impl StoredDiagnostic {
         {
             return Err("eventIdentityTooLarge".into());
         }
-        let search = raw.to_lowercase();
+        let search = raw.to_lowercase().into();
+        let fingerprint = crate::query::fingerprint(&event);
         Ok(Self {
             event,
             raw: raw.into(),
             search,
+            fingerprint,
         })
     }
 }
@@ -124,6 +133,9 @@ pub struct DiagnosticRunInfo {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticRow {
+    pub fingerprint: Option<String>,
+    pub exception_type: Option<String>,
+    pub related_network_entry_id: Option<String>,
     pub event_id: String,
     pub sequence: String,
     pub occurred_at: String,
@@ -223,6 +235,9 @@ impl DiagnosticStore {
     }
 }
 impl DiagnosticRun {
+    pub(crate) fn events(&self) -> impl Iterator<Item = &StoredDiagnostic> {
+        self.events.iter()
+    }
     pub fn count(&self) -> usize {
         self.events.len()
     }
@@ -353,6 +368,13 @@ impl DiagnosticRun {
             .skip(offset)
             .take(limit.min(300))
             .map(|e| DiagnosticRow {
+                fingerprint: e.fingerprint.clone(),
+                exception_type: e
+                    .event
+                    .exception
+                    .as_ref()
+                    .and_then(|exception| exception.r#type.clone()),
+                related_network_entry_id: e.event.related_network_entry_id.clone(),
                 event_id: e.event.event_id.clone(),
                 sequence: e.event.sequence.clone(),
                 occurred_at: e.event.occurred_at.clone(),

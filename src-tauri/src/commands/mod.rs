@@ -129,6 +129,7 @@ pub fn close_session(state: State<'_, AppState>, session_id: String) -> Result<(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn query_entries(
     state: State<'_, AppState>,
     session_id: String,
@@ -137,11 +138,21 @@ pub async fn query_entries(
     offset: usize,
     limit: usize,
     revision: u32,
+    range: Option<crate::query::TimeRange>,
 ) -> Result<QueryPage> {
+    let range = range.unwrap_or_default().parse()?;
     if session_id.starts_with("live-") {
         let remote = state.remote.clone();
         return tauri::async_runtime::spawn_blocking(move || {
-            remote.query(&session_id, &search, &filter, offset, limit, revision)
+            remote.query_range(
+                &session_id,
+                &search,
+                &filter,
+                offset,
+                limit,
+                revision,
+                &range,
+            )
         })
         .await
         .map_err(|_| "internalError")?;
@@ -152,7 +163,7 @@ pub async fn query_entries(
         .map_err(|_| "internalError")?
         .get(&session_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(session.query(&search, &filter, offset, limit, revision))
+        Ok(session.query_range(&search, &filter, offset, limit, revision, &range))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -429,4 +440,83 @@ pub fn get_diagnostic(
 #[tauri::command]
 pub fn close_diagnostic(state: State<'_, AppState>, run_id: String) -> Result<()> {
     state.remote.close_diagnostic(&run_id)
+}
+
+#[tauri::command]
+pub async fn review_diagnostics(
+    state: State<'_, AppState>,
+    run_id: String,
+    query: crate::query::ReviewQuery,
+) -> Result<crate::query::ReviewPage> {
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || remote.review_diagnostics(&run_id, &query))
+        .await
+        .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn query_timeline(
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::query::ReviewQuery,
+) -> Result<crate::query::TimelinePage> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let network = match &scope {
+            crate::query::Scope::Network { id } if id.starts_with("live-") => {
+                remote.network_rows(id)?
+            }
+            crate::query::Scope::Network { id } => library
+                .lock()
+                .map_err(|_| "internalError")?
+                .get(id)?
+                .entries
+                .iter()
+                .map(|e| e.row.clone())
+                .collect(),
+            _ => vec![],
+        };
+        remote.timeline(&scope, network, &query)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+#[tauri::command]
+pub async fn copy_diagnostics(
+    state: State<'_, AppState>,
+    selection: Vec<crate::query::DiagnosticRef>,
+    kind: String,
+) -> Result<String> {
+    let records = state.remote.selected_diagnostics(&selection)?;
+    tauri::async_runtime::spawn_blocking(move || crate::query::copy_diagnostics(&records, &kind))
+        .await
+        .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn export_diagnostics(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    selection: Vec<crate::query::DiagnosticRef>,
+) -> Result<bool> {
+    let records = state.remote.selected_diagnostics(&selection)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("Diagnostic events", &["jsonl"])
+            .set_file_name("diagnostics.jsonl")
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let mut path = path.into_path().map_err(|_| "invalidPath")?;
+        if path.extension().is_none() {
+            path.set_extension("jsonl");
+        }
+        storage::save_diagnostics(&path, &records)?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "internalError")?
 }

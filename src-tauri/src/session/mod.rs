@@ -117,6 +117,25 @@ impl Session {
         limit: usize,
         revision: u32,
     ) -> QueryPage {
+        self.query_range(
+            search,
+            filter,
+            offset,
+            limit,
+            revision,
+            &crate::query::ParsedRange::default(),
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn query_range(
+        &self,
+        search: &str,
+        filter: &str,
+        offset: usize,
+        limit: usize,
+        revision: u32,
+        range: &crate::query::ParsedRange,
+    ) -> QueryPage {
         let search = search.to_lowercase();
         let matches = |entry: &&StoredEntry| {
             let row = &entry.row;
@@ -126,7 +145,7 @@ impl Session {
                 "pinned" => row.pinned,
                 _ => true,
             };
-            accepted && entry.search.contains(&search)
+            accepted && entry.search.contains(&search) && range.includes(&row.started_at)
         };
         let total = self.entries.iter().filter(matches).count();
         let rows = self

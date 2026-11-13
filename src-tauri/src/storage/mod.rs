@@ -30,3 +30,18 @@ pub fn save(path: &Path, session: &Session) -> Result<()> {
     temp.persist(path).map_err(|e| e.error.to_string())?;
     Ok(())
 }
+
+pub fn save_diagnostics(path: &Path, records: &[std::sync::Arc<str>]) -> Result<()> {
+    let parent = path.parent().ok_or("invalidPath")?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+    {
+        let mut writer = BufWriter::new(temp.as_file_mut());
+        for record in records {
+            writeln!(writer, "{record}").map_err(|e| e.to_string())?;
+        }
+        writer.flush().map_err(|e| e.to_string())?;
+    }
+    temp.as_file().sync_all().map_err(|e| e.to_string())?;
+    temp.persist(path).map_err(|e| e.error.to_string())?;
+    Ok(())
+}
