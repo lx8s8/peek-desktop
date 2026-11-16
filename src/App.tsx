@@ -501,6 +501,12 @@ export default function App() {
           {t("archiveSession")}
         </Button>
         <FileTools
+          hasData={!!(sessions.length || remote.diagnosticRuns.length)}
+          onRestored={async (result) => {
+            await refresh();
+            setIndependent(result.sessionId ? null : result.runId);
+            setActiveId(result.sessionId);
+          }}
           scope={
             scopeId
               ? { kind: independentRun ? "diagnostic" : "network", id: scopeId }

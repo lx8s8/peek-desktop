@@ -1,5 +1,7 @@
 export const definitions = {
   "files.open": { label: "fileTools" },
+  "recovery.restore": { label: "restoreWorkspace" },
+  "recovery.save": { label: "saveRecovery" },
   "export.har": { label: "exportHar" },
   "export.logs": { label: "exportAllLogs" },
   "export.text": { label: "exportLogText" },

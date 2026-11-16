@@ -80,7 +80,15 @@ vi.mock("./features/timeline/TimelineTable", () => ({
 }));
 vi.mock("./lib/ipc/client", () => ({
   desktop: true,
-  api: { entryInfo: vi.fn(), archive: vi.fn() },
+  api: {
+    entryInfo: vi.fn(),
+    archive: vi.fn(),
+    recoveryStatus: vi.fn(async () => ({
+      enabled: false,
+      pending: false,
+      available: false,
+    })),
+  },
 }));
 const session = (id: string, generation = 1): SessionSummary => ({
   id,

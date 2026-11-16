@@ -4,6 +4,7 @@ mod commands;
 pub mod export;
 pub mod protocol;
 pub mod query;
+pub mod recovery;
 pub mod remote;
 pub mod session;
 pub mod storage;
@@ -14,6 +15,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
+        .setup(|app| {
+            commands::start_recovery(app)?;
+            Ok(())
+        })
         .on_menu_event(|app, event| {
             // Stable command IDs outlive menu rebuilds and JS resource disposal.
             let _ = app.emit_to("main", "peek-menu-command", event.id().as_ref());
@@ -30,6 +35,11 @@ pub fn run() {
             commands::save_bundle,
             commands::export_scope,
             commands::copy_curl,
+            commands::recovery_status,
+            commands::set_recovery_enabled,
+            commands::save_recovery,
+            commands::restore_recovery,
+            commands::start_new_recovery,
             commands::remote_snapshot,
             commands::start_listener,
             commands::stop_listener,
@@ -49,6 +59,13 @@ pub fn run() {
             commands::write_clipboard,
             commands::popup_context_menu,
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Peek Desktop");
+        .build(tauri::generate_context!())
+        .expect("failed to build Peek Desktop")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event
+                && commands::save_before_exit(app)
+            {
+                api.prevent_exit();
+            }
+        });
 }

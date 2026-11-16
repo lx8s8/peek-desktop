@@ -2,6 +2,16 @@ export interface Imported {
   sessionId: string | null;
   runId: string | null;
 }
+export interface RecoveryStatus {
+  enabled: boolean;
+  available: boolean;
+  pending: boolean;
+  restored: boolean;
+  usedBackup: boolean;
+  updatedAt: number | null;
+  bytes: number;
+  error: string | null;
+}
 export interface SessionSummary {
   archive?: {
     recovered: boolean;

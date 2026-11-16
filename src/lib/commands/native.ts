@@ -91,6 +91,8 @@ export function menuItems(snapshot: MenuSnapshot): Items {
         item("session.save"),
         item("session.archive"),
         item("files.open"),
+        item("recovery.restore"),
+        item("recovery.save"),
         item("export.har"),
         item("export.logs"),
         item("export.text"),

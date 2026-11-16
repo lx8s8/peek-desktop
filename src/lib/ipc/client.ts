@@ -1,6 +1,7 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import type {
   Imported,
+  RecoveryStatus,
   BodyView,
   Filter,
   ImportProgress,
@@ -30,6 +31,12 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  recoveryStatus: () => invoke<RecoveryStatus>("recovery_status"),
+  setRecoveryEnabled: (enabled: boolean) =>
+    invoke<RecoveryStatus>("set_recovery_enabled", { enabled }),
+  saveRecovery: () => invoke<RecoveryStatus>("save_recovery"),
+  restoreRecovery: () => invoke<Imported>("restore_recovery"),
+  startNewRecovery: () => invoke<RecoveryStatus>("start_new_recovery"),
   exportScope: (scope: Scope, kind: "har" | "jsonl" | "text") =>
     invoke<boolean>("export_scope", { scope, kind }),
   copyCurl: (sessionId: string, entryId: string) =>

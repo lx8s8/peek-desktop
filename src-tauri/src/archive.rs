@@ -29,6 +29,10 @@ const MAX_RUNS: usize = 8;
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkOrigin {
+    #[serde(default)]
+    pub source_device_id: Option<String>,
+    #[serde(default)]
+    pub source_network_id: Option<String>,
     pub recovered: bool,
     pub dropped: u64,
     pub evicted: u64,
@@ -101,7 +105,11 @@ impl RunSnapshot {
         Self {
             meta: RunManifest {
                 key: key.into(),
-                device_id: run.device_id.clone(),
+                device_id: run
+                    .original_device_id
+                    .as_ref()
+                    .unwrap_or(&run.device_id)
+                    .clone(),
                 run_id: run.run_id.clone(),
                 network_key: run.network_key.clone(),
                 accepted: run.accepted_strings(),
@@ -187,6 +195,7 @@ impl RunSnapshot {
         Ok(DiagnosticRun {
             // Import namespaces never match a live device/run's admission key.
             device_id: format!("archive-{}", uuid::Uuid::new_v4()),
+            original_device_id: Some(m.device_id.clone()),
             run_id: m.run_id.clone(),
             network_key,
             connection_id: String::new(),
@@ -241,6 +250,8 @@ pub fn capture(
                     .unwrap_or_else(|| "Network".into()),
                 session: Arc::new(session.current.clone()),
                 origin: NetworkOrigin {
+                    source_device_id: Some(session.device_id.clone()),
+                    source_network_id: Some(session.network_id.clone()),
                     dropped: session.dropped,
                     evicted: session.evicted,
                     syncing: session.staging.is_some(),
@@ -304,7 +315,9 @@ pub fn save(path: &Path, bundle: &Bundle) -> Result<()> {
         networks: vec![],
         runs: vec![],
     };
-    let mut temp = tempfile::NamedTempFile::new_in(path.parent().ok_or("invalidPath")?)
+    let mut temp = tempfile::Builder::new()
+        .prefix(".peek-write-")
+        .tempfile_in(path.parent().ok_or("invalidPath")?)
         .map_err(|e| e.to_string())?;
     let mut total = 0_u64;
     {

@@ -91,6 +91,7 @@ impl StoredDiagnostic {
 }
 pub struct DiagnosticRun {
     pub device_id: String,
+    pub original_device_id: Option<String>,
     pub run_id: String,
     pub network_key: Option<String>,
     pub connection_id: String,
@@ -188,6 +189,7 @@ impl DiagnosticStore {
             self.runs.insert(
                 id.clone(),
                 DiagnosticRun {
+                    original_device_id: None,
                     device_id: device,
                     run_id: run,
                     network_key,

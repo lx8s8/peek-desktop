@@ -44,6 +44,8 @@ pub async fn popup_context_menu(
 
 #[derive(Default)]
 pub struct AppState {
+    recovery: Arc<Mutex<crate::recovery::Recovery>>,
+    shutdown: AtomicBool,
     remote: Arc<Remote>,
     subscriptions: Mutex<std::collections::HashMap<String, Subscription>>,
     library: Arc<Mutex<Library>>,
@@ -694,4 +696,136 @@ pub async fn copy_curl(
     tauri::async_runtime::spawn_blocking(move || crate::export::curl(&raw))
         .await
         .map_err(|_| "internalError")?
+}
+
+fn persist_workspace(
+    recovery: &Mutex<crate::recovery::Recovery>,
+    library: &Mutex<Library>,
+    remote: &Remote,
+    force: bool,
+) -> Result<()> {
+    let mut store = recovery.lock().map_err(|_| "internalError")?;
+    let result = store.save_workspace(
+        &*library.lock().map_err(|_| "internalError")?,
+        remote,
+        force,
+    );
+    if let Err(error) = &result {
+        store.status.error = Some(error.clone());
+    }
+    result
+}
+pub fn start_recovery(app: &tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use tauri::Manager;
+    let directory = app.path().app_data_dir()?.join("recovery");
+    let state = app.state::<AppState>();
+    let recovery = state.recovery.clone();
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn(async move {
+        let init = recovery.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            let loaded = crate::recovery::Recovery::load(directory);
+            if let Ok(mut state) = init.lock() {
+                match loaded {
+                    Ok(loaded) => *state = loaded,
+                    Err(error) => state.status.error = Some(error),
+                }
+            }
+        })
+        .await;
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let recovery = recovery.clone();
+            let library = library.clone();
+            let remote = remote.clone();
+            let _ = tauri::async_runtime::spawn_blocking(move || {
+                persist_workspace(&recovery, &library, &remote, false)
+            })
+            .await;
+        }
+    });
+    Ok(())
+}
+pub fn save_before_exit(app: &tauri::AppHandle) -> bool {
+    use tauri::Manager;
+    let state = app.state::<AppState>();
+    if state.shutdown.swap(true, Ordering::SeqCst) {
+        return false;
+    }
+    let recovery = state.recovery.clone();
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            persist_workspace(&recovery, &library, &remote, false)
+        })
+        .await;
+        handle.exit(0);
+    });
+    true
+}
+#[tauri::command]
+pub async fn recovery_status(
+    state: State<'_, AppState>,
+) -> Result<crate::recovery::RecoveryStatus> {
+    let recovery = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(recovery.lock().map_err(|_| "internalError")?.status.clone())
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn set_recovery_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<crate::recovery::RecoveryStatus> {
+    let recovery = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery
+            .lock()
+            .map_err(|_| "internalError")?
+            .set_enabled(enabled)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn save_recovery(state: State<'_, AppState>) -> Result<crate::recovery::RecoveryStatus> {
+    let recovery = state.recovery.clone();
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        persist_workspace(&recovery, &library, &remote, true)?;
+        Ok(recovery.lock().map_err(|_| "internalError")?.status.clone())
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn restore_recovery(state: State<'_, AppState>) -> Result<crate::archive::Imported> {
+    let recovery = state.recovery.clone();
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery
+            .lock()
+            .map_err(|_| "internalError")?
+            .restore(&mut *library.lock().map_err(|_| "internalError")?, &remote)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn start_new_recovery(
+    state: State<'_, AppState>,
+) -> Result<crate::recovery::RecoveryStatus> {
+    let recovery = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery.lock().map_err(|_| "internalError")?.start_new()
+    })
+    .await
+    .map_err(|_| "internalError")?
 }

@@ -33,6 +33,8 @@ fn sample() -> Bundle {
             filename: "synthetic.peek".into(),
             session: Arc::new(session),
             origin: NetworkOrigin {
+                source_device_id: Some("original-device".into()),
+                source_network_id: Some("original-network".into()),
                 dropped: 4,
                 evicted: 7,
                 syncing: true,
@@ -116,6 +118,12 @@ fn archive_roundtrip_preserves_raw_data_gaps_binding_and_independent_import_iden
     assert_eq!(
         &*remote.diagnostic_detail(&run_id, "event-5").unwrap(),
         &*bundle.runs[0].records[0]
+    );
+    let reexported = archive::capture(&library, &remote, None).unwrap();
+    assert_eq!(reexported.runs[0].meta.device_id, "original-device");
+    assert_eq!(
+        reexported.networks[0].origin.source_network_id.as_deref(),
+        Some("original-network")
     );
     let session = library.get(&id).unwrap();
     let timeline = serde_json::to_value(

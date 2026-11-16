@@ -108,7 +108,7 @@ fn cancellation_and_capacity_fail_without_partial_session() {
         "lineTooLarge"
     );
     let mut library = Library::default();
-    for _ in 0..4 {
+    for _ in 0..peek_desktop_lib::session::MAX_SESSIONS {
         let file = fs::read(fixtures().join("sessions/header-only.peek")).unwrap();
         library
             .insert(

@@ -5,7 +5,8 @@ import { Button } from "../../components/ui/button";
 import { api, desktop } from "../../lib/ipc/client";
 import { commands } from "../../lib/commands/dispatcher";
 import { useCommand } from "../../lib/commands/react";
-import type { Scope } from "../../lib/ipc/types";
+import type { Imported, RecoveryStatus, Scope } from "../../lib/ipc/types";
+import { formatBytes } from "../../lib/preferences";
 
 export function FileTools({
   scope,
@@ -14,6 +15,8 @@ export function FileTools({
   entryId,
   onError,
   onNotice,
+  onRestored,
+  hasData = !!scope,
 }: {
   scope: Scope | null;
   hasLogs: boolean;
@@ -21,8 +24,10 @@ export function FileTools({
   entryId?: string;
   onError: (message: string) => void;
   onNotice: (message: string) => void;
+  onRestored?: (result: Imported) => Promise<void>;
+  hasData?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<{
     text: string;
@@ -33,6 +38,32 @@ export function FileTools({
     onNotice(text);
   };
   const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState<RecoveryStatus | null>(null);
+  const recoveryRevision = useRef(0);
+  const publishRecovery = (value: RecoveryStatus) => {
+    ++recoveryRevision.current;
+    setRecovery(value);
+  };
+  useEffect(() => {
+    if (!desktop) return;
+    let active = true;
+    const load = async () => {
+      const request = ++recoveryRevision.current;
+      try {
+        const value = await api.recoveryStatus();
+        if (active && request === recoveryRevision.current) setRecovery(value);
+      } catch (error) {
+        if (active) setFeedback({ text: String(error), error: true });
+      }
+    };
+    void load();
+    const timer = setInterval(() => void load(), 3000);
+    return () => {
+      active = false;
+      ++recoveryRevision.current;
+      clearInterval(timer);
+    };
+  }, []);
   const working = useRef(false);
   const dialog = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -63,6 +94,27 @@ export function FileTools({
     });
   }
   useCommand("files.open", () => setOpen(true), desktop);
+  useCommand(
+    "recovery.save",
+    () =>
+      act(async () => {
+        publishRecovery(await api.saveRecovery());
+        notify(t("saved"));
+      }),
+    desktop && hasData && !!recovery && !recovery.pending && !busy,
+  );
+  useCommand(
+    "recovery.restore",
+    () =>
+      act(async () => {
+        const result = await api.restoreRecovery();
+        await onRestored?.(result);
+        const status = await api.recoveryStatus();
+        publishRecovery(status);
+        notify(t(status.usedBackup ? "recoveryBackup" : "recoveryRestored"));
+      }),
+    desktop && !!recovery?.pending && !busy,
+  );
   useCommand("export.har", () => save("har"), desktop && !!networkId && !busy);
   useCommand("export.logs", () => save("jsonl"), desktop && hasLogs && !busy);
   useCommand("export.text", () => save("text"), desktop && hasLogs && !busy);
@@ -124,6 +176,7 @@ export function FileTools({
       >
         <Download />
         {t("fileTools")}
+        {recovery?.pending ? ` · ${t("recoveryTitle")}` : ""}
       </Button>
       {open && (
         <div
@@ -180,6 +233,60 @@ export function FileTools({
               >
                 {t("copyCurl")}
               </Button>
+            </div>
+            <h3>{t("recoveryTitle")}</h3>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={recovery?.enabled ?? false}
+                disabled={busy || !recovery}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  void act(async () =>
+                    publishRecovery(await api.setRecoveryEnabled(enabled)),
+                  );
+                }}
+              />
+              {t("enableRecovery")}
+            </label>
+            <p className="muted">{t("recoveryHint")}</p>
+            {recovery?.pending && <p role="status">{t("pendingRecovery")}</p>}
+            {recovery?.error && <p role="alert">{t(recovery.error)}</p>}
+            <p className="muted">
+              {recovery?.updatedAt
+                ? t("recoveryInfo", {
+                    size: formatBytes(recovery.bytes),
+                    time: new Date(recovery.updatedAt * 1000).toLocaleString(
+                      i18n.language,
+                    ),
+                  })
+                : t("recoveryNotSaved")}
+            </p>
+            <div className="file-actions">
+              <Button
+                disabled={!recovery?.pending || busy}
+                onClick={() => commands.dispatch("recovery.restore")}
+              >
+                {t("restoreWorkspace")}
+              </Button>
+              <Button
+                disabled={!hasData || !recovery || recovery.pending || busy}
+                onClick={() => commands.dispatch("recovery.save")}
+              >
+                {t("saveRecovery")}
+              </Button>
+              {recovery?.pending && (
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(async () =>
+                      publishRecovery(await api.startNewRecovery()),
+                    )
+                  }
+                >
+                  {t("startNewRecovery")}
+                </Button>
+              )}
             </div>
           </section>
         </div>

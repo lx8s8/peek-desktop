@@ -1,4 +1,24 @@
 export const archiveZh = {
+  recoveryTitle: "工作区恢复",
+  enableRecovery: "启用自动恢复快照",
+  recoveryHint:
+    "开启后每 5 秒检查变化，退出时补存。快照保存当前保留的网络、已加载正文和日志；恢复为离线会话，监听需手动启动。",
+  pendingRecovery: "有上次工作区可恢复；为避免覆盖，快照写入暂时停止。",
+  recoveryReady: "恢复快照已保存；下次启动时可恢复。",
+  restoreWorkspace: "恢复上次工作区",
+  startNewRecovery: "开始新的恢复记录",
+  saveRecovery: "立即保存工作区快照",
+  recoveryRestored: "已恢复为离线会话。",
+  recoveryBackup: "最新快照损坏，已使用上一份有效快照。",
+  recoveryInfo: "恢复缓存 {{size}} · 最近保存 {{time}}",
+  recoveryNotSaved: "尚未保存恢复快照",
+  recoveryPending: "请先恢复上次工作区，或选择开始新的恢复记录。",
+  recoveryNotPending: "本次启动没有待恢复工作区，或已经处理。",
+  recoveryCorrupt: "两份恢复快照均无法校验；当前工作区未改动。",
+  recoveryUnavailable: "无法访问恢复缓存目录，请检查磁盘空间与文件权限。",
+  recoveryInUse: "另一实例正在使用恢复缓存；本实例的自动恢复暂不可用。",
+  recoverySettingsInvalid: "恢复配置损坏；自动保存已关闭，可重新设置。",
+  nothingToRecover: "当前没有可保存的会话。",
   fileTools: "导出与恢复",
   exportHar: "导出当前网络 HAR…",
   exportAllLogs: "导出当前全部日志 JSONL…",
@@ -22,6 +42,34 @@ export const archiveZh = {
   bundleWriteFailed: "归档写入失败，原文件保持不变。",
 };
 export const archiveEn: Record<keyof typeof archiveZh, string> = {
+  recoveryTitle: "Workspace recovery",
+  enableRecovery: "Enable automatic recovery snapshots",
+  recoveryHint:
+    "Checks for changes every 5 seconds and saves on exit. Snapshots retain network data, loaded bodies and logs. Recovery opens offline sessions; start listening manually.",
+  pendingRecovery:
+    "A previous workspace is available. Snapshot writes are paused to protect it.",
+  recoveryReady: "Recovery snapshot saved for the next launch.",
+  restoreWorkspace: "Restore previous workspace",
+  startNewRecovery: "Start a new recovery record",
+  saveRecovery: "Save workspace snapshot now",
+  recoveryRestored: "Recovered as offline sessions.",
+  recoveryBackup:
+    "The latest snapshot was corrupt. Recovered the previous valid snapshot.",
+  recoveryInfo: "Recovery cache {{size}} · Last saved {{time}}",
+  recoveryNotSaved: "No recovery snapshot saved",
+  recoveryPending:
+    "Restore the previous workspace or start a new recovery record first.",
+  recoveryNotPending:
+    "No pending recovery, or recovery was already handled this launch.",
+  recoveryCorrupt:
+    "Neither snapshot passed validation. The current workspace is unchanged.",
+  recoveryUnavailable:
+    "Recovery storage unavailable. Check disk space and file permissions.",
+  recoveryInUse:
+    "Another instance owns the recovery cache. Recovery is unavailable here.",
+  recoverySettingsInvalid:
+    "Recovery settings are corrupt. Automatic saves are off; configure them again.",
+  nothingToRecover: "No sessions to save.",
   fileTools: "Export and recovery",
   exportHar: "Export current network as HAR…",
   exportAllLogs: "Export all current logs as JSONL…",
