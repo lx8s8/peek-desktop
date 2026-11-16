@@ -1,14 +1,22 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:peek/core.dart';
 import 'package:peek_remote/peek_remote.dart';
 import 'package:peek_desktop_bridge/peek_desktop_bridge.dart';
+import 'package:peek_desktop_connect/peek_desktop_connect.dart';
 import 'package:talker/talker.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MaterialApp(home: Demo()));
+  runApp(
+    const MaterialApp(
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: [Locale('zh'), Locale('en')],
+      home: Demo(),
+    ),
+  );
 }
 
 class Demo extends StatefulWidget {
@@ -20,24 +28,20 @@ class Demo extends StatefulWidget {
 class _DemoState extends State<Demo> {
   static const enabled =
       kDebugMode && bool.fromEnvironment('PEEK_DESKTOP_DIAGNOSTICS');
-  final host = TextEditingController(text: '127.0.0.1:9741');
-  final code = TextEditingController();
   final talker = Talker(settings: TalkerSettings(useConsoleLogs: false));
   Peek? peek;
   PeekRemote? remote;
   DesktopDiagnosticsBridge? bridge;
   Timer? refresh;
-  StreamSubscription<List<PeekRemoteDiscovered>>? discovery;
-  List<PeekRemoteDiscovered> desktops = [];
-  PeekRemoteDiscovered? selectedDesktop;
-  String? error;
+  DesktopConnectionMemory? connectionMemory;
   bool emitting = false;
   @override
   void initState() {
     super.initState();
     if (enabled) {
       peek = Peek(options: const PeekOptions(name: 'Peek Bridge Demo'));
-      remote = peek!.attach(PeekRemote(peek!));
+      connectionMemory = DesktopConnectionMemory();
+      remote = peek!.attach(PeekRemote(peek!, memory: connectionMemory!));
       bridge = DesktopDiagnosticsBridge(redactor: redactSensitiveFields)
         ..attachTalker(talker)
         ..attachPeekRemote(remote!)
@@ -47,41 +51,6 @@ class _DemoState extends State<Demo> {
         if (mounted) setState(() {});
       });
     }
-  }
-
-  Future<void> connect() async {
-    try {
-      final endpoint = PeekRemoteEndpoint.parse(host.text);
-      final selected = selectedDesktop?.endpoint == endpoint
-          ? selectedDesktop
-          : null;
-      await remote!.connect(
-        endpoint,
-        code: code.text.trim().isEmpty ? null : code.text.trim(),
-        serverId: selected?.serverId,
-        name: selected?.name,
-      );
-      if (mounted) setState(() => error = null);
-    } on Object {
-      if (mounted) setState(() => error = '连接参数无效，请检查地址与四位配对码。');
-    }
-  }
-
-  void discover() {
-    unawaited(discovery?.cancel());
-    discovery = remote!.discover().listen(
-      (found) {
-        if (mounted) {
-          setState(() {
-            desktops = found;
-            error = null;
-          });
-        }
-      },
-      onError: (Object _) {
-        if (mounted) setState(() => error = '自动发现不可用，请手动填写桌面地址。');
-      },
-    );
   }
 
   void network() {
@@ -180,12 +149,10 @@ class _DemoState extends State<Demo> {
   @override
   void dispose() {
     refresh?.cancel();
-    unawaited(discovery?.cancel());
     unawaited(bridge?.dispose());
     remote?.dispose();
     peek?.dispose();
-    host.dispose();
-    code.dispose();
+    connectionMemory?.dispose();
     super.dispose();
   }
 
@@ -201,56 +168,16 @@ class _DemoState extends State<Demo> {
               '诊断未初始化。请用 debug 模式并传入 --dart-define=PEEK_DESKTOP_DIAGNOSTICS=true 启动。',
             )
           else ...[
-            TextField(
-              controller: host,
-              onChanged: (_) => setState(() => selectedDesktop = null),
-              decoration: const InputDecoration(labelText: '桌面地址（host:port）'),
+            DesktopConnectionPanel(remote: remote!, memory: connectionMemory!),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('macOS 示例支持粘贴配对链接；手机 App 可通过 onScan 接入现有扫码页。'),
             ),
-            TextField(
-              controller: code,
-              maxLength: 4,
-              decoration: const InputDecoration(labelText: '一次性配对码（已配对时可留空）'),
-            ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton(
-                  onPressed: discover,
-                  child: const Text('发现局域网桌面'),
-                ),
-                FilledButton(
-                  onPressed: () => unawaited(connect()),
-                  child: const Text('连接 / 配对'),
-                ),
-                OutlinedButton(
-                  onPressed: () => unawaited(remote!.stop()),
-                  child: const Text('断开'),
-                ),
-                OutlinedButton(
-                  onPressed: () => unawaited(remote!.forget()),
-                  child: const Text('忘记桌面'),
-                ),
-              ],
-            ),
-            for (final desktop in desktops)
-              TextButton(
-                onPressed: () => setState(() {
-                  selectedDesktop = desktop;
-                  host.text =
-                      '${desktop.endpoint.host}:${desktop.endpoint.port}';
-                  code.clear();
-                }),
-                child: Text(
-                  '${desktop.name} · ${desktop.endpoint.host}:${desktop.endpoint.port} · v${desktop.protocolVersion}',
-                ),
-              ),
             const SizedBox(height: 16),
             Text('网络：${remote!.state.name} · 日志：${bridge!.state.name}'),
             Text(
               '待发 ${bridge!.stats.queued} 条 · 淘汰 ${bridge!.stats.dropped} · 已确认 ${bridge!.stats.acknowledged}',
             ),
-            if (error != null) Text(error!),
             const SizedBox(height: 20),
             Wrap(
               spacing: 8,

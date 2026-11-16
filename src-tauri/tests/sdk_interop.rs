@@ -15,7 +15,9 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
     let remote = server().await;
     let snapshot = remote.issue_code(true).await.unwrap();
     let port = snapshot.listener.port;
-    let code = snapshot.pairing.unwrap().code.unwrap();
+    let pairing = snapshot.pairing.unwrap();
+    let code = pairing.code.unwrap();
+    let server_id = pairing.server_id;
     let dir = tempfile::tempdir().unwrap();
     let done = dir.path().join("validated");
     let log = dir.path().join("flutter.log");
@@ -25,6 +27,7 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
         .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/peek_desktop_bridge"))
         .env("PEEK_INTEROP_PORT", port.to_string())
         .env("PEEK_INTEROP_CODE", code)
+        .env("PEEK_INTEROP_SERVER_ID", server_id)
         .env("PEEK_INTEROP_DONE", &done)
         .stdout(Stdio::from(file.try_clone().unwrap()))
         .stderr(Stdio::from(file))
@@ -158,6 +161,6 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
         std::fs::read_to_string(log).unwrap()
     );
     println!(
-        "Official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified."
+        "Connect: parsed QR invitation and recalled history by server identity; official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified."
     );
 }

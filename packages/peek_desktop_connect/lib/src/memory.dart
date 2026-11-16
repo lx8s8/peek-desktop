@@ -146,8 +146,8 @@ class DesktopConnectionMemory extends ChangeNotifier
   @override
   Future<void> remember(PeekRemoteDesktop desktop, {String? token}) =>
       _serial(() async {
-        final entries = List<PeekRemoteDesktop>.of(await _load());
         await _credentials.remember(desktop, token: token);
+        final entries = List<PeekRemoteDesktop>.of(await _load());
         entries.removeWhere((entry) => entry.serverId == desktop.serverId);
         entries.insert(0, desktop);
         await _save(entries.take(limit).toList());
@@ -155,8 +155,8 @@ class DesktopConnectionMemory extends ChangeNotifier
 
   @override
   Future<void> forget(String serverId) => _serial(() async {
-    final entries = List<PeekRemoteDesktop>.of(await _load());
     await _credentials.forget(serverId);
+    final entries = List<PeekRemoteDesktop>.of(await _load());
     entries.removeWhere((entry) => entry.serverId == serverId);
     await _save(entries);
   });

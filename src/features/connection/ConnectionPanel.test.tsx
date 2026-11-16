@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ConnectionPanel } from "./ConnectionPanel";
+import { pairingLink } from "./PairingQr";
 import { api, emptyRemote } from "../../lib/ipc/client";
 vi.mock("../../lib/ipc/client", () => ({
   desktop: true,
@@ -13,6 +14,13 @@ vi.mock("../../lib/ipc/client", () => ({
   },
 }));
 afterEach(() => vi.useRealTimers());
+it("preserves an explicitly configured default WebSocket port in pairing links", () => {
+  const link = new URL(
+    pairingLink("192.168.1.8:80", "synthetic-desktop", "0123", 1924992180),
+  );
+  expect(link.searchParams.get("port")).toBe("80");
+  expect(link.searchParams.get("code")).toBe("0123");
+});
 it("starts only explicitly and sends an independent diagnostic grant for pairing", async () => {
   const change = vi.fn(async () => {}),
     error = vi.fn();

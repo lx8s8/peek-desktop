@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:peek/core.dart';
 import 'package:peek_remote/peek_remote.dart';
 import 'package:peek_desktop_bridge/peek_desktop_bridge.dart';
+import 'package:peek_desktop_connect/peek_desktop_connect.dart';
 import 'package:talker/talker.dart';
 
 Future<void> until(bool Function() predicate) async {
@@ -19,7 +20,11 @@ void main() {
     () async {
       final env = Platform.environment;
       final peek = Peek(options: const PeekOptions(name: 'Synthetic Interop'));
-      final remote = PeekRemote(peek, memory: PeekRemoteMemory.inMemory());
+      final memory = DesktopConnectionMemory(
+        credentials: PeekRemoteMemory.inMemory(),
+        historyStore: DesktopHistoryStore.inMemory(),
+      );
+      final remote = PeekRemote(peek, memory: memory);
       final talker = Talker(settings: TalkerSettings(useConsoleLogs: false));
       final bridge = DesktopDiagnosticsBridge(redactor: redactSensitiveFields)
         ..attachTalker(talker)
@@ -30,6 +35,7 @@ void main() {
         await remote.stop();
         remote.dispose();
         peek.dispose();
+        memory.dispose();
       });
       const id = PeekId('interop-request');
       final now = DateTime.now().toUtc();
@@ -49,7 +55,26 @@ void main() {
         '127.0.0.1',
         port: int.parse(env['PEEK_INTEROP_PORT']!),
       );
-      await remote.connect(endpoint, code: env['PEEK_INTEROP_CODE']);
+      final invitation = DesktopPairingLink.parse(
+        Uri(
+          scheme: 'peek-desktop',
+          host: 'pair',
+          queryParameters: {
+            'v': '1',
+            'host': endpoint.host,
+            'port': '${endpoint.port}',
+            'serverId': env['PEEK_INTEROP_SERVER_ID']!,
+            'code': env['PEEK_INTEROP_CODE']!,
+            'expiresAt':
+                '${DateTime.now().add(const Duration(minutes: 3)).millisecondsSinceEpoch ~/ 1000}',
+          },
+        ).toString(),
+      );
+      await remote.connect(
+        invitation.endpoint,
+        code: invitation.code,
+        serverId: invitation.serverId,
+      );
       await until(() => remote.state == PeekRemoteState.connected);
       peek.report(
         PeekResponseReceived(
@@ -82,7 +107,9 @@ void main() {
         () => BigInt.parse(bridge.stats.acknowledged) >= BigInt.from(3),
       );
       await remote.stop();
-      await remote.connect(endpoint);
+      final desktop = (await memory.desktops()).single;
+      expect(desktop.serverId, invitation.serverId);
+      await remote.connect(desktop.endpoint, serverId: desktop.serverId);
       await until(
         () =>
             remote.state == PeekRemoteState.connected &&

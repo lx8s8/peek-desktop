@@ -68,7 +68,39 @@ class DesktopServer {
   }
 }
 
+class FailedHistory implements DesktopHistoryStore {
+  @override
+  Future<String?> read() async => throw StateError('Synthetic history failure');
+  @override
+  Future<void> write(String value) async =>
+      throw StateError('Synthetic history failure');
+}
+
 void main() {
+  test(
+    'history storage failures cannot prevent official credential save or revocation',
+    () async {
+      final credentials = PeekRemoteMemory.inMemory();
+      final memory = DesktopConnectionMemory(
+        credentials: credentials,
+        historyStore: FailedHistory(),
+      );
+      const desktop = PeekRemoteDesktop(
+        serverId: 'a',
+        endpoint: PeekRemoteEndpoint('192.168.1.8'),
+      );
+      await expectLater(
+        memory.remember(desktop, token: 'a-token'),
+        throwsStateError,
+      );
+      expect(await memory.token('a'), 'a-token');
+      expect(await memory.lastDesktop(), desktop);
+      await expectLater(memory.forget('a'), throwsStateError);
+      expect(await memory.token('a'), isNull);
+      expect(await memory.lastDesktop(), isNull);
+      memory.dispose();
+    },
+  );
   test(
     'desktop QR schema parses exact identity, code and expiry without exposing code in toString',
     () {

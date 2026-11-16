@@ -15,7 +15,7 @@ export function pairingLink(
   const query = new URLSearchParams({
     v: "1",
     host: endpoint.hostname,
-    port: endpoint.port,
+    port: endpoint.port || "80",
     serverId,
     code,
     expiresAt: String(expiresAt),

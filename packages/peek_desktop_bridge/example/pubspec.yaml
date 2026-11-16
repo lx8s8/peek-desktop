@@ -7,10 +7,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   peek: 2.1.1
   peek_remote: 2.1.1
   peek_desktop_bridge:
     path: ../
+  peek_desktop_connect:
+    path: ../../peek_desktop_connect
   talker: 5.1.20
 dev_dependencies:
   flutter_test:

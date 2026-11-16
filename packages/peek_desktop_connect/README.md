@@ -27,7 +27,7 @@ DesktopConnectionPanel(
 );
 ```
 
-`onScan` 由宿主已有扫码页提供；未提供时显示手动地址、链接粘贴和历史/发现入口，不请求相机权限，也不假装已实现相机。示例工程为 macOS，演示粘贴二维码链接；移动 App 接入扫码回调后点击“扫码绑定”即可解析并发起配对。中英文文案跟随宿主 `Localizations.localeOf(context)`。
+`onScan` 由宿主已有扫码页提供；未提供时显示手动地址、链接粘贴和历史/发现入口，相机扫描与权限由宿主负责。示例工程为 macOS，演示粘贴二维码链接；移动 App 接入扫码回调后点击“扫码绑定”即可解析并发起配对。中英文文案跟随宿主 `Localizations.localeOf(context)`。
 
 销毁顺序由宿主管理：先移除面板，再 `await bridge.dispose()`、`await remote.stop()`、`remote.dispose()`、`memory.dispose()`。`enabled: false` 的面板不读历史、不发现、不连接；正式包应从编译期跳过整个实例创建入口。
 
@@ -36,7 +36,7 @@ DesktopConnectionPanel(
 - 可分别绑定多台桌面，当前使用同一个 `PeekRemote` 每次连接一台。点历史桌面即免码连接；切换时旧连接关闭，不广播给所有配对电脑。
 - 按 `serverId` 区分身份；IP/端口只是最近地址。自动发现同一身份的新地址，可直接点选连接并更新历史。地址未知时首次连接必须有四位码，避免把当前桌面的 token 发给其他手动地址。
 - 官方凭据继续通过传入的 `PeekRemoteMemory` 保存。默认使用官方 shared_preferences 实现；宿主也可传入自己的适配器。新增的历史存储只含身份、名称、地址，最多 20 台，按最近使用排序，不复制 token 或配对码。列表淘汰不撤销官方授权；主动“忘记”删除该身份的凭据和历史，其他桌面不受影响。
-- 老版本只保存的最后一台桌面可自动出现在历史中。历史读取/保存失败会显示说明，现有官方网络连接不因此停止。
+- 老版本只保存的最后一台桌面可自动出现在历史中。历史读取/保存失败会显示说明，现有官方网络连接不因此停止；凭据保存和撤销先执行，不被历史元信息的故障阻断。
 - 无 UI 的宿主可用 `memory.desktops()` 获取列表，通过 `remote.connect(desktop.endpoint, serverId: desktop.serverId, name: desktop.name)` 切换；连接成功后调用 `await memory.rememberConnected(remote)` 更新地址。面板会自动完成该更新。
 - 日志队列隔离继续由 `peek_desktop_bridge` 按桌面身份处理。官方网络客户端在新目标连接成功后会同步 Peek 本地 store 的历史请求，这与诊断待发队列不同。
 

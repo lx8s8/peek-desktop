@@ -35,6 +35,8 @@ if (appDiagnosticsEnabled) {
 
 当前 IO 传输支持 Dart VM 上的 Flutter 平台；Web 不支持。网络内容仍由官方 Peek 拦截器采集，桥接失败不影响业务请求、控制台或本地日志。
 
+共享测试机的历史 IP/桌面选择、自动发现与二维码入口由独立私有 [`peek_desktop_connect`](../peek_desktop_connect/README.md) 提供；把该包的 memory 同时传给现有 `PeekRemote` 和连接面板。bridge 继续复用这一个 remote，切换桌面身份会清理旧目标待发诊断队列；每次发送给当前所选一台，不同时广播。相机扫码通过宿主回调接入，日志包不增加相机权限。
+
 ## 验证与演示
 
 ```bash

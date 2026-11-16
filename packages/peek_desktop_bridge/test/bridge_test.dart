@@ -16,18 +16,26 @@ Future<void> until(bool Function() predicate) async {
 }
 
 class Fixture {
-  Fixture(this.server, {this.supported = true});
+  Fixture(
+    this.server, {
+    this.supported = true,
+    this.serverId = 'synthetic-server',
+  });
   final HttpServer server;
   final bool supported;
+  final String serverId;
   final List<WebSocket> sockets = [];
   final List<Map<String, dynamic>> events = [];
   final List<Map<String, dynamic>> gaps = [];
   final Map<String, Map<String, String>> accepted = {};
   int probes = 0, diagnosticConnections = 0;
   bool loseAckOnce = false;
-  static Future<Fixture> start({bool supported = true}) async {
+  static Future<Fixture> start({
+    bool supported = true,
+    String serverId = 'synthetic-server',
+  }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fixture = Fixture(server, supported: supported);
+    final fixture = Fixture(server, supported: supported, serverId: serverId);
     server.listen((request) => unawaited(fixture.handle(request)));
     return fixture;
   }
@@ -40,7 +48,7 @@ class Fixture {
         jsonEncode({
           'protocol': 'peek-desktop-diagnostics',
           'version': 1,
-          'serverId': 'synthetic-server',
+          'serverId': serverId,
           'capabilities': ['logs', 'ack', 'gaps'],
         }),
       );
@@ -60,8 +68,8 @@ class Fixture {
             jsonEncode({
               'type': 'welcome',
               'protocolVersion': 1,
-              'deviceToken': 'synthetic-device-token',
-              'server': {'id': 'synthetic-server'},
+              'deviceToken': 'synthetic-token-$serverId',
+              'server': {'id': serverId},
             }),
           );
         case 'diagnostics.hello':
@@ -297,6 +305,63 @@ void main() {
       remote.dispose();
       peek.dispose();
       await fixture.close();
+    },
+  );
+  test(
+    'switching one official client isolates each desktop diagnostic queue',
+    () async {
+      final a = await Fixture.start(serverId: 'desktop-a');
+      final b = await Fixture.start(serverId: 'desktop-b');
+      final peek = Peek();
+      final remote = await a.remote(peek);
+      final bridge = DesktopDiagnosticsBridge(redactor: redactSensitiveFields)
+        ..attachPeekRemote(remote)
+        ..start();
+      addTearDown(() async {
+        await bridge.dispose();
+        await remote.stop();
+        remote.dispose();
+        peek.dispose();
+        await a.close();
+        await b.close();
+      });
+      await until(() => bridge.state == DiagnosticsState.ready);
+      bridge.record(const DiagnosticRecord(message: 'a-live'));
+      await until(() => bridge.stats.acknowledged == '1');
+      await remote.stop();
+      await until(() => bridge.state == DiagnosticsState.waitingForNetwork);
+      bridge.record(
+        const DiagnosticRecord(message: 'a-offline-must-not-reach-b'),
+      );
+      expect(bridge.stats.queued, 1);
+      await remote.connect(
+        PeekRemoteEndpoint('127.0.0.1', port: b.server.port),
+        code: 'synthetic-code',
+        serverId: 'desktop-b',
+      );
+      await until(
+        () =>
+            bridge.state == DiagnosticsState.ready &&
+            remote.serverId == 'desktop-b',
+      );
+      expect(bridge.stats.queued, 0);
+      bridge.record(const DiagnosticRecord(message: 'b-live'));
+      await until(() => bridge.stats.acknowledged == '1');
+      expect(b.events.map((event) => event['message']), ['b-live']);
+      expect(a.events.map((event) => event['message']), ['a-live']);
+      await remote.connect(
+        PeekRemoteEndpoint('127.0.0.1', port: a.server.port),
+        serverId: 'desktop-a',
+      );
+      await until(
+        () =>
+            bridge.state == DiagnosticsState.ready &&
+            remote.serverId == 'desktop-a',
+      );
+      bridge.record(const DiagnosticRecord(message: 'a-return'));
+      await until(() => bridge.stats.acknowledged == '1');
+      expect(a.events.map((event) => event['message']), ['a-live', 'a-return']);
+      expect(b.events.map((event) => event['message']), ['b-live']);
     },
   );
   test('default Talker adapter leaves network logs with Peek', () {
