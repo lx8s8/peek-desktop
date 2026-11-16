@@ -34,6 +34,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "kasen",
+    "category": "DeveloperTool",
+    "copyright": "Copyright (c) 2026 kasen",
+    "homepage": "https://github.com/lx8s8/peek-desktop",
+    "shortDescription": "Flutter network and log inspector",
+    "longDescription": "View Flutter network requests, Talker logs and exception stacks. Save sessions, export HAR and restore offline workspaces."
   }
 }

@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "format:check": "prettier --check src vite.config.ts vitest.config.ts scripts"
+    "format:check": "prettier --check src vite.config.ts vitest.config.ts scripts",
+    "icons:generate": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",

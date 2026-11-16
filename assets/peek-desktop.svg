@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Peek Desktop</title>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="#20242d"/>
+  <path d="M288 400V304a16 16 0 0 1 16-16h96M624 288h96a16 16 0 0 1 16 16v96M288 624v96a16 16 0 0 0 16 16h96" fill="none" stroke="#ff8b60" stroke-width="48" stroke-linecap="round"/>
+  <circle cx="488" cy="480" r="136" fill="none" stroke="#f5f6f8" stroke-width="48"/>
+  <path d="m588 580 140 140" stroke="#ff8b60" stroke-width="64" stroke-linecap="round"/>
+  <path d="M424 456h128M424 508h76" stroke="#ff8b60" stroke-width="24" stroke-linecap="round"/>
+</svg>
