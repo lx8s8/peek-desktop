@@ -1,4 +1,15 @@
 export const archiveZh = {
+  fileTools: "导出与恢复",
+  exportHar: "导出当前网络 HAR…",
+  exportAllLogs: "导出当前全部日志 JSONL…",
+  exportLogText: "导出当前日志文本…",
+  copyCurl: "复制当前请求 cURL",
+  exportBounds:
+    "导出当前会话的保留数据，不受搜索和时间筛选影响。HAR 保留正文缺失/截断标记；JSONL 可重新导入，文本用于阅读。",
+  curlCopied: "已复制 POSIX shell cURL 命令。",
+  curlUnsupported:
+    "当前请求正文未完整采集，或包含二进制、上传文件等不支持的内容，无法生成完整 cURL。",
+  invalidExport: "不支持的导出格式。",
   archiveSession: "保存完整归档…",
   archivedSession: "离线归档",
   recoveredSession: "恢复的离线会话",
@@ -11,6 +22,17 @@ export const archiveZh = {
   bundleWriteFailed: "归档写入失败，原文件保持不变。",
 };
 export const archiveEn: Record<keyof typeof archiveZh, string> = {
+  fileTools: "Export and recovery",
+  exportHar: "Export current network as HAR…",
+  exportAllLogs: "Export all current logs as JSONL…",
+  exportLogText: "Export current logs as text…",
+  copyCurl: "Copy current request as cURL",
+  exportBounds:
+    "Exports retained session data regardless of search and time filters. HAR marks missing/truncated bodies. JSONL supports reimport; text is for reading.",
+  curlCopied: "POSIX shell cURL command copied.",
+  curlUnsupported:
+    "The request body is incomplete or contains unsupported binary/upload data. A complete cURL cannot be generated.",
+  invalidExport: "Unsupported export format.",
   archiveSession: "Save complete archive…",
   archivedSession: "Offline archive",
   recoveredSession: "Recovered offline session",

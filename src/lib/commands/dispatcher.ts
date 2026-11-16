@@ -1,4 +1,9 @@
 export const definitions = {
+  "files.open": { label: "fileTools" },
+  "export.har": { label: "exportHar" },
+  "export.logs": { label: "exportAllLogs" },
+  "export.text": { label: "exportLogText" },
+  "edit.copyCurl": { label: "copyCurl" },
   "session.open": { label: "open", accelerator: "CmdOrCtrl+O" },
   "session.archive": {
     label: "archiveSession",

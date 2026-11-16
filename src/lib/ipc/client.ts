@@ -30,6 +30,10 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  exportScope: (scope: Scope, kind: "har" | "jsonl" | "text") =>
+    invoke<boolean>("export_scope", { scope, kind }),
+  copyCurl: (sessionId: string, entryId: string) =>
+    invoke<string>("copy_curl", { sessionId, entryId }),
   popupContextMenu: (rid: number, x: number, y: number) =>
     invoke<void>("popup_context_menu", { rid, x, y }),
   writeClipboard: (text: string) => invoke<void>("write_clipboard", { text }),

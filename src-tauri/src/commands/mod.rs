@@ -621,3 +621,77 @@ pub async fn save_bundle(
     .await
     .map_err(|_| "internalError")?
 }
+
+#[tauri::command]
+pub async fn export_scope(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    kind: String,
+) -> Result<bool> {
+    let extension = match kind.as_str() {
+        "har" => "har",
+        "jsonl" => "jsonl",
+        "text" => "txt",
+        _ => return Err("invalidExport".into()),
+    };
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let bundle = crate::archive::capture(
+            &*library.lock().map_err(|_| "internalError")?,
+            &remote,
+            Some(&scope),
+        )?;
+        if kind == "har" && bundle.networks.is_empty() {
+            return Err("sessionNotFound".into());
+        }
+        if kind != "har" && bundle.runs.is_empty() {
+            return Err("diagnosticNotFound".into());
+        }
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("Session export", &[extension])
+            .set_file_name(format!("session.{extension}"))
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let mut path = path.into_path().map_err(|_| "invalidPath")?;
+        if path.extension().is_none() {
+            path.set_extension(extension);
+        }
+        if kind == "har" {
+            crate::export::har(&path, &bundle.networks[0].session)?;
+        } else {
+            crate::export::diagnostics(&path, &bundle, kind == "text")?;
+        }
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+#[tauri::command]
+pub async fn copy_curl(
+    state: State<'_, AppState>,
+    session_id: String,
+    entry_id: String,
+) -> Result<String> {
+    let raw = if session_id.starts_with("live-") {
+        state.remote.entry(&session_id, &entry_id)?
+    } else {
+        state
+            .library
+            .lock()
+            .map_err(|_| "internalError")?
+            .get(&session_id)?
+            .entry(&entry_id)
+            .ok_or("entryNotFound")?
+            .raw
+            .clone()
+    };
+    tauri::async_runtime::spawn_blocking(move || crate::export::curl(&raw))
+        .await
+        .map_err(|_| "internalError")?
+}

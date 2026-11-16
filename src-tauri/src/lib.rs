@@ -1,6 +1,7 @@
 pub mod archive;
 pub mod body;
 mod commands;
+pub mod export;
 pub mod protocol;
 pub mod query;
 pub mod remote;
@@ -27,6 +28,8 @@ pub fn run() {
             commands::get_body,
             commands::save_peek,
             commands::save_bundle,
+            commands::export_scope,
+            commands::copy_curl,
             commands::remote_snapshot,
             commands::start_listener,
             commands::stop_listener,

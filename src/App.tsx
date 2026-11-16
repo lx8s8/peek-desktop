@@ -27,6 +27,7 @@ import {
 import { Group, Panel, Separator, type Layout } from "react-resizable-panels";
 import { useTranslation } from "react-i18next";
 import { Button } from "./components/ui/button";
+import { FileTools } from "./features/files/FileTools";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
 import { useWorkspace } from "./features/connection/useWorkspace";
 import {
@@ -499,6 +500,24 @@ export default function App() {
           <Archive />
           {t("archiveSession")}
         </Button>
+        <FileTools
+          scope={
+            scopeId
+              ? { kind: independentRun ? "diagnostic" : "network", id: scopeId }
+              : null
+          }
+          hasLogs={!!(independentRun || runs.length)}
+          networkId={active?.id}
+          entryId={
+            currentTab === "network"
+              ? view.selected?.id
+              : currentTab === "timeline"
+                ? view.timelineEntry?.id
+                : undefined
+          }
+          onError={reportError}
+          onNotice={(text) => setNotice({ text, error: false })}
+        />
         <ConnectionPanel
           remote={remote}
           onChange={refresh}

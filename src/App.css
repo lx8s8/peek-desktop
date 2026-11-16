@@ -1287,3 +1287,8 @@ button.timeline-grid.selected {
 .association-unavailable {
   color: var(--warning);
 }
+
+.file-actions {
+  display: grid;
+  gap: 10px;
+}
