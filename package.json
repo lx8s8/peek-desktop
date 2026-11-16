@@ -24,6 +24,7 @@
     "i18next": "^27.1.1",
     "lossless-json": "^4.3.3",
     "lucide-react": "^1.72.0",
+    "qrcode.react": "4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^18.0.1",

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api, desktop } from "../../lib/ipc/client";
 import type { RemoteSnapshot } from "../../lib/ipc/types";
+import { PairingQr } from "./PairingQr";
 
 export function ConnectionPanel({
   remote,
@@ -131,6 +132,13 @@ export function ConnectionPanel({
               </Button>
             </header>
             <p className="muted">{t("connectionDescription")}</p>
+            <p className="connection-scope-hint">
+              {t(
+                (remote.listening ? remote.host : host) === "127.0.0.1"
+                  ? "loopbackHint"
+                  : "lanHint",
+              )}
+            </p>
             <div className="connection-fields">
               <label>
                 {t("listenAddress")}
@@ -213,6 +221,16 @@ export function ConnectionPanel({
                   <span className="muted">
                     {t("codeExpires", { count: expires })}
                   </span>
+                  {remote.host === "0.0.0.0" && (
+                    <PairingQr
+                      key={remote.pairing.code}
+                      addresses={remote.addresses}
+                      serverId={remote.pairing.serverId}
+                      code={remote.pairing.code}
+                      expires={expires}
+                      onError={onError}
+                    />
+                  )}
                 </>
               ) : (
                 <p className="muted">{t("pairingHint")}</p>

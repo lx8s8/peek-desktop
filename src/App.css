@@ -975,6 +975,37 @@ select {
   width: 100%;
   margin: 0;
 }
+.connection-scope-hint {
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.pairing-qr {
+  width: 100%;
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+.pairing-qr label {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.pairing-qr select {
+  padding: 6px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.pairing-qr svg {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.pairing-qr small {
+  line-height: 1.6;
+}
 .pairing-code {
   font:
     650 30px ui-monospace,
