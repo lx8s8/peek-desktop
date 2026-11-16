@@ -781,7 +781,7 @@ export default function App() {
               </>
             )}
             <div className="sidebar-bottom">
-              <span className="development-label">P2 · {t("previewOnly")}</span>
+              <span className="development-label">P3 · {t("previewOnly")}</span>
               <p>{t("connectionReady")}</p>
             </div>
           </nav>
@@ -1044,7 +1044,13 @@ export default function App() {
       <footer className="status-bar">
         <span className="status-left">
           <span className="offline-dot" />
-          {t(remote.listening ? "live" : "fileOnly")}
+          {t(
+            active?.archive
+              ? "archivedSession"
+              : remote.listening
+                ? "live"
+                : "fileOnly",
+          )}
           <ChevronRight size={11} />
           {sessions.length} {t("sessionCount")}
           {active && (

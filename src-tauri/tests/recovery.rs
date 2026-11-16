@@ -30,6 +30,36 @@ fn bundle() -> Bundle {
     }
 }
 #[test]
+fn detached_snapshot_commits_after_workspace_changes_without_holding_its_lock() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Recovery::load(dir.path().to_owned()).unwrap();
+    let remote = Remote::default();
+    let library = std::sync::Mutex::new(Library::default());
+    let prepared = {
+        let mut library = library.lock().unwrap();
+        archive::install(&mut library, &remote, bundle(), false).unwrap();
+        store.prepare_workspace(&library, &remote, true).unwrap()
+    };
+    library.try_lock().unwrap().sessions.clear();
+    store.commit_workspace(prepared).unwrap();
+    drop(store);
+    let mut store = Recovery::load(dir.path().to_owned()).unwrap();
+    let pending = store.read_pending().unwrap();
+    let result = store
+        .apply_pending(&mut library.try_lock().unwrap(), &remote, pending)
+        .unwrap();
+    assert_eq!(
+        library
+            .lock()
+            .unwrap()
+            .get(&result.session_id.unwrap())
+            .unwrap()
+            .entries
+            .len(),
+        18
+    );
+}
+#[test]
 fn recovery_is_explicit_persistent_and_does_not_overwrite_pending_or_empty_workspaces() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Recovery::load(dir.path().to_owned()).unwrap();

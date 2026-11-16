@@ -19,7 +19,7 @@ const zh = {
   intro: "每一次请求，都清晰可见。",
   introHint: "打开 .peek 会话文件，检查请求、响应与原始正文。",
   emptyFiles: "还没有打开的会话",
-  fileHint: "支持 Peek 标准 JSON Lines 格式",
+  fileHint: ".peek 网络会话 · .peekbundle 完整归档 · JSONL 诊断历史",
   browser: "当前为浏览器预览，文件操作请使用桌面应用。",
   connectionHint: "设备配对、实时网络与日志同步将在后续连接阶段接入。",
   search: "搜索地址、方法、状态或来源…",
@@ -110,7 +110,7 @@ const en: Record<keyof typeof zh, string> = {
   introHint:
     "Open a .peek session to inspect requests, responses, and original bodies.",
   emptyFiles: "No open sessions",
-  fileHint: "Peek standard JSON Lines format",
+  fileHint: ".peek network · .peekbundle archive · JSONL diagnostic history",
   browser: "Browser preview. Open the desktop app to work with files.",
   connectionHint:
     "Pairing, live network traffic, and diagnostic sync are planned for the connection phase.",

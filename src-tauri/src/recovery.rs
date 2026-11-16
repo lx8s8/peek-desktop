@@ -37,6 +37,15 @@ pub struct Recovery {
     newest: Option<usize>,
     stamp: Option<String>,
 }
+pub struct PreparedWorkspace {
+    bundle: Bundle,
+    stamp: String,
+}
+pub struct PendingRecovery {
+    bundle: Bundle,
+    slot: usize,
+    backup: bool,
+}
 impl Recovery {
     pub fn load(directory: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&directory).map_err(|_| "recoveryUnavailable")?;
@@ -164,26 +173,49 @@ impl Recovery {
         remote: &Remote,
         force: bool,
     ) -> Result<()> {
+        let prepared = self.prepare_workspace(library, remote, force)?;
+        self.commit_workspace(prepared)
+    }
+    /// Capture under workspace locks; callers release those locks before commit.
+    pub fn prepare_workspace(
+        &self,
+        library: &Library,
+        remote: &Remote,
+        force: bool,
+    ) -> Result<Option<PreparedWorkspace>> {
         self.ready()?;
         if !force && (!self.status.enabled || self.status.pending) {
-            return Ok(());
+            return Ok(None);
+        }
+        if self.status.pending {
+            return Err("recoveryPending".into());
         }
         let mut ids = library.sessions.keys().collect::<Vec<_>>();
         ids.sort();
         let stamp = format!("{ids:?}:{}", *remote.changes.borrow());
         if !force && self.stamp.as_ref() == Some(&stamp) {
-            return Ok(());
+            return Ok(None);
         }
         let bundle = archive::capture(library, remote, None)?;
         // Empty workspaces never overwrite a recoverable snapshot.
         if bundle.networks.is_empty() && bundle.runs.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
-        self.checkpoint(&bundle)?;
-        self.stamp = Some(stamp);
+        Ok(Some(PreparedWorkspace { bundle, stamp }))
+    }
+    pub fn commit_workspace(&mut self, prepared: Option<PreparedWorkspace>) -> Result<()> {
+        if let Some(prepared) = prepared {
+            self.checkpoint(&prepared.bundle)?;
+            self.stamp = Some(prepared.stamp);
+        }
         Ok(())
     }
     pub fn restore(&mut self, library: &mut Library, remote: &Remote) -> Result<Imported> {
+        let pending = self.read_pending()?;
+        self.apply_pending(library, remote, pending)
+    }
+    /// Read/decompress/validate without holding a library mutex.
+    pub fn read_pending(&self) -> Result<PendingRecovery> {
         self.ready()?;
         if !self.status.pending {
             return Err("recoveryNotPending".into());
@@ -197,11 +229,26 @@ impl Recovery {
             }
         }
         let (slot, position, bundle) = valid.ok_or("recoveryCorrupt")?;
-        let imported = archive::install(library, remote, bundle, true)?;
-        self.newest = Some(slot);
+        Ok(PendingRecovery {
+            bundle,
+            slot,
+            backup: position > 0,
+        })
+    }
+    pub fn apply_pending(
+        &mut self,
+        library: &mut Library,
+        remote: &Remote,
+        pending: PendingRecovery,
+    ) -> Result<Imported> {
+        if !self.status.pending {
+            return Err("recoveryNotPending".into());
+        }
+        let imported = archive::install(library, remote, pending.bundle, true)?;
+        self.newest = Some(pending.slot);
         self.status.pending = false;
         self.status.restored = true;
-        self.status.used_backup = position > 0;
+        self.status.used_backup = pending.backup;
         self.status.error = None;
         self.stamp = None;
         Ok(imported)

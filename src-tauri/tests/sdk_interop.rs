@@ -127,6 +127,77 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
                         .unwrap()
                         .contains("900719925474099312345")
                 );
+                // P3: real SDK data and fetched bodies survive archive and disk recovery.
+                let bundle = peek_desktop_lib::archive::capture(
+                    &peek_desktop_lib::session::Library::default(),
+                    &remote,
+                    Some(&scope),
+                )
+                .unwrap();
+                let bundle_path = dir.path().join("interop.peekbundle");
+                peek_desktop_lib::archive::save(&bundle_path, &bundle).unwrap();
+                let loaded = peek_desktop_lib::archive::open(
+                    &bundle_path,
+                    &std::sync::atomic::AtomicBool::new(false),
+                    |_| {},
+                )
+                .unwrap();
+                let recovery_dir = dir.path().join("recovery");
+                let mut cache =
+                    peek_desktop_lib::recovery::Recovery::load(recovery_dir.clone()).unwrap();
+                cache.checkpoint(&loaded).unwrap();
+                drop(cache);
+                let offline = peek_desktop_lib::remote::server::Remote::default();
+                let mut library = peek_desktop_lib::session::Library::default();
+                let mut cache = peek_desktop_lib::recovery::Recovery::load(recovery_dir).unwrap();
+                let imported = cache.restore(&mut library, &offline).unwrap();
+                let archived_id = imported.session_id.unwrap();
+                let restored = library.get(&archived_id).unwrap();
+                let restored_raw = &restored.entry("interop-request").unwrap().raw;
+                assert!(restored_raw.contains("900719925474099312345"));
+                assert!(restored_raw.contains("0.12345678901234567890"));
+                let restored_run = imported.run_id.unwrap();
+                assert_eq!(
+                    &*offline
+                        .diagnostic_detail(&restored_run, &events.rows[0].event_id)
+                        .unwrap(),
+                    &*raw
+                );
+                let restored_timeline = serde_json::to_value(
+                    offline
+                        .timeline(
+                            &Scope::Network {
+                                id: archived_id.clone(),
+                            },
+                            restored.entries.iter().map(|e| e.row.clone()).collect(),
+                            &ReviewQuery {
+                                limit: 300,
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap(),
+                )
+                .unwrap();
+                assert_eq!(restored_timeline["total"], 5);
+                assert!(!offline.snapshot().unwrap().listener.listening);
+                assert!(
+                    offline
+                        .snapshot()
+                        .unwrap()
+                        .diagnostic_runs
+                        .iter()
+                        .all(|run| !run.online)
+                );
+                let har_path = dir.path().join("interop.har");
+                peek_desktop_lib::export::har(&har_path, &restored).unwrap();
+                let har: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(har_path).unwrap()).unwrap();
+                assert!(
+                    har["log"]["entries"][0]["response"]["content"]["text"]
+                        .as_str()
+                        .unwrap()
+                        .contains("900719925474099312345")
+                );
                 return Ok(());
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
@@ -161,6 +232,6 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
         std::fs::read_to_string(log).unwrap()
     );
     println!(
-        "Connect: parsed QR invitation and recalled history by server identity; official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified."
+        "Connect: parsed QR invitation and recalled history by server identity; official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified; P3: archive, two-slot recovery, offline timeline, original diagnostics and precision HAR body verified."
     );
 }

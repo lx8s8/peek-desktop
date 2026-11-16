@@ -705,11 +705,13 @@ fn persist_workspace(
     force: bool,
 ) -> Result<()> {
     let mut store = recovery.lock().map_err(|_| "internalError")?;
-    let result = store.save_workspace(
-        &*library.lock().map_err(|_| "internalError")?,
-        remote,
-        force,
-    );
+    let result = (|| {
+        let prepared = {
+            let library = library.lock().map_err(|_| "internalError")?;
+            store.prepare_workspace(&library, remote, force)?
+        };
+        store.commit_workspace(prepared)
+    })();
     if let Err(error) = &result {
         store.status.error = Some(error.clone());
     }
@@ -810,10 +812,19 @@ pub async fn restore_recovery(state: State<'_, AppState>) -> Result<crate::archi
     let library = state.library.clone();
     let remote = state.remote.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        recovery
-            .lock()
-            .map_err(|_| "internalError")?
-            .restore(&mut *library.lock().map_err(|_| "internalError")?, &remote)
+        let mut store = recovery.lock().map_err(|_| "internalError")?;
+        let result = (|| {
+            let pending = store.read_pending()?;
+            store.apply_pending(
+                &mut *library.lock().map_err(|_| "internalError")?,
+                &remote,
+                pending,
+            )
+        })();
+        if let Err(error) = &result {
+            store.status.error = Some(error.clone());
+        }
+        result
     })
     .await
     .map_err(|_| "internalError")?

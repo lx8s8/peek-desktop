@@ -307,6 +307,39 @@ pub fn save(path: &Path, bundle: &Bundle) -> Result<()> {
     if bundle.networks.len() > MAX_SESSIONS || bundle.runs.len() > MAX_RUNS {
         return Err("bundleTooLarge".into());
     }
+    // A snapshot produced here must fit into an empty offline library on recovery.
+    if bundle
+        .networks
+        .iter()
+        .map(|network| network.session.raw_bytes)
+        .sum::<usize>()
+        > MAX_LIBRARY_BYTES
+    {
+        return Err("libraryFull".into());
+    }
+    let network_bytes: usize = bundle
+        .networks
+        .iter()
+        .map(|network| {
+            network.session.raw_header.len()
+                + 1
+                + network
+                    .session
+                    .entries
+                    .iter()
+                    .map(|entry| entry.raw.len() + 1)
+                    .sum::<usize>()
+        })
+        .sum();
+    let diagnostic_bytes: usize = bundle
+        .runs
+        .iter()
+        .flat_map(|run| &run.records)
+        .map(|raw| raw.len() + 1)
+        .sum();
+    if network_bytes as u64 + diagnostic_bytes as u64 > MAX_BUNDLE_BYTES - 1024 * 1024 {
+        return Err("bundleTooLarge".into());
+    }
     let mut manifest = Manifest {
         format: "peekbundle".into(),
         version: 1,
