@@ -1,5 +1,5 @@
 use crate::protocol::{diagnostics::DiagnosticEvent, session::Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::Arc,
@@ -97,8 +97,8 @@ pub struct DiagnosticRun {
     pub online: bool,
     pub cancel: CancellationToken,
     pub accepted: BTreeMap<String, u64>,
-    events: VecDeque<StoredDiagnostic>,
-    bytes: usize,
+    pub(crate) events: VecDeque<StoredDiagnostic>,
+    pub(crate) bytes: usize,
     pub received: u64,
     pub duplicates: u64,
     pub evicted: u64,
@@ -106,7 +106,7 @@ pub struct DiagnosticRun {
     pub version: u64,
     pub gaps: VecDeque<Gap>,
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Gap {
     pub emitter_id: String,

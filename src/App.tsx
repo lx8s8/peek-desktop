@@ -8,6 +8,7 @@ import { useNativeMenu, useContextMenu } from "./lib/commands/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
+  Archive,
   ArrowRight,
   ChevronRight,
   Circle,
@@ -303,8 +304,8 @@ export default function App() {
       const session = await api.open(setProgress);
       if (session) {
         await refresh();
-        setIndependent(null);
-        setActiveId(session.id);
+        setIndependent(session.sessionId ? null : session.runId);
+        setActiveId(session.sessionId);
       }
     } catch (error) {
       if (String(error) === "cancelled")
@@ -331,6 +332,25 @@ export default function App() {
       setSaving(false);
     }
   }, [active, t, reportError]);
+  const archive = async () => {
+    if (!scopeId || saveRef.current || busyRef.current || !desktop) return;
+    saveRef.current = true;
+    setSaving(true);
+    try {
+      if (
+        await api.archive({
+          kind: independentRun ? "diagnostic" : "network",
+          id: scopeId,
+        })
+      )
+        setNotice({ text: t("saved"), error: false });
+    } catch (error) {
+      reportError(String(error));
+    } finally {
+      saveRef.current = false;
+      setSaving(false);
+    }
+  };
   async function close(id: string) {
     try {
       await api.close(id);
@@ -347,6 +367,11 @@ export default function App() {
       reportError(String(error));
     }
   }
+  useCommand(
+    "session.archive",
+    archive,
+    desktop && !!scopeId && !busy && !saving,
+  );
   useCommand("session.open", open, desktop && !busy && !saving);
   useCommand("session.save", save, desktop && !!active && !busy && !saving);
   useCommand(
@@ -378,12 +403,12 @@ export default function App() {
   useCommand(
     "view.logs",
     () => updateView({ tab: "logs" }),
-    !!(active?.deviceId || independentRun),
+    !!(active?.deviceId || runs.length || independentRun),
   );
   useCommand(
     "view.exceptions",
     () => updateView({ tab: "exceptions" }),
-    !!(active?.deviceId || independentRun),
+    !!(active?.deviceId || runs.length || independentRun),
   );
   useCommand("view.timeline", () => updateView({ tab: "timeline" }), !!scopeId);
   useCommand("view.theme", () =>
@@ -427,7 +452,7 @@ export default function App() {
     reportError,
   );
   const sessionContextMenu = useContextMenu(
-    ["session.save", "session.close"],
+    ["session.save", "session.archive", "session.close"],
     reportError,
   );
   useEffect(() => {
@@ -466,6 +491,13 @@ export default function App() {
         >
           <Save />
           {t("save")}
+        </Button>
+        <Button
+          onClick={() => commands.dispatch("session.archive")}
+          disabled={!scopeId || saving || busy || !desktop}
+        >
+          <Archive />
+          {t("archiveSession")}
         </Button>
         <ConnectionPanel
           remote={remote}
@@ -589,6 +621,19 @@ export default function App() {
                         <strong>
                           {session.header.name || session.filename}
                         </strong>
+                        {session.archive && (
+                          <small>
+                            {t(
+                              session.archive.recovered
+                                ? "recoveredSession"
+                                : "archivedSession",
+                            )}
+                            {` · ${t("archiveLoss", { dropped: session.archive.dropped, evicted: session.archive.evicted })}`}
+                            {session.archive.syncing
+                              ? ` · ${t("archiveSyncing")}`
+                              : ""}
+                          </small>
+                        )}
                         <small>
                           {session.deviceId
                             ? t(
@@ -738,7 +783,7 @@ export default function App() {
                   <div className="live-tabs segmented">
                     {(independentRun
                       ? (["logs", "exceptions", "timeline"] as const)
-                      : active?.deviceId
+                      : active?.deviceId || runs.length
                         ? ([
                             "network",
                             "logs",
@@ -757,7 +802,7 @@ export default function App() {
                       >
                         {t(tab)}
                         {tab === "logs"
-                          ? ` (${independentRun?.count ?? active?.diagnosticCount ?? 0})`
+                          ? ` (${independentRun?.count ?? runs.reduce((total, run) => total + run.count, 0)})`
                           : ""}
                       </button>
                     ))}

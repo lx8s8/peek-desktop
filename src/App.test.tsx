@@ -7,12 +7,21 @@ import {
 } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import type { EntryRow, SessionSummary, TimelineRow } from "./lib/ipc/types";
+import type {
+  DiagnosticRun,
+  EntryRow,
+  SessionSummary,
+  TimelineRow,
+} from "./lib/ipc/types";
 import { api } from "./lib/ipc/client";
 import App from "./App";
 const data = vi.hoisted(() => ({
   sessions: [] as SessionSummary[],
-  remote: { diagnosticRuns: [], sessions: [], listening: false },
+  remote: {
+    diagnosticRuns: [] as DiagnosticRun[],
+    sessions: [],
+    listening: false,
+  },
 }));
 vi.mock("./lib/commands/native", () => ({
   useNativeMenu: () => false,
@@ -71,7 +80,7 @@ vi.mock("./features/timeline/TimelineTable", () => ({
 }));
 vi.mock("./lib/ipc/client", () => ({
   desktop: true,
-  api: { entryInfo: vi.fn() },
+  api: { entryInfo: vi.fn(), archive: vi.fn() },
 }));
 const session = (id: string, generation = 1): SessionSummary => ({
   id,
@@ -107,6 +116,7 @@ const entry: EntryRow = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  data.remote.diagnosticRuns = [];
   data.sessions = [session("live-one"), session("live-two")];
   vi.mocked(api.entryInfo).mockResolvedValue(entry);
 });
@@ -160,4 +170,43 @@ it("uses the same dispatcher for platform shortcuts, search focus and view butto
   expect(
     screen.getByRole("button", { name: "时间线" }).getAttribute("aria-pressed"),
   ).toBe("true");
+});
+
+it("shows archived bound diagnostics and archives their network scope without a live device", async () => {
+  data.sessions = [
+    {
+      ...session("file-archive-one"),
+      deviceId: undefined,
+      online: false,
+      archive: { recovered: false, dropped: 2, evicted: 3, syncing: false },
+    },
+  ];
+  data.remote.diagnosticRuns = [
+    {
+      id: "archive-run",
+      runId: "original",
+      deviceId: "archive",
+      networkSessionKey: "file-archive-one",
+      online: false,
+      count: 1,
+      received: 1,
+      duplicates: 0,
+      evicted: 0,
+      gapCount: 0,
+      version: 1,
+      gaps: [],
+    },
+  ];
+  vi.mocked(api.archive).mockResolvedValue(true);
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /^日志/ }));
+  expect(screen.getByText("diagnostic table")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "保存完整归档…" }));
+  await waitFor(() =>
+    expect(api.archive).toHaveBeenCalledWith({
+      kind: "network",
+      id: "file-archive-one",
+    }),
+  );
+  data.remote.diagnosticRuns = [];
 });

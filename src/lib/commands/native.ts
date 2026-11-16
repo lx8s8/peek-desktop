@@ -89,6 +89,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
       items: [
         item("session.open"),
         item("session.save"),
+        item("session.archive"),
         item("session.close"),
         separator(),
         item("diagnostics.export"),

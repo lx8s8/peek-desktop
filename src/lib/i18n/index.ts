@@ -1,3 +1,4 @@
+import { archiveZh, archiveEn } from "./archive";
 import { menuZh, menuEn } from "./menu";
 import { reviewZh, reviewEn } from "./review";
 import { remoteZh, remoteEn } from "./remote";
@@ -85,7 +86,8 @@ const zh = {
   fileTooLarge: "文件超过 64 MiB 上限。",
   lineTooLarge: "单条记录超过 8 MiB 上限。",
   tooManyEntries: "会话超过 100,000 条记录上限。",
-  libraryFull: "已达到 4 个会话或 128 MiB 原文上限，请先关闭部分会话。",
+  libraryFull:
+    "已达到离线库上限（12 会话 / 192 MiB 原文或 8 个诊断运行），请先关闭部分会话。",
   invalidHeader: "文件头无效，无法作为 Peek 会话打开。",
   importBusy: "已有文件正在导入。",
   sessionNotFound: "会话已关闭。",
@@ -182,7 +184,7 @@ const en: Record<keyof typeof zh, string> = {
   lineTooLarge: "A record exceeds the 8 MiB limit.",
   tooManyEntries: "Session exceeds the 100,000 record limit.",
   libraryFull:
-    "The 4 session or 128 MiB original-data limit was reached. Close a session first.",
+    "The 12 offline session or 192 MiB original-data limit was reached (at most 8 diagnostic runs). Close a session first.",
   invalidHeader:
     "Invalid header. This file cannot be opened as a Peek session.",
   importBusy: "A file is already being imported.",
@@ -195,8 +197,12 @@ const en: Record<keyof typeof zh, string> = {
 
 void i18n.use(initReactI18next).init({
   resources: {
-    "zh-CN": { translation: { ...zh, ...remoteZh, ...reviewZh, ...menuZh } },
-    en: { translation: { ...en, ...remoteEn, ...reviewEn, ...menuEn } },
+    "zh-CN": {
+      translation: { ...zh, ...remoteZh, ...reviewZh, ...menuZh, ...archiveZh },
+    },
+    en: {
+      translation: { ...en, ...remoteEn, ...reviewEn, ...menuEn, ...archiveEn },
+    },
   },
   lng: readPreference("language", "zh-CN") === "en" ? "en" : "zh-CN",
   fallbackLng: "zh-CN",

@@ -236,6 +236,7 @@ impl LiveStore {
                 skipped: s.current.skipped,
                 newer_format: false,
                 raw_bytes: s.current.raw_bytes,
+                archive: None,
                 live: Some(LiveInfo {
                     device_id: s.device_id.clone(),
                     network_session_id: s.network_id.clone(),

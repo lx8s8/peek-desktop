@@ -1,3 +1,4 @@
+pub mod archive;
 pub mod body;
 mod commands;
 pub mod protocol;
@@ -25,6 +26,7 @@ pub fn run() {
             commands::get_entry_metadata,
             commands::get_body,
             commands::save_peek,
+            commands::save_bundle,
             commands::remote_snapshot,
             commands::start_listener,
             commands::stop_listener,

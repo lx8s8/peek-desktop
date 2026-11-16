@@ -1,4 +1,14 @@
+export interface Imported {
+  sessionId: string | null;
+  runId: string | null;
+}
 export interface SessionSummary {
+  archive?: {
+    recovered: boolean;
+    dropped: number;
+    evicted: number;
+    syncing: boolean;
+  } | null;
   deviceId?: string;
   networkSessionId?: string;
   online?: boolean;

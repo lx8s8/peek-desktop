@@ -1,5 +1,9 @@
 export const definitions = {
   "session.open": { label: "open", accelerator: "CmdOrCtrl+O" },
+  "session.archive": {
+    label: "archiveSession",
+    accelerator: "CmdOrCtrl+Alt+S",
+  },
   "session.save": { label: "menuSaveNetwork", accelerator: "CmdOrCtrl+S" },
   "session.close": { label: "close", accelerator: "CmdOrCtrl+Shift+W" },
   "connection.open": { label: "connection", accelerator: "CmdOrCtrl+K" },

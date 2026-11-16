@@ -13,8 +13,8 @@ use std::{
 pub const MAX_FILE_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_ENTRIES: usize = 100_000;
-pub const MAX_SESSIONS: usize = 4;
-pub const MAX_LIBRARY_BYTES: usize = 128 * 1024 * 1024;
+pub const MAX_SESSIONS: usize = 12;
+pub const MAX_LIBRARY_BYTES: usize = 192 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct StoredEntry {
@@ -281,6 +281,7 @@ pub fn read_session(
 pub struct Library {
     next_id: u64,
     pub sessions: HashMap<String, (String, Arc<Session>)>,
+    pub archives: HashMap<String, crate::archive::NetworkOrigin>,
 }
 
 #[derive(Serialize)]
@@ -295,6 +296,7 @@ pub struct SessionSummary {
     pub raw_bytes: usize,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub live: Option<LiveInfo>,
+    pub archive: Option<crate::archive::NetworkOrigin>,
 }
 
 #[derive(Clone, Serialize)]
@@ -329,6 +331,7 @@ impl Library {
             newer_format: session.header.format_version > 1,
             raw_bytes: session.raw_bytes,
             live: None,
+            archive: None,
         };
         self.sessions.insert(id, (filename, Arc::new(session)));
         Ok(summary)
@@ -354,6 +357,7 @@ impl Library {
                 newer_format: session.header.format_version > 1,
                 raw_bytes: session.raw_bytes,
                 live: None,
+                archive: self.archives.get(id).cloned(),
             })
             .collect();
         summaries.sort_by(|a, b| a.id.cmp(&b.id));
