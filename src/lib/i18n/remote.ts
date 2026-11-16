@@ -51,7 +51,7 @@ export const remoteZh = {
   diagnosticSearch: "搜索日志、来源或堆栈…",
   noDiagnosticSdk: "尚未接入诊断 SDK",
   noDiagnosticSdkHint:
-    "普通 Peek 客户端只同步网络；接入私有 SDK 并授予诊断权限后可查看日志。",
+    "接入 peek_desktop_bridge 并允许诊断同步后，这里会显示 App 日志。",
   noLogs: "暂无匹配日志",
   noLogsHint: "等待客户端发送，或调整搜索及级别。",
   level: "级别",
@@ -142,7 +142,7 @@ export const remoteEn: Record<keyof typeof remoteZh, string> = {
   diagnosticSearch: "Search logs, sources, or stacks…",
   noDiagnosticSdk: "Diagnostic SDK not connected",
   noDiagnosticSdkHint:
-    "Standard Peek clients send network data. Add the private SDK and grant diagnostic access to view logs.",
+    "Add peek_desktop_bridge and allow diagnostic access to view App logs here.",
   noLogs: "No matching logs",
   noLogsHint: "Wait for the client, or change the search and level.",
   level: "Level",

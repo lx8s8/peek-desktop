@@ -37,7 +37,7 @@ export const menuZh = {
   menuShortcutHint:
     "⌘/Ctrl O 打开，S 保存网络，Shift S 导出所选日志；⌘/Ctrl 1–4 切换视图，F 搜索；列表方向键 / Home / End 导航，Shift 连选，⌘/Ctrl 点选多选；Delete / Esc 取消选择。",
   menuRetentionHint:
-    "日志分组和时间线展示当前保留窗口；.peek 只保存网络，日志可导出选中 JSONL。接收、去重、淘汰与缺口单独计数；退出应用会丢失内存记录。",
+    "列表和分组只显示当前保留的数据。.peek 保存网络，.peekbundle 可同时保存日志。需要重启后继续查看时，请保存归档或开启恢复快照。",
   clipboardUnavailable: "系统剪贴板暂不可用，请重试。",
 };
 export const menuEn: Record<keyof typeof menuZh, string> = {
@@ -79,6 +79,6 @@ export const menuEn: Record<keyof typeof menuZh, string> = {
   menuShortcutHint:
     "⌘/Ctrl O opens, S saves network, Shift S exports selected logs; ⌘/Ctrl 1–4 changes views, F finds. Use arrows / Home / End in lists, Shift for a range, ⌘/Ctrl click for multiple events. Delete / Esc clears selection.",
   menuRetentionHint:
-    "Groups and timelines show the retained window. .peek saves network only; selected logs export as JSONL. Receiving, deduplication, eviction, and gaps are counted separately. In-memory records are lost on exit.",
+    "Lists and groups show retained data. .peek saves network; .peekbundle also saves logs. Save an archive or enable recovery snapshots to view data after restarting.",
   clipboardUnavailable: "The system clipboard is unavailable. Please retry.",
 };

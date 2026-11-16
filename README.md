@@ -1,102 +1,51 @@
 # Peek Desktop
 
-使用 Tauri 2、Rust、React 19 与 TypeScript 开发的桌面网络检查器。当前提供 `.peek` 文件工作区、真实设备配对、实时网络、Flutter SDK 日志/异常查看、关联时间线、中英文原生菜单、完整会话归档、HAR/cURL 导出与工作区恢复；Windows 与真实移动设备仍待验证。
+在电脑上查看 Flutter App 的网络请求、日志和异常堆栈。支持实时连接设备，也可以打开 `.peek` 文件和会话归档离线排查。
 
-架构与阶段安排见 [技术方案](docs/技术方案.md)，Flutter SDK 设计见 [普通日志与异常同步方案](docs/普通日志与异常同步方案.md)。文件基础、连接闭环与查看功能的验证范围分别见 [P0 实施进度](docs/实施进度.md)、[P1 实施记录](docs/P1实施记录.md)、[P2 实施记录](docs/P2实施记录.md) 和 [P3 实施记录](docs/P3实施记录.md)。
+项目基于 Tauri 2、Rust、React 和 TypeScript。当前处于开发阶段，已完成 macOS 本地构建和主要操作验证；Windows、物理移动设备及正式安装包仍在[待办列表](docs/待办.md)中。
 
-Flutter SDK 已独立至 MIT 开源仓库 [peek-flutter-sdk](https://github.com/lx8s8/peek-flutter-sdk)，桌面通过 `sdk` 子模块固定版本联合验证。首次克隆执行 `git submodule update --init --recursive`，子模块使用 HTTPS，无需 SDK 私有仓库凭据；App 可按 `v0.1.1` tag 和包目录引用两个插件。
+## 功能
 
-## 当前可用
+- 查看请求和响应的 Headers、正文、耗时及错误；支持 JSON 树、原文和 Hex 预览
+- 配对设备，实时接收网络记录；局域网地址、二维码和可选 Bonjour 发现
+- 查看 Talker 日志、原始异常堆栈及结构化属性；按级别、来源、标签和时间筛选
+- 在时间线中一起查看网络和日志，按请求 ID 跳转关联记录
+- 保存完整会话归档，导出 HAR、日志 JSONL、文本或当前请求的 cURL
+- 可选工作区恢复、简体中文与英文菜单、深浅主题和键盘操作
 
-- 原生文件对话框打开 `.peek`，后台按 JSON Lines 读取，显示进度并支持取消；失败或取消不添加部分会话。
-- 会话侧栏、可调整三栏、TanStack 虚拟表格；Rust 搜索地址/方法/状态/来源，过滤错误、进行中、已固定记录。
-- 按需获取请求元信息、Headers、请求与响应正文；重复 Headers 分开显示，二进制提供 Hex 摘要，未采集、未加载与截断各有说明。
-- JSON 原文、只读树、格式化与复制；Worker 分析 JSON，`lossless-json` 保留长整数/小数精度，`vanilla-jsoneditor` 懒加载并在卸载时销毁。
-- 保存网络会话为标准 `.peek`；原始有效记录行用于无损导出，临时文件写入成功后原子替换目标。
-- 简体中文/英文、深浅主题、布局偏好保留；Cmd/Ctrl O 打开、Cmd/Ctrl S 保存、Cmd/Ctrl F 搜索，列表支持方向键、Home/End 和 PageUp/PageDown。
+Flutter 接入使用独立的 MIT 项目 [peek-flutter-sdk](https://github.com/lx8s8/peek-flutter-sdk)。其中连接包负责扫码和电脑选择，日志包负责 Talker 同步；两者共用 App 中的一个 `PeekRemote`。
 
-- 手动启停本机/局域网监听、可选 mDNS 发现；四位一次性配对码、系统凭据存储、网络和诊断独立授权、设备撤销。
-- 局域网实际地址及多网卡配对二维码；私有连接包提供历史桌面、自动发现、链接粘贴与扫码回调，多台配对后可按身份切换当前目标。
-- 标准 Peek WebSocket 历史快照、实时增删改、断线重连和正文按需取回；诊断日志与异常使用独立通道，展示原始堆栈、属性、累计确认、去重、缺口及淘汰计数。
-- 日志按级别、来源、tag、emitter、全文与时间范围筛选；异常支持指纹分组和原始成员查看，独立保留各视图的过滤与选择。
-- 网络与诊断时间线共享时间范围，区分明确请求引用、近似时间及不可用关联；完整详情说明空堆栈与采集截断。
-- 跟随/暂停、键盘导航与多选、选中消息/堆栈/原文复制和 JSONL 导出；中文/英文原生菜单、右键、快捷键和工具栏统一命令及可用状态。
+## 从源码运行
 
-新增 `.peekbundle` 完整归档、标准诊断 JSONL 历史导入、HAR/完整日志文本导出和当前请求 cURL；可选两份轮换工作区恢复快照。没有默认加载的假设备或假流量，监听默认关闭；双平台发布仍待后续验收。
-
-## 连接设备
-
-1. 在桌面“设备连接”中选择“仅本机”或“局域网设备”，启动监听；端口默认 `9741`，与前端开发端口无关。
-2. 生成配对码。手机填写电脑实际局域网 IP；`127.0.0.1:9741` 仅供同机示例，`0.0.0.0` 只是监听范围。客户端可填写地址和四位码，或通过 [连接包](sdk/packages/peek_desktop_connect/README.md) 扫码/粘贴桌面配对链接；配对码 180 秒失效，成功一次即失效。
-3. 查看实时网络，选择请求后打开“响应”取回远端正文；保存 `.peek` 会保留已取回的正文，未取回的远端正文不能在离线文件中加载。
-4. 普通日志需接入 [Flutter SDK](sdk/packages/peek_desktop_bridge/README.md)，并在配对时允许诊断同步。SDK 复用同一个官方客户端的公开凭据，不再次配对。仓库提供 [macOS 合成数据示例](sdk/packages/peek_desktop_bridge/example/README.md)。
-5. “关闭诊断”只断开日志通道；重新允许后在示例点击“重试日志连接”。“忘记设备”撤销两路授权。停止监听后已收到的数据仍可查看，离线后可关闭会话释放内存。
-
-共享测试机可记住多台电脑，每次连接一台；历史和发现列表按桌面 `serverId` 选择凭据，发现同一电脑的新 IP 后可直接连接。连接入口与日志采集分别放在 `peek_desktop_connect` 和 `peek_desktop_bridge`，扫码相机复用宿主能力。实现和真机验证边界见 [快速连接方案](docs/快速连接方案.md)。
-
-`.peek` 仅保存网络；“保存完整归档”保存当前网络及绑定日志为 `.peekbundle`，独立日志也可归档。“打开文件”可重新打开归档或标准诊断 JSONL。导出与归档使用当前保留窗口，不受列表搜索/时间过滤影响，不补回已淘汰或未加载的数据。
-
-“导出与恢复”可导出 HAR、全部日志 JSONL/文本、复制当前请求 cURL，以及开启自动恢复快照（默认关闭）。开启后每 5 秒按变化保存，正常退出补存；启动后从该入口恢复上次工作区，最新快照损坏时回退上一份。恢复数据为离线副本，监听需手动启动；待恢复或空工作区不会覆盖旧快照。详见 [P3 实施记录](docs/P3实施记录.md)。
-
-## 本地开发
-
-需要 Node.js >= 22.12、pnpm 10.33.0、Rust >= 1.91，以及所在平台的 [Tauri 构建工具](https://v2.tauri.app/start/prerequisites/)。
+需要 Node.js >= 22.12、pnpm 10.33.0、Rust >= 1.91，以及对应平台的 [Tauri 构建环境](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
+git clone --recurse-submodules https://github.com/lx8s8/peek-desktop.git
+cd peek-desktop
 pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
-`pnpm dev` 仅在 `http://127.0.0.1:1430` 预览前端，文件操作需要 Tauri 桌面环境。可通过原生“打开文件”选择 `src-tauri/tests/fixtures/upstream/sessions/basic.peek` 查看固定上游样例。
+已经克隆过的仓库可执行 `git submodule update --init --recursive` 补齐 SDK。`pnpm dev` 只启动浏览器预览，文件对话框、设备监听和系统菜单需要桌面环境。
 
-## 数据与容量
+## 开始使用
 
-Rust 保留权威会话与原始记录；UI 只查询当前窗口（最多 300 行预读，接口硬上限 500 行），选择记录后才查询详情和正文。
+**打开文件**：使用“打开文件”或 Cmd/Ctrl O。仓库内的 `src-tauri/tests/fixtures/upstream/sessions/basic.peek` 可用于试用请求列表和详情。
 
-离线文件单文件最大 64 MiB、单行最大 8 MiB、每会话最多 100,000 条不同 ID；离线库同时最多 12 个会话、192 MiB 保留原文。超过上限会拒绝本次导入。这是原文预算，索引、摘要、解析临时对象和 WebView 仍有额外内存开销。关闭会话释放其保留数据，启用恢复后按快照机制保留离线副本。
+**连接手机**：在“设备连接”中选择“局域网设备”，启动监听并生成配对码。App 扫描桌面二维码，或输入电脑的局域网 IP 和四位配对码。同机示例可使用 `127.0.0.1:9741`。配对码 180 秒有效，成功一次后失效。
 
-实时最多 8 个网络会话，各保留 10,000 条 / 8 MiB 原文，重同步 staging 使用独立同等预算；诊断最多 8 个运行，各保留 2,000 条 / 4 MiB，优先淘汰低级别日志。上限和缺口可在 UI 查看，ACK 仅代表内存接纳。详细连接与队列边界见 P1 记录。
+**查看日志**：App 接入日志包，并在配对时允许诊断同步。连接成功后可切换“日志”“异常”和“时间线”。共享测试机可以记住多台电脑，每次选择一台连接。
 
-异常分组次数及首次/最近时间按当前保留窗口和筛选条件统计。时间线使用墙钟时间，不推断跨来源因果关系。诊断/时间线每次最多查询 300 行摘要；多选最多 300 条，复制最多 1 MiB，超限可导出 JSONL。
+**保存排查现场**：“保存完整归档”生成 `.peekbundle`，包含当前保留的网络和日志。“保存网络会话”生成 `.peek`，只含网络记录。尚未从设备取回的正文需先加载再保存。
 
-标准 `.peek` 文件头必须有效；正常坏行跳过并计数，重复 ID 采用最后值并保留首次位置，更新格式版本尽量读取并提示。保存时统一 LF 换行，不保留空行、坏行与旧的重复 ID 版本；有效记录中的未知字段、重复 JSON key 和数字原文均保留。
+连接问题见[设备连接指南](docs/快速连接方案.md)，文件格式及自动恢复见[文件、导出与恢复](docs/文件与恢复.md)。
 
-文本/表单正文预览最多 1 MiB，二进制最多显示 4 KiB Hex；预览限制与设备采集截断分别提示。大正文可通过保存会话保留文件中已有的内容，`remote` 正文在离线文件中无法取回。树视图受大小、节点数与深度限制；无效 JSON 保留原文。HTML、SVG 与其他响应内容作为数据展示，不执行网页。
+## 文档与开发
 
-## 验证与本地打包
+- [文档目录](docs/README.md)
+- [开发指南](CONTRIBUTING.md)：检查、构建、联合测试与问题反馈
+- [架构说明](docs/技术方案.md)：数据流、模块和实现取舍
+- [日志同步说明](docs/普通日志与异常同步方案.md)与[诊断协议 v1](docs/诊断协议v1.md)
+- [待办与发布准备](docs/待办.md)
 
-```bash
-pnpm check
-pnpm test
-pnpm build
-pnpm format:check
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-# 首次 clone 后运行 git submodule update --init --recursive
-# 需先在 sdk/packages/peek_desktop_bridge 运行 flutter pub get
-cargo test --locked --manifest-path src-tauri/Cargo.toml --test sdk_interop -- --ignored --nocapture
-pnpm tauri build --debug --bundles app
-```
-
-2026 年 11 月 13 日本机 macOS 已通过前端检查/测试/构建、Rust 测试/格式/Clippy 和原生 `.app` 编译；实际窗口验证了官方样例导入、过滤、Headers/JSON、主题语言、保存回读与十万条合成会话。P1 另通过真实官方 Dart 客户端与 Rust 的跨语言测试、macOS 原生配对、Keychain 授权后既有凭据免码恢复、官方 Bonjour 发现、多桌面身份切换、网络与日志展示及诊断授权撤销/恢复。Windows 构建、真实移动设备互操作和完整性能矩阵尚未验收。
-
-P2 已通过前端 31 项、Rust 27 项及扩展跨语言回归；macOS 原生窗口已验证时间线、共享时间范围、异常分组/原始成员、空堆栈/截断、多选复制/JSONL 保存、准确请求跳转、暂停期间继续接收及 120 条日志 ACK。原生右键与操作按钮可正常弹出菜单并执行命令，另修复了菜单跟踪持有资源锁导致的挂起。最新修复版已通过菜单保持展开期间接收完整 120 条日志，以及失效/有效关联提示与跳转补验，具体范围和本地临时签名引起钥匙串再次询问的原因见 [P2 实施记录](docs/P2实施记录.md)。
-
-P3 已通过 37 项前端测试、43 项常规 Rust 测试与扩展跨语言联调；macOS 原生保存对话框已验收完整归档、HAR、日志 JSONL/文本和 cURL 复制。正常退出并重新启动后，原有会话、独立日志、正文数字精度、堆栈及请求关联均恢复，监听保持关闭。归档校验、双份快照回退、独立进程恢复及十万条核心磁盘探针结果见 P3 记录。诊断 ACK 仍只表示内存接纳，自动快照不提供逐事件持久化确认。
-
-JSON 编辑器约 1 MiB 的懒加载 chunk 仍会触发 Vite 大包提示；它不随空工作区加载，后续需继续评估组件拆分和实际 WebView 开销。
-
-## 可复现合成输入
-
-生成命令拒绝覆盖已有文件；所有请求均使用合成域名与数据。可分别生成 10,000 与 100,000 条输入，然后在桌面打开，或运行 Rust 核心探针：
-
-```bash
-node scripts/generate-session.mjs /tmp/peek-10k.peek 10000
-node scripts/generate-session.mjs /tmp/peek-100k.peek 100000
-cargo run --locked --manifest-path src-tauri/Cargo.toml --example session_probe -- /tmp/peek-100k.peek
-```
-
-探针只测本地导入和 20 次窗口搜索，不代表实时消息吞吐、WebView 帧率、总进程内存或 release 性能。
-
-项目仓库为 [lx8s8/peek-desktop](https://github.com/lx8s8/peek-desktop)，主分支为 `main`。当前 `local.peek.desktop` 标识与脚手架图标用于本地开发，尚未配置发布流程。
+本项目使用 Peek 公开的网络协议和会话格式，兼容样例的来源与许可见[上游样例说明](src-tauri/tests/fixtures/upstream/README.md)。它接收 App 已采集的数据，不需要安装代理证书。
