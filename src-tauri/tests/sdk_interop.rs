@@ -24,7 +24,7 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
     let file = std::fs::File::create(&log).unwrap();
     let mut child = Command::new("flutter")
         .args(["test", "test/interop_test.dart", "--reporter", "expanded"])
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/peek_desktop_bridge"))
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/packages/peek_desktop_bridge"))
         .env("PEEK_INTEROP_PORT", port.to_string())
         .env("PEEK_INTEROP_CODE", code)
         .env("PEEK_INTEROP_SERVER_ID", server_id)

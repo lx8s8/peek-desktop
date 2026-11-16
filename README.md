@@ -4,6 +4,8 @@
 
 架构与阶段安排见 [技术方案](docs/技术方案.md)，私有 Flutter SDK 设计见 [普通日志与异常同步方案](docs/普通日志与异常同步方案.md)。文件基础、连接闭环与查看功能的验证范围分别见 [P0 实施进度](docs/实施进度.md)、[P1 实施记录](docs/P1实施记录.md)、[P2 实施记录](docs/P2实施记录.md) 和 [P3 实施记录](docs/P3实施记录.md)。
 
+Flutter SDK 已独立至私有仓库 [peek-flutter-sdk](https://github.com/lx8s8/peek-flutter-sdk)，桌面通过 `sdk` 子模块固定版本联合验证。首次克隆执行 `git submodule update --init --recursive`，需要该私有仓库读取权限；App 可直接按 Git tag 和包目录引用两个插件。
+
 ## 当前可用
 
 - 原生文件对话框打开 `.peek`，后台按 JSON Lines 读取，显示进度并支持取消；失败或取消不添加部分会话。
@@ -25,9 +27,9 @@
 ## 连接设备
 
 1. 在桌面“设备连接”中选择“仅本机”或“局域网设备”，启动监听；端口默认 `9741`，与前端开发端口无关。
-2. 生成配对码。手机填写电脑实际局域网 IP；`127.0.0.1:9741` 仅供同机示例，`0.0.0.0` 只是监听范围。客户端可填写地址和四位码，或通过 [连接包](packages/peek_desktop_connect/README.md) 扫码/粘贴桌面配对链接；配对码 180 秒失效，成功一次即失效。
+2. 生成配对码。手机填写电脑实际局域网 IP；`127.0.0.1:9741` 仅供同机示例，`0.0.0.0` 只是监听范围。客户端可填写地址和四位码，或通过 [连接包](sdk/packages/peek_desktop_connect/README.md) 扫码/粘贴桌面配对链接；配对码 180 秒失效，成功一次即失效。
 3. 查看实时网络，选择请求后打开“响应”取回远端正文；保存 `.peek` 会保留已取回的正文，未取回的远端正文不能在离线文件中加载。
-4. 普通日志需接入 [私有 Flutter SDK](packages/peek_desktop_bridge/README.md)，并在配对时允许诊断同步。SDK 复用同一个官方客户端的公开凭据，不再次配对。仓库提供 [macOS 合成数据示例](packages/peek_desktop_bridge/example/README.md)。
+4. 普通日志需接入 [私有 Flutter SDK](sdk/packages/peek_desktop_bridge/README.md)，并在配对时允许诊断同步。SDK 复用同一个官方客户端的公开凭据，不再次配对。仓库提供 [macOS 合成数据示例](sdk/packages/peek_desktop_bridge/example/README.md)。
 5. “关闭诊断”只断开日志通道；重新允许后在示例点击“重试日志连接”。“忘记设备”撤销两路授权。停止监听后已收到的数据仍可查看，离线后可关闭会话释放内存。
 
 共享测试机可记住多台电脑，每次连接一台；历史和发现列表按桌面 `serverId` 选择凭据，发现同一电脑的新 IP 后可直接连接。连接入口与日志采集分别放在 `peek_desktop_connect` 和 `peek_desktop_bridge`，扫码相机复用宿主能力。实现和真机验证边界见 [快速连接方案](docs/快速连接方案.md)。
@@ -71,7 +73,8 @@ pnpm format:check
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-# 需先在 packages/peek_desktop_bridge 运行 flutter pub get
+# 首次 clone 后运行 git submodule update --init --recursive
+# 需先在 sdk/packages/peek_desktop_bridge 运行 flutter pub get
 cargo test --locked --manifest-path src-tauri/Cargo.toml --test sdk_interop -- --ignored --nocapture
 pnpm tauri build --debug --bundles app
 ```
