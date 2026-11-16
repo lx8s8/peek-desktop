@@ -33,3 +33,10 @@ src-tauri/gen/
 **/.dart_tool/
 **/build/
 **/.flutter-plugins-dependencies
+
+# Packaged installers and signing material
+release-artifacts/
+*.p12
+*.pfx
+*.p8
+*.key

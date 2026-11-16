@@ -11,7 +11,12 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "format:check": "prettier --check src vite.config.ts vitest.config.ts scripts",
-    "icons:generate": "node scripts/generate-icons.mjs"
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "release:check": "node scripts/check-release.mjs",
+    "release:test": "node --test scripts/*.test.mjs",
+    "package:local": "node scripts/package-desktop.mjs preview",
+    "package:development": "node scripts/package-desktop.mjs development",
+    "package:signed": "node scripts/package-desktop.mjs signed"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",

@@ -18,10 +18,12 @@ pnpm check
 pnpm test
 pnpm build
 pnpm format:check
+pnpm release:check
+pnpm release:test
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-pnpm tauri build --debug --bundles app
+pnpm package:local --debug
 ```
 
 只修改文档时，核对命令、相对链接和当前实现即可。修改界面时执行前端检查；修改 Rust 状态或协议时增加对应回归，并运行 Rust 检查。正式包还需要平台签名和安装验证，debug 构建不能覆盖这些检查。

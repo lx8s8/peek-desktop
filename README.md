@@ -15,6 +15,12 @@
 
 Flutter 接入使用独立的 MIT 项目 [peek-flutter-sdk](https://github.com/lx8s8/peek-flutter-sdk)。其中连接包负责扫码和电脑选择，日志包负责 Talker 同步；两者共用 App 中的一个 `PeekRemote`。
 
+## 安装包
+
+打包流程提供 macOS Apple Silicon / Intel DMG 和 Windows x64 安装器。代码变更后可在 [Actions](https://github.com/lx8s8/peek-desktop/actions/workflows/package-desktop.yml) 获取预览产物；正式签名与发布状态以 [P4 记录](docs/P4实施记录.md)为准。
+
+本地生成安装包使用 `pnpm package:local`。签名、公证和升级方式见[桌面发布说明](docs/桌面发布.md)。
+
 ## 从源码运行
 
 需要 Node.js >= 22.12、pnpm 10.33.0、Rust >= 1.91，以及对应平台的 [Tauri 构建环境](https://v2.tauri.app/start/prerequisites/)。
