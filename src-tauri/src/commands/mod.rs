@@ -68,21 +68,76 @@ impl Drop for ImportGuard {
     }
 }
 
+fn begin_import(state: &AppState) -> Result<(Arc<AtomicBool>, ImportGuard)> {
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let mut active = state.import.lock().map_err(|_| "internalError")?;
+    if active.is_some() {
+        return Err("importBusy".into());
+    }
+    *active = Some(Arc::clone(&cancelled));
+    Ok((cancelled, ImportGuard(Arc::clone(&state.import))))
+}
+
+fn import_file(
+    path: std::path::PathBuf,
+    library: Arc<Mutex<Library>>,
+    remote: Arc<Remote>,
+    cancelled: Arc<AtomicBool>,
+    progress: Channel<ImportProgress>,
+) -> Result<Option<crate::archive::Imported>> {
+    let path = crate::file_open::validate(&path)?;
+    let total_bytes = path.metadata().map_err(|e| e.to_string())?.len();
+    let mut last = Instant::now() - Duration::from_secs(1);
+    let mut report = |bytes_read| {
+        if last.elapsed() >= Duration::from_millis(50) {
+            let _ = progress.send(ImportProgress {
+                bytes_read,
+                total_bytes,
+            });
+            last = Instant::now();
+        }
+    };
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if matches!(extension.as_str(), "peekbundle" | "jsonl") {
+        let bundle = if extension == "peekbundle" {
+            crate::archive::open(&path, &cancelled, &mut report)?
+        } else {
+            crate::archive::open_jsonl(&path, &cancelled)?
+        };
+        let mut library = library.lock().map_err(|_| "internalError")?;
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("cancelled".into());
+        }
+        return crate::archive::install(&mut library, &remote, bundle, false).map(Some);
+    }
+    let session = storage::open(&path, &cancelled, report)?;
+    let mut library = library.lock().map_err(|_| "internalError")?;
+    if cancelled.load(Ordering::Relaxed) {
+        return Err("cancelled".into());
+    }
+    let filename = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into();
+    let summary = library.insert(filename, session)?;
+    Ok(Some(crate::archive::Imported {
+        session_id: Some(summary.id),
+        run_id: None,
+    }))
+}
+
 #[tauri::command]
 pub async fn open_peek(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     progress: Channel<ImportProgress>,
 ) -> Result<Option<crate::archive::Imported>> {
-    let cancelled = Arc::new(AtomicBool::new(false));
-    {
-        let mut active = state.import.lock().map_err(|_| "internalError")?;
-        if active.is_some() {
-            return Err("importBusy".into());
-        }
-        *active = Some(Arc::clone(&cancelled));
-    }
-    let guard = ImportGuard(Arc::clone(&state.import));
+    let (cancelled, guard) = begin_import(&state)?;
     let library = Arc::clone(&state.library);
     let remote = state.remote.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -98,57 +153,46 @@ pub async fn open_peek(
         else {
             return Ok(None);
         };
-        let path = path.into_path().map_err(|_| "invalidPath")?;
-        let total_bytes = path.metadata().map_err(|e| e.to_string())?.len();
-        let mut last = Instant::now() - Duration::from_secs(1);
-        let mut report = |bytes_read| {
-            if last.elapsed() >= Duration::from_millis(50) {
-                let _ = progress.send(ImportProgress {
-                    bytes_read,
-                    total_bytes,
-                });
-                last = Instant::now();
-            }
-        };
-        let extension = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if matches!(extension.as_str(), "peekbundle" | "jsonl") {
-            let bundle = if extension == "peekbundle" {
-                crate::archive::open(&path, &cancelled, &mut report)?
-            } else {
-                crate::archive::open_jsonl(&path, &cancelled)?
-            };
-            let mut library = library.lock().map_err(|_| "internalError")?;
-            if cancelled.load(Ordering::Relaxed) {
-                return Err("cancelled".into());
-            }
-            return crate::archive::install(&mut library, &remote, bundle, false).map(Some);
-        }
-        let session = storage::open(&path, &cancelled, report)?;
-        let mut library = library.lock().map_err(|_| "internalError")?;
-        if cancelled.load(Ordering::Relaxed) {
-            return Err("cancelled".into());
-        }
-        let filename = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into();
-        let summary = library.insert(filename, session)?;
-        Ok(Some(crate::archive::Imported {
-            session_id: Some(summary.id),
-            run_id: None,
-        }))
+        import_file(
+            path.into_path().map_err(|_| "invalidPath")?,
+            library,
+            remote,
+            cancelled,
+            progress,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn cancel_import(state: State<'_, AppState>) {
+pub fn has_pending_files(files: State<'_, crate::file_open::OpenFiles>) -> Result<bool> {
+    files.pending()
+}
+
+#[tauri::command]
+pub async fn open_pending_file(
+    state: State<'_, AppState>,
+    files: State<'_, crate::file_open::OpenFiles>,
+    progress: Channel<ImportProgress>,
+) -> Result<Option<crate::archive::Imported>> {
+    let (cancelled, guard) = begin_import(&state)?;
+    let Some(path) = files.next()? else {
+        return Ok(None);
+    };
+    let library = Arc::clone(&state.library);
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = guard;
+        import_file(path, library, remote, cancelled, progress)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn cancel_import(state: State<'_, AppState>, files: State<'_, crate::file_open::OpenFiles>) {
+    files.clear();
     if let Ok(active) = state.import.lock()
         && let Some(active) = &*active
     {

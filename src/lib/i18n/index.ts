@@ -19,6 +19,8 @@ const zh = {
   intro: "每一次请求，都清晰可见。",
   introHint: "打开 .peek 会话文件，检查请求、响应与原始正文。",
   emptyFiles: "还没有打开的会话",
+  unsupportedFile: "请选择 .peek、.peekbundle 或诊断 JSONL 文件。",
+  openQueueFull: "一次最多打开 32 个文件，其余文件请稍后再打开。",
   fileHint: ".peek 网络会话 · .peekbundle 完整归档 · JSONL 诊断历史",
   browser: "当前为浏览器预览，文件操作请使用桌面应用。",
   connectionHint: "设备配对、实时网络与日志同步将在后续连接阶段接入。",
@@ -110,6 +112,9 @@ const en: Record<keyof typeof zh, string> = {
   introHint:
     "Open a .peek session to inspect requests, responses, and original bodies.",
   emptyFiles: "No open sessions",
+  unsupportedFile: "Choose a .peek, .peekbundle, or diagnostic JSONL file.",
+  openQueueFull:
+    "Up to 32 files can be opened at once. Open the remaining files afterwards.",
   fileHint: ".peek network · .peekbundle archive · JSONL diagnostic history",
   browser: "Browser preview. Open the desktop app to work with files.",
   connectionHint:

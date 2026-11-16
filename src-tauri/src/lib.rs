@@ -2,6 +2,7 @@ pub mod archive;
 pub mod body;
 mod commands;
 pub mod export;
+pub mod file_open;
 pub mod protocol;
 pub mod query;
 pub mod recovery;
@@ -10,12 +11,21 @@ pub mod session;
 pub mod storage;
 
 pub fn run() {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            app.state::<file_open::OpenFiles>()
+                .arguments(&args, std::path::Path::new(&cwd));
+            file_open::notify(app);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
+        .manage(file_open::OpenFiles::default())
         .setup(|app| {
+            let args = std::env::args().collect::<Vec<_>>();
+            app.state::<file_open::OpenFiles>()
+                .arguments(&args, &std::env::current_dir()?);
             commands::start_recovery(app)?;
             Ok(())
         })
@@ -25,6 +35,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_peek,
+            commands::open_pending_file,
+            commands::has_pending_files,
             commands::cancel_import,
             commands::list_sessions,
             commands::close_session,
@@ -62,6 +74,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build Peek Desktop")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { ref urls } = event {
+                app.state::<file_open::OpenFiles>()
+                    .enqueue(urls.iter().filter_map(|url| url.to_file_path().ok()));
+                file_open::notify(app);
+            }
             if let tauri::RunEvent::ExitRequested { api, .. } = event
                 && commands::save_before_exit(app)
             {

@@ -28,6 +28,7 @@ import { Group, Panel, Separator, type Layout } from "react-resizable-panels";
 import { useTranslation } from "react-i18next";
 import { Button } from "./components/ui/button";
 import { FileTools } from "./features/files/FileTools";
+import { useFileOpen } from "./features/files/useFileOpen";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
 import { useWorkspace } from "./features/connection/useWorkspace";
 import {
@@ -318,6 +319,46 @@ export default function App() {
       setProgress(null);
     }
   }, [t, reportError, refresh]);
+  const openPending = useCallback(async () => {
+    if (!desktop || busyRef.current || saveRef.current) return false;
+    try {
+      if (!(await api.hasPendingFiles())) return true;
+    } catch (error) {
+      reportError(String(error));
+      return true;
+    }
+    if (busyRef.current || saveRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    setNotice(null);
+    try {
+      // The native queue is bounded to 32 files. Continue past a bad file.
+      for (let attempt = 0; attempt < 64; attempt++) {
+        try {
+          const imported = await api.openPending(setProgress);
+          if (!imported) break;
+          await refresh();
+          setIndependent(imported.sessionId ? null : imported.runId);
+          setActiveId(imported.sessionId);
+        } catch (error) {
+          const code = String(error);
+          if (code === "cancelled") {
+            setNotice({ text: t("cancelled"), error: false });
+            break;
+          }
+          reportError(code);
+          if (code === "importBusy") return false;
+        }
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+      setProgress(null);
+    }
+    return true;
+  }, [refresh, reportError, t]);
+  useFileOpen(busy || saving, openPending, reportError);
+
   const save = useCallback(async () => {
     if (!active || saveRef.current || busyRef.current || !desktop) return;
     saveRef.current = true;

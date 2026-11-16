@@ -82,6 +82,9 @@ vi.mock("./lib/ipc/client", () => ({
   desktop: true,
   api: {
     entryInfo: vi.fn(),
+    watchFiles: vi.fn(async () => () => {}),
+    openPending: vi.fn(async () => null),
+    hasPendingFiles: vi.fn(async () => false),
     archive: vi.fn(),
     recoveryStatus: vi.fn(async () => ({
       enabled: false,
@@ -124,6 +127,8 @@ const entry: EntryRow = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(api.hasPendingFiles).mockResolvedValue(false);
+  vi.mocked(api.openPending).mockReset().mockResolvedValue(null);
   data.remote.diagnosticRuns = [];
   data.sessions = [session("live-one"), session("live-two")];
   vi.mocked(api.entryInfo).mockResolvedValue(entry);
@@ -217,4 +222,24 @@ it("shows archived bound diagnostics and archives their network scope without a 
     }),
   );
   data.remote.diagnosticRuns = [];
+});
+
+it("continues queued file imports after a bad file and releases the workspace", async () => {
+  vi.mocked(api.hasPendingFiles).mockResolvedValue(true);
+  vi.mocked(api.openPending)
+    .mockRejectedValueOnce("unsupportedFile")
+    .mockResolvedValueOnce({ sessionId: "live-two", runId: null })
+    .mockResolvedValueOnce(null);
+  render(<App />);
+  await waitFor(() => expect(api.openPending).toHaveBeenCalledTimes(3));
+  await screen.findByText("请选择 .peek、.peekbundle 或诊断 JSONL 文件。");
+  await waitFor(() =>
+    expect(
+      (
+        screen.getAllByRole("button", {
+          name: "打开文件",
+        })[0] as HTMLButtonElement
+      ).disabled,
+    ).toBe(false),
+  );
 });

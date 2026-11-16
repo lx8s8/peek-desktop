@@ -40,6 +40,32 @@
     "copyright": "Copyright (c) 2026 kasen",
     "homepage": "https://github.com/lx8s8/peek-desktop",
     "shortDescription": "Flutter network and log inspector",
-    "longDescription": "View Flutter network requests, Talker logs and exception stacks. Save sessions, export HAR and restore offline workspaces."
+    "longDescription": "View Flutter network requests, Talker logs and exception stacks. Save sessions, export HAR and restore offline workspaces.",
+    "fileAssociations": [
+      {
+        "ext": [
+          "peek"
+        ],
+        "name": "Peek network session",
+        "description": "Peek network session",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "peekbundle"
+        ],
+        "name": "Peek Desktop archive",
+        "description": "Peek Desktop session archive",
+        "role": "Viewer",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "local.peek.desktop.archive",
+          "conformsTo": [
+            "public.zip-archive"
+          ]
+        }
+      }
+    ]
   }
 }

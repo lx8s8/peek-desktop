@@ -1,4 +1,5 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type {
   Imported,
   RecoveryStatus,
@@ -119,6 +120,13 @@ export const api = {
     const progress = new Channel<ImportProgress>();
     progress.onmessage = onProgress;
     return invoke<Imported | null>("open_peek", { progress });
+  },
+  watchFiles: (onFiles: () => void) => listen("peek-open-files", onFiles),
+  hasPendingFiles: () => invoke<boolean>("has_pending_files"),
+  openPending: (onProgress: (progress: ImportProgress) => void) => {
+    const progress = new Channel<ImportProgress>();
+    progress.onmessage = onProgress;
+    return invoke<Imported | null>("open_pending_file", { progress });
   },
   cancel: () => invoke<void>("cancel_import"),
   close: (sessionId: string) => invoke<void>("close_session", { sessionId }),
