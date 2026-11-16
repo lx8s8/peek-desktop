@@ -22,19 +22,25 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
     let done = dir.path().join("validated");
     let log = dir.path().join("flutter.log");
     let file = std::fs::File::create(&log).unwrap();
-    let mut child = Command::new("flutter")
-        .args(["test", "test/interop_test.dart", "--reporter", "expanded"])
-        .current_dir(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/packages/peek_desktop_bridge"),
-        )
-        .env("PEEK_INTEROP_PORT", port.to_string())
-        .env("PEEK_INTEROP_CODE", code)
-        .env("PEEK_INTEROP_SERVER_ID", server_id)
-        .env("PEEK_INTEROP_DONE", &done)
-        .stdout(Stdio::from(file.try_clone().unwrap()))
-        .stderr(Stdio::from(file))
-        .spawn()
-        .expect("Flutter must be available");
+    let package = std::env::var_os("PEEK_INTEROP_FLUTTER_PACKAGE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/packages/peek_desktop_bridge")
+        });
+    let test_file = std::env::var("PEEK_INTEROP_FLUTTER_TEST")
+        .unwrap_or_else(|_| "test/interop_test.dart".into());
+    let mut child =
+        Command::new(std::env::var_os("PEEK_FLUTTER_BIN").unwrap_or_else(|| "flutter".into()))
+            .args(["test", &test_file, "--reporter", "expanded"])
+            .current_dir(package)
+            .env("PEEK_INTEROP_PORT", port.to_string())
+            .env("PEEK_INTEROP_CODE", code)
+            .env("PEEK_INTEROP_SERVER_ID", server_id)
+            .env("PEEK_INTEROP_DONE", &done)
+            .stdout(Stdio::from(file.try_clone().unwrap()))
+            .stderr(Stdio::from(file))
+            .spawn()
+            .expect("Flutter must be available");
     let check = tokio::time::timeout(Duration::from_secs(90), async {
         loop {
             if child.try_wait().unwrap().is_some() {
@@ -111,8 +117,13 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
                     .iter()
                     .find(|row| row["kind"] == "exception")
                     .unwrap();
-                assert_eq!(exception["association"], "explicit");
-                assert_eq!(exception["relatedNetworkEntryId"], "interop-request");
+                if std::env::var("PEEK_INTEROP_EXPECT_EXPLICIT").as_deref() == Ok("false") {
+                    assert_eq!(exception["association"], "time");
+                    assert!(exception["relatedNetworkEntryId"].is_null());
+                } else {
+                    assert_eq!(exception["association"], "explicit");
+                    assert_eq!(exception["relatedNetworkEntryId"], "interop-request");
+                }
                 assert_eq!(exception["runId"], run.id);
                 let exported = dir.path().join("interop-diagnostics.jsonl");
                 peek_desktop_lib::storage::save_diagnostics(&exported, std::slice::from_ref(&raw))
@@ -234,6 +245,6 @@ async fn official_flutter_client_and_private_sdk_interoperate_with_rust() {
         std::fs::read_to_string(log).unwrap()
     );
     println!(
-        "Connect: parsed QR invitation and recalled history by server identity; official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, explicit reference and original JSONL verified; P3: archive, two-slot recovery, offline timeline, original diagnostics and precision HAR body verified."
+        "Connect: parsed QR invitation and recalled history by server identity; official PeekRemote 2.1.1: paired, reconnected, fetched >6 KiB precision body and exported; SDK: 4 logs, original stack, redaction and ACK; P2: filtered group, 5-row timeline, expected association mode and original JSONL verified; P3: archive, two-slot recovery, offline timeline, original diagnostics and precision HAR body verified."
     );
 }
