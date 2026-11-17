@@ -14,6 +14,7 @@
         "displayLanguageSelector": true,
         "installerIcon": "icons/icon.ico"
       }
-    }
+    },
+    "licenseFile": "../LICENSE"
   }
 }

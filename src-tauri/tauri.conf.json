@@ -68,7 +68,6 @@
       }
     ],
     "license": "MIT",
-    "licenseFile": "../LICENSE",
     "resources": {
       "../LICENSE": "licenses/LICENSE",
       "../THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md"

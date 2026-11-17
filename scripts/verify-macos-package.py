@@ -16,7 +16,10 @@ mount = root / 'volume'
 mount.mkdir()
 mounted = False
 try:
-    subprocess.run(['hdiutil', 'attach', str(args.dmg.resolve()), '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', str(mount)], check=True, capture_output=True)
+    result = subprocess.run(['hdiutil', 'attach', str(args.dmg.resolve()), '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', str(mount)], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError('DMG mount failed: ' + result.stderr.strip())
+
     mounted = True
     destination = root / 'installed' / 'Peek Desktop.app'
     destination.parent.mkdir()
@@ -29,6 +32,8 @@ try:
     assert {'peek', 'peekbundle'} <= extensions
     assert (destination / 'Contents/Resources' / info['CFBundleIconFile']).is_file()
     assert (destination / 'Contents/MacOS' / info['CFBundleExecutable']).is_file()
+    for filename in ['LICENSE', 'THIRD_PARTY_NOTICES.md']:
+        assert (destination / 'Contents/Resources/licenses' / filename).read_bytes() == Path(filename).read_bytes()
     print(json.dumps({'version': info['CFBundleShortVersionString'], 'fileTypes': sorted(extensions), 'copiedApp': str(destination) if args.keep_copy else 'validated temporary installation'}, ensure_ascii=False))
 finally:
     if mounted:
