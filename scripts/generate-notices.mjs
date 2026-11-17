@@ -99,6 +99,7 @@ for (const [key, pkg] of [...packages].sort(([a], [b]) =>
   for (const item of files) {
     if (!existsSync(item.file)) throw Error(`许可文件缺失：${key}`);
     const body = readFileSync(item.file, "utf8")
+      .replace(/\r\n/g, "\n")
       .replace(/[ \t]+$/gm, "")
       .trim();
     const id = createHash("sha256").update(body).digest("hex").slice(0, 16);

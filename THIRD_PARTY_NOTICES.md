@@ -73,7 +73,7 @@
 | node:axobject-query@4.1.0 | Apache-2.0 | Jesse Beach <splendidnoise@gmail.com> | [源码 / 包](https://www.npmjs.com/package/axobject-query/v/4.1.0) | [许可](#license-c4da23066f58e141) |
 | node:class-variance-authority@0.7.1 | Apache-2.0 | Joe Bell (https://joebell.co.uk) | [源码 / 包](https://www.npmjs.com/package/class-variance-authority/v/0.7.1) | [许可](#license-be61dfc96bbff04f) |
 | node:clsx@2.1.1 | MIT | Luke Edwards | [源码 / 包](https://www.npmjs.com/package/clsx/v/2.1.1) | [许可](#license-3d5b63706380c8c7) |
-| node:codemirror-wrapped-line-indent@1.0.9 | MIT | Muhammad Iqbal Fauzi | [源码 / 包](https://www.npmjs.com/package/codemirror-wrapped-line-indent/v/1.0.9) | [许可](#license-c267217b9f9d486f) |
+| node:codemirror-wrapped-line-indent@1.0.9 | MIT | Muhammad Iqbal Fauzi | [源码 / 包](https://www.npmjs.com/package/codemirror-wrapped-line-indent/v/1.0.9) | [许可](#license-e95682a8d2de052e) |
 | node:crelt@1.0.7 | MIT | Marijn Haverbeke <marijn@haverbeke.berlin> | [源码 / 包](https://www.npmjs.com/package/crelt/v/1.0.7) | [许可](#license-1f7269cdcd8d4d30) |
 | node:csstype@3.2.3 | MIT | Fredrik Nicol <fredrik.nicol@gmail.com> | [源码 / 包](https://www.npmjs.com/package/csstype/v/3.2.3) | [许可](#license-6a972b33787e1430) |
 | node:detect-libc@2.1.2 | Apache-2.0 | Lovell Fuller <npm@lovell.info> | [源码 / 包](https://www.npmjs.com/package/detect-libc/v/2.1.2) | [许可](#license-6dc0e068dcf3a5bc) |
@@ -127,7 +127,7 @@
 | node:tailwindcss@4.3.5 | MIT |  | [源码 / 包](https://www.npmjs.com/package/tailwindcss/v/4.3.5) | [许可](#license-fdd854c84f367147) |
 | node:tapable@2.3.3 | MIT | Tobias Koppers @sokra | [源码 / 包](https://www.npmjs.com/package/tapable/v/2.3.3) | [许可](#license-31d52158e4bc522a) |
 | node:tinyglobby@0.2.17 | MIT | Superchupu | [源码 / 包](https://www.npmjs.com/package/tinyglobby/v/0.2.17) | [许可](#license-4918b99deb04bad7) |
-| node:typescript@6.0.3 | Apache-2.0 | Microsoft Corp. | [源码 / 包](https://www.npmjs.com/package/typescript/v/6.0.3) | [许可](#license-c3613146372a1d5b) |
+| node:typescript@6.0.3 | Apache-2.0 | Microsoft Corp. | [源码 / 包](https://www.npmjs.com/package/typescript/v/6.0.3) | [许可](#license-d446a8c73d7bbe48) |
 | node:undici-types@7.24.6 | MIT |  | [源码 / 包](https://www.npmjs.com/package/undici-types/v/7.24.6) | [许可](#license-fe64958bfaef10b1) |
 | node:vanilla-jsoneditor@3.13.1 | ISC |  | [源码 / 包](https://www.npmjs.com/package/vanilla-jsoneditor/v/3.13.1) | [许可](#license-47a3cfe317ebc050) |
 | node:vanilla-picker@2.12.3 | ISC | Andreas Borgen (https://github.com/Sphinxxxx), Adam Brooks (https://github.com/dissimulate) | [源码 / 包](https://www.npmjs.com/package/vanilla-picker/v/2.12.3) | [许可](#license-3da5d90c0ee13b30) |
@@ -228,7 +228,7 @@
 | rust:futures-sink@0.3.34 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/futures-sink/0.3.34) | [许可](#license-27480f391bd92f66) · [许可](#license-b420d8add23b5cf7) |
 | rust:futures-task@0.3.34 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/futures-task/0.3.34) | [许可](#license-27480f391bd92f66) · [许可](#license-b420d8add23b5cf7) |
 | rust:futures-util@0.3.34 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/futures-util/0.3.34) | [许可](#license-27480f391bd92f66) · [许可](#license-b420d8add23b5cf7) |
-| rust:generic-array@0.14.7 | MIT | Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com> | [源码 / 包](https://crates.io/crates/generic-array/0.14.7) | [许可](#license-c09aae9d3c77b531) |
+| rust:generic-array@0.14.7 | MIT | Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com> | [源码 / 包](https://crates.io/crates/generic-array/0.14.7) | [许可](#license-ad4fcfaf8d5b12b9) |
 | rust:getrandom@0.3.4 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.3.4) | [许可](#license-e7330bf53074b4a9) · [许可](#license-73af2019a565c0e6) |
 | rust:getrandom@0.4.3 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.4.3) | [许可](#license-e7330bf53074b4a9) · [许可](#license-94b1870d380ccf53) |
 | rust:glob@0.3.4 | MIT OR Apache-2.0 | The Rust Project Developers | [源码 / 包](https://crates.io/crates/glob/0.3.4) | [许可](#license-954f335b8baf5e1a) · [许可](#license-14435fbcd271e278) |
@@ -1853,7 +1853,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## license-c267217b9f9d486f
+## license-e95682a8d2de052e
 
 来源：https://www.npmjs.com/package/codemirror-wrapped-line-indent/v/1.0.9
 
@@ -3497,7 +3497,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## license-c3613146372a1d5b
+## license-d446a8c73d7bbe48
 
 来源：https://www.npmjs.com/package/typescript/v/6.0.3
 
@@ -11028,7 +11028,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-## license-c09aae9d3c77b531
+## license-ad4fcfaf8d5b12b9
 
 来源：https://crates.io/crates/generic-array/0.14.7
 

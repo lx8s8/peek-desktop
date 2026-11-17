@@ -1,2 +1,4 @@
-# Keep vendored upstream license bytes unchanged.
-third-party/licenses/*.txt whitespace=-blank-at-eol
+# Preserve upstream license bytes and stable packaged text.
+third-party/licenses/*.txt -text whitespace=-blank-at-eol
+THIRD_PARTY_NOTICES.md text eol=lf
+LICENSE text eol=lf
