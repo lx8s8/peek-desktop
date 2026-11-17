@@ -5,12 +5,14 @@ import { Button } from "../../components/ui/button";
 import { commands } from "../../lib/commands/dispatcher";
 import { useCommand } from "../../lib/commands/react";
 import { api, desktop } from "../../lib/ipc/client";
+import { UpdateCheck } from "./UpdateCheck";
 import type { AppInfo, ProjectLink } from "../../lib/ipc/types";
 
 export function AboutPanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const [checkRequest, setCheckRequest] = useState(0);
   const [view, setView] = useState("info");
   const [legal, setLegal] = useState("");
   const [error, setError] = useState("");
@@ -18,8 +20,18 @@ export function AboutPanel() {
   const dialog = useRef<HTMLElement>(null);
   useCommand("help.about", () => {
     setView("info");
+    setCheckRequest(0);
     setOpen(true);
   });
+  useCommand(
+    "help.checkUpdates",
+    () => {
+      setView("info");
+      setOpen(true);
+      setCheckRequest((value) => value + 1);
+    },
+    desktop,
+  );
   useCommand("help.project", () => api.openProjectLink("project"), desktop);
   useCommand("help.issues", () => api.openProjectLink("issues"), desktop);
   useEffect(() => {
@@ -178,6 +190,10 @@ export function AboutPanel() {
                     ? `${info.platform} · ${info.architecture}`
                     : t(desktop ? "loading" : "browser")}
                 </p>
+                <UpdateCheck
+                  request={checkRequest}
+                  onCheck={() => setCheckRequest((value) => value + 1)}
+                />
                 <dl className="about-facts">
                   <div>
                     <dt>{t("author")}</dt>

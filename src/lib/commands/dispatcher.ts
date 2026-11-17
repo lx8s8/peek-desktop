@@ -38,6 +38,7 @@ export const definitions = {
   "view.language": { label: "language", accelerator: "CmdOrCtrl+Shift+L" },
   "language.zh-CN": { label: "menuChinese" },
   "language.en": { label: "menuEnglish" },
+  "help.checkUpdates": { label: "checkUpdates" },
   "help.about": { label: "menuAbout" },
   "help.project": { label: "projectRepository" },
   "help.issues": { label: "reportIssue" },

@@ -910,3 +910,20 @@ pub async fn open_project_link(app: tauri::AppHandle, link: String) -> Result<()
         .open_url(url, None::<&str>)
         .map_err(|_| "openLinkFailed".into())
 }
+
+#[tauri::command]
+pub async fn check_updates(
+    checker: State<'_, crate::updates::Checker>,
+) -> Result<crate::updates::UpdateInfo> {
+    checker.check().await
+}
+#[tauri::command]
+pub async fn open_release_link(app: tauri::AppHandle, url: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    if !crate::updates::valid_release_link(&url) {
+        return Err("invalidProjectLink".into());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|_| "openLinkFailed".into())
+}

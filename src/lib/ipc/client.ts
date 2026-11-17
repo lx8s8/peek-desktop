@@ -1,6 +1,7 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  UpdateInfo,
   AppInfo,
   ProjectLink,
   Imported,
@@ -34,6 +35,8 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  checkUpdates: () => invoke<UpdateInfo>("check_updates"),
+  openReleaseLink: (url: string) => invoke<void>("open_release_link", { url }),
   appInfo: () => invoke<AppInfo>("app_info"),
   legalText: (document: "license" | "notices") =>
     invoke<string>("legal_text", { document }),

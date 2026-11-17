@@ -1429,3 +1429,29 @@ button.timeline-grid.selected {
     11px/1.7 ui-monospace,
     monospace;
 }
+
+.update-check {
+  margin: 18px 0;
+  font-size: 13px;
+}
+.update-result {
+  margin-top: 10px;
+}
+.update-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.update-notes {
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font:
+    11px/1.7 ui-monospace,
+    monospace;
+}

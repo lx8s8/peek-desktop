@@ -214,3 +214,12 @@ export interface AppInfo {
 }
 export type ProjectLink =
   "project" | "issues" | "releases" | "sdk" | "upstream";
+
+export interface UpdateInfo {
+  status: "available" | "current" | "ahead" | "notPublished";
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseUrl: string | null;
+  downloadUrl: string | null;
+  notes: string;
+}

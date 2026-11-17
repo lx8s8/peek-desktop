@@ -10,6 +10,7 @@ pub mod recovery;
 pub mod remote;
 pub mod session;
 pub mod storage;
+pub mod updates;
 
 pub fn run() {
     use tauri::{Emitter, Manager};
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
+        .manage(updates::Checker::default())
         .manage(file_open::OpenFiles::default())
         .setup(|app| {
             let args = std::env::args().collect::<Vec<_>>();
@@ -36,6 +38,8 @@ pub fn run() {
             let _ = app.emit_to("main", "peek-menu-command", event.id().as_ref());
         })
         .invoke_handler(tauri::generate_handler![
+            commands::check_updates,
+            commands::open_release_link,
             commands::app_info,
             commands::legal_text,
             commands::open_project_link,

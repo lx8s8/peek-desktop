@@ -71,6 +71,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
             text: "Peek Desktop",
             items: [
               item("help.about"),
+              item("help.checkUpdates"),
               separator(),
               native("Services", "menuServices"),
               separator(),
@@ -181,6 +182,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
       id: "menu.help",
       text: t("menuHelp"),
       items: [
+        ...(!snapshot.mac ? [item("help.checkUpdates"), separator()] : []),
         item("help.project"),
         item("help.issues"),
         separator(),

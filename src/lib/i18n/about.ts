@@ -1,5 +1,16 @@
 export const aboutZh = {
   aboutSections: "关于页面",
+  checkUpdates: "检查更新…",
+  checkingUpdates: "正在检查…",
+  update_available: "发现新版本 {{version}}",
+  update_current: "当前已是最新版本 {{version}}",
+  update_ahead: "当前版本高于最新公开版本 {{version}}",
+  update_notPublished: "尚未发布正式版本，可前往版本发布页查看。",
+  updateCheckFailed: "无法检查更新，请检查网络后重试。",
+  updateRateLimited: "GitHub 请求过于频繁，请稍后重试。",
+  updateInvalidRelease: "版本信息不完整，请前往版本发布页查看。",
+  downloadUpdate: "下载新版",
+  viewRelease: "查看更新说明",
   aboutDetails: "软件信息",
   author: "作者",
   licenseAgreement: "开源许可",
@@ -16,6 +27,21 @@ export const aboutZh = {
 };
 export const aboutEn: Record<keyof typeof aboutZh, string> = {
   aboutSections: "About sections",
+  checkUpdates: "Check for updates…",
+  checkingUpdates: "Checking…",
+  update_available: "Version {{version}} is available",
+  update_current: "You are up to date ({{version}})",
+  update_ahead: "This build is newer than the latest release ({{version}})",
+  update_notPublished:
+    "No stable release has been published yet. See Releases for details.",
+  updateCheckFailed:
+    "Could not check for updates. Check your connection and try again.",
+  updateRateLimited:
+    "GitHub's request limit was reached. Please try again later.",
+  updateInvalidRelease:
+    "Release information is incomplete. Please see Releases.",
+  downloadUpdate: "Download update",
+  viewRelease: "Release notes",
   aboutDetails: "Details",
   author: "Author",
   licenseAgreement: "License",
