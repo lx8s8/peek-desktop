@@ -246,12 +246,10 @@ impl Remote {
         let addresses = if host == "127.0.0.1" {
             vec![format!("127.0.0.1:{port}")]
         } else {
-            local_ip_address::list_afinet_netifas()
+            super::addresses::local_addresses()
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|(_, ip)| ip.is_ipv4() && !ip.is_loopback())
-                .map(|(_, ip)| format!("{ip}:{port}"))
-                .take(16)
+                .map(|ip| format!("{ip}:{port}"))
                 .collect()
         };
         let daemon = if advertise && host == "0.0.0.0" {

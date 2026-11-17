@@ -6,13 +6,17 @@ export const remoteZh = {
   lan: "局域网设备",
   loopbackHint:
     "127.0.0.1 仅供本机应用连接。手机或其他电脑请选择“局域网设备”。",
-  lanHint:
-    "客户端填写下方电脑的实际 IP；0.0.0.0 表示监听所有网卡。设备需位于可互通的局域网。",
+  lanHint: "使用下方地址连接；手机与电脑需位于可互通的局域网。",
+  computerAddress: "本机地址",
+  refreshAddresses: "刷新地址",
+  copyAddress: "复制地址",
+  listenerNotStarted: "尚未启动监听",
+  localAddressesUnavailable: "无法读取本机地址，请刷新重试。",
   pairingAddress: "扫码连接地址",
   pairingQr: "一次性配对二维码",
   pairingQrHint:
     "在 App 的诊断连接入口扫码；也可复制配对链接。成功一次或到期后失效，多网卡时选择设备可访问的地址。",
-  noLanAddress: "未找到局域网 IPv4 地址，请检查电脑网络后重新启动监听。",
+  noLanAddress: "未找到局域网 IPv4 地址，请检查网络后刷新。",
   copyPairingLink: "复制配对链接",
   pairingLinkCopied: "配对链接已复制",
   port: "端口",
@@ -95,13 +99,19 @@ export const remoteEn: Record<keyof typeof remoteZh, string> = {
   loopbackHint:
     "127.0.0.1 accepts apps on this computer. Choose LAN devices for a phone or another computer.",
   lanHint:
-    "Enter an actual computer IP shown below. 0.0.0.0 listens on all interfaces. Devices must be on a reachable LAN.",
+    "Use an address below. The device and this computer must be on a reachable network.",
+  computerAddress: "Computer addresses",
+  refreshAddresses: "Refresh addresses",
+  copyAddress: "Copy address",
+  listenerNotStarted: "Not listening",
+  localAddressesUnavailable:
+    "Cannot read local addresses. Refresh to try again.",
   pairingAddress: "Address for pairing",
   pairingQr: "One-time pairing QR code",
   pairingQrHint:
     "Scan from the app's diagnostics connection screen, or copy the pairing link. It expires after one use or the time limit. Choose a reachable address on computers with multiple interfaces.",
   noLanAddress:
-    "No LAN IPv4 address found. Check this computer's network and restart listening.",
+    "No LAN IPv4 address found. Check this computer's network and refresh.",
   copyPairingLink: "Copy pairing link",
   pairingLinkCopied: "Pairing link copied",
   port: "Port",

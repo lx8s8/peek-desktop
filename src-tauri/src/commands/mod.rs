@@ -377,6 +377,13 @@ pub struct RemoteUpdate {
 }
 
 #[tauri::command]
+pub async fn local_addresses() -> Result<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(crate::remote::addresses::local_addresses)
+        .await
+        .map_err(|_| "internalError")?
+}
+
+#[tauri::command]
 pub async fn remote_snapshot(
     state: State<'_, AppState>,
 ) -> Result<crate::remote::server::RemoteSnapshot> {

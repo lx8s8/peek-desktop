@@ -53,6 +53,7 @@ pub fn run() {
             commands::restore_recovery,
             commands::start_new_recovery,
             commands::remote_snapshot,
+            commands::local_addresses,
             commands::start_listener,
             commands::stop_listener,
             commands::issue_pairing_code,

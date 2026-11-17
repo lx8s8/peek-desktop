@@ -1,3 +1,4 @@
+pub mod addresses;
 mod diagnostic_transport;
 pub mod diagnostics;
 pub mod pairing;

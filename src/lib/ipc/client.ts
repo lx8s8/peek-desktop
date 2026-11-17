@@ -55,6 +55,7 @@ export const api = {
   ) => invoke<string>("copy_diagnostics", { selection, kind }),
   exportDiagnostics: (selection: DiagnosticRef[]) =>
     invoke<boolean>("export_diagnostics", { selection }),
+  localAddresses: () => invoke<string[]>("local_addresses"),
   remote: () =>
     desktop
       ? invoke<RemoteSnapshot>("remote_snapshot")

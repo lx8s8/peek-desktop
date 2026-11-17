@@ -1259,3 +1259,18 @@ button.timeline-grid.selected {
   display: grid;
   gap: 10px;
 }
+
+.address-heading,
+.address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.address-heading {
+  justify-content: space-between;
+}
+.address-row code {
+  font-size: 14px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConnectionPanel } from "./ConnectionPanel";
 import { pairingLink } from "./PairingQr";
 import { api, emptyRemote } from "../../lib/ipc/client";
@@ -8,11 +8,16 @@ vi.mock("../../lib/ipc/client", () => ({
   emptyRemote: { listening: false, diagnosticRuns: [], sessions: [] },
   api: {
     start: vi.fn(),
+    localAddresses: vi.fn(),
     pair: vi.fn(),
     revoke: vi.fn(),
     writeClipboard: vi.fn(),
   },
 }));
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(api.localAddresses).mockResolvedValue(["192.168.1.8", "10.1.1.9"]);
+});
 afterEach(() => vi.useRealTimers());
 it("preserves an explicitly configured default WebSocket port in pairing links", () => {
   const link = new URL(
@@ -31,9 +36,9 @@ it("starts only explicitly and sends an independent diagnostic grant for pairing
   );
   expect(api.start).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "设备连接" }));
-  fireEvent.change(screen.getByLabelText("监听范围"), {
-    target: { value: "0.0.0.0" },
-  });
+  expect((screen.getByLabelText("监听范围") as HTMLSelectElement).value).toBe(
+    "0.0.0.0",
+  );
   fireEvent.click(screen.getByRole("button", { name: "启动监听" }));
   await waitFor(() =>
     expect(api.start).toHaveBeenCalledWith("0.0.0.0", 9741, true),
@@ -149,4 +154,33 @@ it("keeps loopback local and removes a QR when its time expires", async () => {
   const { act } = await import("@testing-library/react");
   act(() => vi.advanceTimersByTime(1000));
   expect(screen.queryByRole("img")).toBeNull();
+});
+
+it("shows current computer addresses before listening, refreshes and copies the selected port", async () => {
+  vi.mocked(api.localAddresses)
+    .mockResolvedValueOnce(["192.168.1.8"])
+    .mockResolvedValueOnce(["192.168.1.19"]);
+  vi.mocked(api.writeClipboard).mockResolvedValue();
+  render(
+    <ConnectionPanel
+      remote={emptyRemote}
+      onChange={async () => {}}
+      onError={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "设备连接" }));
+  await screen.findByText("192.168.1.8:9741");
+  expect(api.start).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("端口"), {
+    target: { value: "9841" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "复制地址 192.168.1.8:9841" }),
+  );
+  await waitFor(() =>
+    expect(api.writeClipboard).toHaveBeenCalledWith("192.168.1.8:9841"),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "刷新地址" }));
+  await screen.findByText("192.168.1.19:9841");
+  expect(screen.queryByText("192.168.1.8:9841")).toBeNull();
 });
