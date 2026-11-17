@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "./components/ui/button";
 import { FileTools } from "./features/files/FileTools";
 import { useFileOpen } from "./features/files/useFileOpen";
+import { AboutPanel } from "./features/about/AboutPanel";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
 import { useWorkspace } from "./features/connection/useWorkspace";
 import {
@@ -574,6 +575,7 @@ export default function App() {
           {t(remote.listening ? "listening" : "offline")}
         </span>
         <div className="toolbar-end">
+          <AboutPanel />
           <Button
             size="icon"
             variant="ghost"

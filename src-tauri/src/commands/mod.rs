@@ -891,3 +891,22 @@ pub async fn start_new_recovery(
     .await
     .map_err(|_| "internalError")?
 }
+
+#[tauri::command]
+pub fn app_info() -> crate::app_info::AppInfo {
+    crate::app_info::info()
+}
+
+#[tauri::command]
+pub fn legal_text(document: &str) -> Result<String> {
+    crate::app_info::legal_text(document).map(str::to_owned)
+}
+
+#[tauri::command]
+pub async fn open_project_link(app: tauri::AppHandle, link: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = crate::app_info::project_link(&link)?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|_| "openLinkFailed".into())
+}

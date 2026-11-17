@@ -206,3 +206,11 @@ export interface BodyView {
   image?: ImagePreview;
   imageUnavailable?: string;
 }
+
+export interface AppInfo {
+  version: string;
+  platform: string;
+  architecture: string;
+}
+export type ProjectLink =
+  "project" | "issues" | "releases" | "sdk" | "upstream";

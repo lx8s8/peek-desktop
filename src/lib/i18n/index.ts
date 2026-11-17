@@ -1,3 +1,4 @@
+import { aboutZh, aboutEn } from "./about";
 import { bodyZh, bodyEn } from "./body";
 import { archiveZh, archiveEn } from "./archive";
 import { menuZh, menuEn } from "./menu";
@@ -199,6 +200,7 @@ void i18n.use(initReactI18next).init({
         ...menuZh,
         ...archiveZh,
         ...bodyZh,
+        ...aboutZh,
       },
     },
     en: {
@@ -209,6 +211,7 @@ void i18n.use(initReactI18next).init({
         ...menuEn,
         ...archiveEn,
         ...bodyEn,
+        ...aboutEn,
       },
     },
   },

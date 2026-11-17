@@ -1,0 +1,33 @@
+export const aboutZh = {
+  aboutSections: "关于页面",
+  aboutDetails: "软件信息",
+  author: "作者",
+  licenseAgreement: "开源许可",
+  thirdPartyNotices: "第三方声明",
+  projectRepository: "项目地址",
+  reportIssue: "反馈问题",
+  releaseHistory: "版本发布",
+  flutterSdk: "Flutter SDK",
+  upstreamProject: "Peek Pro 上游项目",
+  aboutLoadFailed: "无法读取软件信息，请关闭后重试。",
+  openLinkFailed: "无法打开链接，请稍后重试。",
+  invalidProjectLink: "此项目链接不可用。",
+  invalidLegalDocument: "此许可文档不可用。",
+};
+export const aboutEn: Record<keyof typeof aboutZh, string> = {
+  aboutSections: "About sections",
+  aboutDetails: "Details",
+  author: "Author",
+  licenseAgreement: "License",
+  thirdPartyNotices: "Third-party notices",
+  projectRepository: "Source code",
+  reportIssue: "Report an issue",
+  releaseHistory: "Releases",
+  flutterSdk: "Flutter SDK",
+  upstreamProject: "Peek Pro upstream project",
+  aboutLoadFailed:
+    "Could not load app information. Close this dialog and try again.",
+  openLinkFailed: "Could not open the link. Please try again.",
+  invalidProjectLink: "This project link is unavailable.",
+  invalidLegalDocument: "This license document is unavailable.",
+};

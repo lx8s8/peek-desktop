@@ -299,6 +299,7 @@
 | rust:objc2-web-kit@0.3.2 | Zlib OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/objc2-web-kit/0.3.2) | [许可](#license-1aa0a34224480ff9) |
 | rust:objc2@0.6.5 | MIT | Mads Marquart <mads@marquart.dk> | [源码 / 包](https://crates.io/crates/objc2/0.6.5) | [许可](#license-1aa0a34224480ff9) |
 | rust:once_cell@1.21.4 | MIT OR Apache-2.0 | Aleksey Kladov <aleksey.kladov@gmail.com> | [源码 / 包](https://crates.io/crates/once_cell/1.21.4) | [许可](#license-954f335b8baf5e1a) · [许可](#license-30fefc3a7d6a0041) |
+| rust:open@5.4.5 | MIT | Sebastian Thiel <byronimo@gmail.com> | [源码 / 包](https://crates.io/crates/open/5.4.5) | [许可](#license-c3ca23514163a6fe) |
 | rust:option-ext@0.2.0 | MPL-2.0 | Simon Ochsenreither <simon@ochsenreither.de> | [源码 / 包](https://crates.io/crates/option-ext/0.2.0) | [许可](#license-86cf9656479f1edb) |
 | rust:parking_lot_core@0.9.12 | MIT OR Apache-2.0 | Amanieu d'Antras <amanieu@gmail.com> | [源码 / 包](https://crates.io/crates/parking_lot_core/0.9.12) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8d1f81ea4e87111d) |
 | rust:parking_lot@0.12.5 | MIT OR Apache-2.0 | Amanieu d'Antras <amanieu@gmail.com> | [源码 / 包](https://crates.io/crates/parking_lot/0.12.5) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8d1f81ea4e87111d) |
@@ -388,6 +389,7 @@
 | rust:tauri-plugin-clipboard-manager@2.5.0 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-clipboard-manager/2.5.0) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin-dialog@2.8.4 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-dialog/2.8.4) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin-fs@2.7.1 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-fs/2.7.1) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
+| rust:tauri-plugin-opener@2.7.3 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-opener/2.7.3) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin-single-instance@2.5.5 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-single-instance/2.5.5) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-b7f455413bfe5f9d) |
 | rust:tauri-plugin@2.7.2 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin/2.7.2) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) · [许可](#license-7c667b0cf9860e6a) |
 | rust:tauri-runtime-wry@2.12.3 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-runtime-wry/2.12.3) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
@@ -13900,6 +13902,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## license-c3ca23514163a6fe
+
+来源：https://crates.io/crates/open/5.4.5
+
+```text
+The MIT License (MIT)
+=====================
+
+Copyright © `2015` `Sebastian Thiel`
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the “Software”), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ## license-86cf9656479f1edb

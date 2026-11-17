@@ -70,7 +70,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
             id: "menu.app",
             text: "Peek Desktop",
             items: [
-              native({ About: null }, "menuAbout"),
+              item("help.about"),
               separator(),
               native("Services", "menuServices"),
               separator(),
@@ -181,11 +181,12 @@ export function menuItems(snapshot: MenuSnapshot): Items {
       id: "menu.help",
       text: t("menuHelp"),
       items: [
+        item("help.project"),
+        item("help.issues"),
+        separator(),
         item("help.shortcuts"),
         item("help.retention"),
-        ...(!snapshot.mac
-          ? [separator(), native({ About: null }, "menuAbout")]
-          : []),
+        ...(!snapshot.mac ? [separator(), item("help.about")] : []),
       ],
     },
   ];

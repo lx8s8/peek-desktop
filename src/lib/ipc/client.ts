@@ -1,6 +1,8 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  AppInfo,
+  ProjectLink,
   Imported,
   RecoveryStatus,
   BodyView,
@@ -32,6 +34,11 @@ export const emptyRemote: RemoteSnapshot = {
   diagnosticRuns: [],
 };
 export const api = {
+  appInfo: () => invoke<AppInfo>("app_info"),
+  legalText: (document: "license" | "notices") =>
+    invoke<string>("legal_text", { document }),
+  openProjectLink: (link: ProjectLink) =>
+    invoke<void>("open_project_link", { link }),
   recoveryStatus: () => invoke<RecoveryStatus>("recovery_status"),
   setRecoveryEnabled: (enabled: boolean) =>
     invoke<RecoveryStatus>("set_recovery_enabled", { enabled }),

@@ -1,3 +1,4 @@
+pub mod app_info;
 pub mod archive;
 pub mod body;
 mod commands;
@@ -19,6 +20,7 @@ pub fn run() {
             file_open::notify(app);
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::AppState::default())
         .manage(file_open::OpenFiles::default())
@@ -34,6 +36,9 @@ pub fn run() {
             let _ = app.emit_to("main", "peek-menu-command", event.id().as_ref());
         })
         .invoke_handler(tauri::generate_handler![
+            commands::app_info,
+            commands::legal_text,
+            commands::open_project_link,
             commands::open_peek,
             commands::open_pending_file,
             commands::has_pending_files,
