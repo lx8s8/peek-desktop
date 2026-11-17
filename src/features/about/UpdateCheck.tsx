@@ -17,7 +17,13 @@ export function UpdateCheck({
   const [result, setResult] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!request || !desktop) return;
+    if (!request) {
+      setChecking(false);
+      setResult(null);
+      setError("");
+      return;
+    }
+    if (!desktop) return;
     let active = true;
     setChecking(true);
     setResult(null);

@@ -67,3 +67,25 @@ it("reports current versions and missing releases without offering a downgrade",
   rerender(<UpdateCheck request={2} onCheck={vi.fn()} />);
   await screen.findByText(/尚未发布正式版本/);
 });
+
+it("clears pending state when the about menu resets the check", async () => {
+  let resolve!: (value: UpdateInfo) => void;
+  vi.mocked(api.checkUpdates).mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const { rerender } = render(<UpdateCheck request={1} onCheck={vi.fn()} />);
+  expect(
+    (screen.getByRole("button", { name: "正在检查…" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  rerender(<UpdateCheck request={0} onCheck={vi.fn()} />);
+  expect(
+    (screen.getByRole("button", { name: "检查更新…" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
+  await act(async () => resolve(release));
+  expect(screen.queryByText("发现新版本 0.2.0")).toBeNull();
+});
