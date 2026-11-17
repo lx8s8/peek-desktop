@@ -1,3 +1,5 @@
+mod image;
+
 use crate::protocol::session::{Result, body_size};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use serde::Serialize;
@@ -16,6 +18,10 @@ pub struct BodyView {
     pub preview_truncated: bool,
     pub text: String,
     pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<image::ImagePreview>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_unavailable: Option<&'static str>,
 }
 
 pub fn view(body: &Value) -> Result<BodyView> {
@@ -33,6 +39,8 @@ pub fn view(body: &Value) -> Result<BodyView> {
         preview_truncated: false,
         text: String::new(),
         reason: None,
+        image: None,
+        image_unavailable: None,
     };
     match kind {
         "text" => {
@@ -50,6 +58,10 @@ pub fn view(body: &Value) -> Result<BodyView> {
                 .decode(body["bytes"].as_str().ok_or("invalidBody")?)
                 .map_err(|_| "invalidBody")?;
             view.captured_bytes = bytes.len();
+            let truncated =
+                view.truncated || view.size.is_some_and(|size| size > bytes.len() as u64);
+            (view.image, view.image_unavailable) =
+                image::preview(&bytes, view.media_type.as_deref(), truncated);
             view.preview_truncated = bytes.len() > 4096;
             for (i, chunk) in bytes[..bytes.len().min(4096)].chunks(16).enumerate() {
                 view.text.push_str(&format!("{:08x}  ", i * 16));

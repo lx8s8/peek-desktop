@@ -1,5 +1,16 @@
 export const bodyZh = {
   bodySearch: "搜索正文",
+  imagePreview: "图片",
+  hexPreview: "十六进制",
+  imageScale: "图片缩放",
+  fitImage: "适应窗口",
+  actualImageSize: "原始尺寸",
+  capturedImage: "已采集的正文图片",
+  imageTooLarge:
+    "图片超过预览上限（4 MiB、16 百万像素或单边 8,192 像素），可查看十六进制或保存会话。",
+  imageTruncated: "图片数据不完整，显示十六进制内容。",
+  imageInvalid: "无法读取图片，显示十六进制内容。",
+  imageUnsupported: "此图片格式暂不支持预览，显示十六进制内容。",
   bodySearchPlaceholder: "搜索字段、值或文本…",
   matchCase: "区分大小写",
   previousMatch: "上一处匹配",
@@ -11,6 +22,17 @@ export const bodyZh = {
 };
 export const bodyEn: Record<keyof typeof bodyZh, string> = {
   bodySearch: "Search body",
+  imagePreview: "Image",
+  hexPreview: "Hex",
+  imageScale: "Image scale",
+  fitImage: "Fit",
+  actualImageSize: "Actual size",
+  capturedImage: "Captured body image",
+  imageTooLarge:
+    "Image exceeds the preview limit (4 MiB, 16 megapixels or 8,192 px per side). View Hex or save the session.",
+  imageTruncated: "Image data is incomplete. Showing Hex instead.",
+  imageInvalid: "Cannot read this image. Showing Hex instead.",
+  imageUnsupported: "This image format has no preview. Showing Hex instead.",
   bodySearchPlaceholder: "Find a field, value or text…",
   matchCase: "Match case",
   previousMatch: "Previous match",

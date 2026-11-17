@@ -168,6 +168,7 @@
 | rust:chacha20@0.10.2 | MIT OR Apache-2.0 | RustCrypto Developers | [源码 / 包](https://crates.io/crates/chacha20/0.10.2) | [许可](#license-e8541ea93f027a6c) · [许可](#license-1038b7737a0a04bd) |
 | rust:chrono@0.4.45 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/chrono/0.4.45) | [许可](#license-ce4a94c006fa5d15) |
 | rust:clipboard-win@5.4.3 | BSL-1.0 | Douman <douman@gmx.se> | [源码 / 包](https://crates.io/crates/clipboard-win/5.4.3) | [许可](#license-8d8291caf1cee26d) |
+| rust:color_quant@1.1.0 | MIT | nwin <nwin@users.noreply.github.com> | [源码 / 包](https://crates.io/crates/color_quant/1.1.0) | [许可](#license-a24abca538cdcc16) |
 | rust:const-oid@0.10.3 | Apache-2.0 OR MIT | RustCrypto Developers | [源码 / 包](https://crates.io/crates/const-oid/0.10.3) | [许可](#license-e8541ea93f027a6c) · [许可](#license-ea753cf1e3ec3e02) |
 | rust:constant_time_eq@0.6.1 | CC0-1.0 OR MIT-0 OR Apache-2.0 | Cesar Eduardo Barros <cesarb@cesarb.eti.br> | [源码 / 包](https://crates.io/crates/constant_time_eq/0.6.1) | [许可](#license-85ad950cce8752f7) · [许可](#license-6d489af6292662d9) · [许可](#license-ee3c852dd133c6ca) |
 | rust:cookie@0.18.2 | MIT OR Apache-2.0 | Sergio Benitez <sb@sergio.bz>, Alex Crichton <alex@alexcrichton.com> | [源码 / 包](https://crates.io/crates/cookie/0.18.2) | [许可](#license-c859d211879e327d) · [许可](#license-47c8d25246e6cb7b) |
@@ -231,6 +232,7 @@
 | rust:generic-array@0.14.7 | MIT | Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com> | [源码 / 包](https://crates.io/crates/generic-array/0.14.7) | [许可](#license-ad4fcfaf8d5b12b9) |
 | rust:getrandom@0.3.4 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.3.4) | [许可](#license-e7330bf53074b4a9) · [许可](#license-73af2019a565c0e6) |
 | rust:getrandom@0.4.3 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.4.3) | [许可](#license-e7330bf53074b4a9) · [许可](#license-94b1870d380ccf53) |
+| rust:gif@0.14.2 | MIT OR Apache-2.0 | The image-rs Developers | [源码 / 包](https://crates.io/crates/gif/0.14.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-1b6f7ab81ae25979) |
 | rust:glob@0.3.4 | MIT OR Apache-2.0 | The Rust Project Developers | [源码 / 包](https://crates.io/crates/glob/0.3.4) | [许可](#license-954f335b8baf5e1a) · [许可](#license-14435fbcd271e278) |
 | rust:half@2.7.1 | MIT OR Apache-2.0 | Kathryn Long <squeeself@gmail.com> | [源码 / 包](https://crates.io/crates/half/2.7.1) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-1847e0e0698142ed) |
 | rust:hashbrown@0.12.3 | MIT OR Apache-2.0 | Amanieu d'Antras <amanieu@gmail.com> | [源码 / 包](https://crates.io/crates/hashbrown/0.12.3) | [许可](#license-954f335b8baf5e1a) · [许可](#license-ae9791f02f2bbe0c) |
@@ -254,6 +256,7 @@
 | rust:idna_adapter@1.2.2 | Apache-2.0 OR MIT | The rust-url developers | [源码 / 包](https://crates.io/crates/idna_adapter/1.2.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-0d8a0aecbcbaf057) |
 | rust:idna@1.1.0 | MIT OR Apache-2.0 | The rust-url developers | [源码 / 包](https://crates.io/crates/idna/1.1.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-7a8093fb4a93f23e) |
 | rust:if-addrs@0.15.0 | MIT OR BSD-3-Clause | MaidSafe Developers <dev@maidsafe.net>, Messense Lv <messense@icloud.com> | [源码 / 包](https://crates.io/crates/if-addrs/0.15.0) | [许可](#license-eb71eade89cdb9af) · [许可](#license-b8777f2b9ad6f8ef) |
+| rust:image-webp@0.2.4 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/image-webp/0.2.4) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-77949ead506e84e3) |
 | rust:image@0.25.10 | MIT OR Apache-2.0 | The image-rs Developers | [源码 / 包](https://crates.io/crates/image/0.25.10) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-77949ead506e84e3) |
 | rust:indexmap@1.9.3 | Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/indexmap/1.9.3) | [许可](#license-954f335b8baf5e1a) · [许可](#license-4f2ac128e429d964) |
 | rust:indexmap@2.14.2 | Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/indexmap/2.14.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-4f2ac128e429d964) |
@@ -7964,6 +7967,34 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
+## license-a24abca538cdcc16
+
+来源：https://crates.io/crates/color_quant/1.1.0
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2016 PistonDevelopers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## license-ea753cf1e3ec3e02
 
 来源：https://crates.io/crates/const-oid/0.10.3
@@ -11328,6 +11359,34 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+```
+
+## license-1b6f7ab81ae25979
+
+来源：https://crates.io/crates/gif/0.14.2
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2015 nwin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ## license-1847e0e0698142ed

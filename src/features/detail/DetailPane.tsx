@@ -12,6 +12,7 @@ import { Button } from "../../components/ui/button";
 import type { BodyView, EntryRow } from "../../lib/ipc/types";
 import { formatBytes } from "../../lib/preferences";
 import { JsonViewer } from "./JsonViewer";
+import { BodyPreview } from "./BodyPreview";
 
 export function DetailPane({
   sessionId,
@@ -199,7 +200,7 @@ export function DetailPane({
               <div className="loading">{t("loading")}</div>
             ) : (
               <>
-                {(body.truncated || body.previewTruncated) && (
+                {(body.truncated || (body.previewTruncated && !body.image)) && (
                   <div className="inline-note warning">
                     {body.truncated && t("truncated")}{" "}
                     {body.previewTruncated && t("previewTruncated")}{" "}
@@ -212,23 +213,11 @@ export function DetailPane({
                     {t(body.reason ?? "emptyBody")}
                   </div>
                 ) : (
-                  <>
-                    {body.kind === "bytes" && (
-                      <div className="inline-note">{t("binary")}</div>
-                    )}
-                    <JsonViewer
-                      key={`${entry.id}-${side}`}
-                      text={body.text}
-                      theme={theme}
-                      json={
-                        !body.previewTruncated &&
-                        (body.kind === "form" ||
-                          (body.kind === "text" &&
-                            (/json/i.test(body.mediaType ?? "") ||
-                              /^[\s]*[\[{]/.test(body.text))))
-                      }
-                    />
-                  </>
+                  <BodyPreview
+                    key={`${entry.id}-${side}`}
+                    body={body}
+                    theme={theme}
+                  />
                 )}
               </>
             )}

@@ -188,6 +188,12 @@ export interface ImportProgress {
   bytesRead: number;
   totalBytes: number;
 }
+export interface ImagePreview {
+  dataUrl: string;
+  mediaType: string;
+  width: number;
+  height: number;
+}
 export interface BodyView {
   kind: string;
   mediaType: string | null;
@@ -197,4 +203,6 @@ export interface BodyView {
   previewTruncated: boolean;
   text: string;
   reason: string | null;
+  image?: ImagePreview;
+  imageUnavailable?: string;
 }
