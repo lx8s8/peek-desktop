@@ -64,3 +64,18 @@ it("does not replace the selected legal document with an older response", async 
   await act(async () => old("stale license"));
   expect(screen.queryByText("stale license")).toBeNull();
 });
+
+it("keeps keyboard focus inside the dialog when a metadata-only component is selected", async () => {
+  vi.mocked(api.legalText).mockResolvedValue(
+    "| rust:metadata@1 | MIT | Author | [Source](https://example.test) | 包内许可声明 |",
+  );
+  render(<AboutPanel />);
+  fireEvent.click(screen.getByRole("button", { name: "关于 Peek Desktop" }));
+  fireEvent.click(screen.getByRole("button", { name: "第三方声明" }));
+  const select = await screen.findByRole("combobox");
+  select.focus();
+  fireEvent.keyDown(window, { key: "Tab" });
+  expect(document.activeElement).toBe(
+    screen.getByRole("button", { name: "关闭提示" }),
+  );
+});

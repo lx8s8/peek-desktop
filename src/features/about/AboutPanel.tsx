@@ -89,7 +89,7 @@ export function AboutPanel() {
       }
       if (event.key === "Tab") {
         const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
         );
         if (!nodes?.length) return;
         const first = nodes[0],
