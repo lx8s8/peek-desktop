@@ -13,17 +13,13 @@ const zh = {
   sessions: "会话",
   files: "已打开文件",
   devices: "设备",
-  noDevice: "设备连接尚未接入",
   offline: "离线文件模式",
   network: "网络",
-  intro: "每一次请求，都清晰可见。",
-  introHint: "打开 .peek 会话文件，检查请求、响应与原始正文。",
-  emptyFiles: "还没有打开的会话",
+  emptyFiles: "暂无会话",
   unsupportedFile: "请选择 .peek、.peekbundle 或诊断 JSONL 文件。",
   openQueueFull: "一次最多打开 32 个文件，其余文件请稍后再打开。",
   fileHint: ".peek 网络会话 · .peekbundle 完整归档 · JSONL 诊断历史",
   browser: "当前为浏览器预览，文件操作请使用桌面应用。",
-  connectionHint: "设备配对、实时网络与日志同步将在后续连接阶段接入。",
   search: "搜索地址、方法、状态或来源…",
   all: "全部",
   errors: "错误",
@@ -96,7 +92,6 @@ const zh = {
   entryNotFound: "记录不存在。",
   internalError: "内部状态异常，请重新启动应用。",
   retry: "重试",
-  previewOnly: "开发预览",
 };
 const en: Record<keyof typeof zh, string> = {
   open: "Open file",
@@ -105,20 +100,14 @@ const en: Record<keyof typeof zh, string> = {
   sessions: "Sessions",
   files: "Opened files",
   devices: "Devices",
-  noDevice: "Device connection not available yet",
   offline: "Offline files",
   network: "Network",
-  intro: "Every request, in focus.",
-  introHint:
-    "Open a .peek session to inspect requests, responses, and original bodies.",
-  emptyFiles: "No open sessions",
+  emptyFiles: "No sessions",
   unsupportedFile: "Choose a .peek, .peekbundle, or diagnostic JSONL file.",
   openQueueFull:
     "Up to 32 files can be opened at once. Open the remaining files afterwards.",
   fileHint: ".peek network · .peekbundle archive · JSONL diagnostic history",
   browser: "Browser preview. Open the desktop app to work with files.",
-  connectionHint:
-    "Pairing, live network traffic, and diagnostic sync are planned for the connection phase.",
   search: "Search URL, method, status, or source…",
   all: "All",
   errors: "Errors",
@@ -197,7 +186,6 @@ const en: Record<keyof typeof zh, string> = {
   entryNotFound: "Record not found.",
   internalError: "Internal state error. Please restart the app.",
   retry: "Retry",
-  previewOnly: "Development preview",
 };
 
 void i18n.use(initReactI18next).init({

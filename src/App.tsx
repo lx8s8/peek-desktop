@@ -9,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
   Archive,
-  ArrowRight,
   ChevronRight,
   Circle,
   FileCode2,
@@ -821,10 +820,6 @@ export default function App() {
                 </div>
               </>
             )}
-            <div className="sidebar-bottom">
-              <span className="development-label">{t("previewOnly")}</span>
-              <p>{t("connectionReady")}</p>
-            </div>
           </nav>
         </Panel>
         <Separator className="panel-separator" />
@@ -1008,12 +1003,8 @@ export default function App() {
                 ) : null}
               </>
             ) : (
-              <div className="welcome">
-                <div className="welcome-symbol">
-                  <Activity size={40} strokeWidth={1.5} />
-                </div>
-                <span className="eyebrow">PEEK DESKTOP</span>
-                <h1>{t("intro")}</h1>
+              <div className="empty-workspace">
+                <h2>{t("emptyFiles")}</h2>
                 <p>{t("connectionReady")}</p>
                 <Button
                   variant="primary"
@@ -1022,7 +1013,6 @@ export default function App() {
                 >
                   <FolderOpen />
                   {t("open")}
-                  <ArrowRight />
                 </Button>
                 <span className="file-hint">{t("fileHint")}</span>
               </div>

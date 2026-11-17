@@ -299,21 +299,6 @@ input:focus-visible,
   padding: 14px 10px;
   font-size: 11px;
 }
-.sidebar-bottom {
-  margin-top: auto;
-  padding: 18px 16px;
-  color: var(--muted);
-  border-top: 1px solid var(--border);
-}
-.development-label {
-  font-size: 10px;
-  letter-spacing: 0.2px;
-}
-.sidebar-bottom p {
-  font-size: 10px;
-  line-height: 1.8;
-  margin-top: 8px;
-}
 .console {
   display: flex;
   flex-direction: column;
@@ -348,44 +333,26 @@ input:focus-visible,
 .muted {
   color: var(--muted);
 }
-.welcome {
+.empty-workspace {
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  padding: 30px;
+  padding: 24px;
   text-align: center;
 }
-.welcome-symbol {
-  width: 86px;
-  height: 86px;
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-radius: 22px;
-  margin-bottom: 25px;
-}
-.eyebrow {
-  font-size: 9px;
-  letter-spacing: 2px;
-  color: var(--muted);
-}
-h1 {
-  font-size: 23px;
+.empty-workspace h2 {
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: -0.6px;
-  margin: 12px 0 10px;
+  margin: 0 0 8px;
 }
-.welcome p {
+.empty-workspace p {
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.8;
-  max-width: 310px;
-  margin: 0 0 24px;
+  margin: 0 0 16px;
 }
-.welcome > .button {
+.empty-workspace > .button {
   height: 33px;
 }
 .file-hint {
