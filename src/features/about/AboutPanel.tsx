@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button";
 import { commands } from "../../lib/commands/dispatcher";
 import { useCommand } from "../../lib/commands/react";
 import { api, desktop } from "../../lib/ipc/client";
+import { LegalDocument, ThirdPartyNotices } from "./LegalDocument";
 import { UpdateCheck } from "./UpdateCheck";
 import type { AppInfo, ProjectLink } from "../../lib/ipc/types";
 
@@ -137,7 +138,7 @@ export function AboutPanel() {
         >
           <section
             ref={dialog}
-            className="about-dialog"
+            className={`about-dialog ${view === "info" ? "about-info" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={t("menuAbout")}
@@ -231,9 +232,11 @@ export function AboutPanel() {
                 <p className="muted">Copyright © 2026 kasen</p>
               </div>
             ) : legal ? (
-              <pre className="legal-text" tabIndex={0}>
-                {legal}
-              </pre>
+              view === "notices" ? (
+                <ThirdPartyNotices text={legal} />
+              ) : (
+                <LegalDocument text={legal} />
+              )
             ) : (
               <div className="loading">{t("loading")}</div>
             )}

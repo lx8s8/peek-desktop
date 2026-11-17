@@ -1,5 +1,14 @@
 export const aboutZh = {
   aboutSections: "关于页面",
+  filterComponents: "搜索组件、作者或许可证…",
+  component: "组件",
+  componentCount: "{{count}} 个组件",
+  upstreamAuthors: "上游作者",
+  licenseNumber: "许可 {{number}}",
+  licenseMetadataOnly: "上游包只提供许可声明，未附带许可原文；来源地址见上方。",
+  noComponents: "没有匹配的组件",
+  previousLegalPage: "上一页",
+  nextLegalPage: "下一页",
   checkUpdates: "检查更新…",
   checkingUpdates: "正在检查…",
   update_available: "发现新版本 {{version}}",
@@ -27,6 +36,16 @@ export const aboutZh = {
 };
 export const aboutEn: Record<keyof typeof aboutZh, string> = {
   aboutSections: "About sections",
+  filterComponents: "Find a component, author or license…",
+  component: "Component",
+  componentCount: "{{count}} components",
+  upstreamAuthors: "Upstream authors",
+  licenseNumber: "License {{number}}",
+  licenseMetadataOnly:
+    "The upstream package provides license metadata without the full text. Its source is listed above.",
+  noComponents: "No matching components",
+  previousLegalPage: "Previous page",
+  nextLegalPage: "Next page",
   checkUpdates: "Check for updates…",
   checkingUpdates: "Checking…",
   update_available: "Version {{version}} is available",

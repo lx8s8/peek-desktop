@@ -1455,3 +1455,71 @@ button.timeline-grid.selected {
     11px/1.7 ui-monospace,
     monospace;
 }
+
+.about-dialog.about-info {
+  height: auto;
+  max-height: 88vh;
+}
+.legal-document,
+.notices-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.legal-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.notices-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 10px;
+  flex-shrink: 0;
+}
+.notices-controls input {
+  flex: 1;
+  min-width: 140px;
+}
+.notices-controls select {
+  flex: 1;
+  min-width: 140px;
+  max-width: 100%;
+}
+.notices-controls small {
+  width: 100%;
+  color: var(--muted);
+}
+.notice-metadata {
+  font-size: 11px;
+  padding: 0 20px;
+  margin: 0 0 10px;
+  flex-shrink: 0;
+}
+.notice-metadata > div {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0;
+}
+.notice-metadata dt {
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 66px;
+}
+.notice-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.license-choices {
+  margin: 0 20px 8px;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
