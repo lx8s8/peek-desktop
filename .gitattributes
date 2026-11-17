@@ -1,0 +1,2 @@
+# Keep vendored upstream license bytes unchanged.
+third-party/licenses/*.txt whitespace=-blank-at-eol

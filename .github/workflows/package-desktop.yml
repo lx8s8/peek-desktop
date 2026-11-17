@@ -2,9 +2,9 @@ name: 桌面检查与打包
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'src-tauri/**', 'scripts/**', 'package.json', 'pnpm-lock.yaml', 'assets/**', '.github/**']
+    paths: ['src/**', 'src-tauri/**', 'scripts/**', 'package.json', 'pnpm-lock.yaml', 'assets/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'third-party/**', '.github/**']
   pull_request:
-    paths: ['src/**', 'src-tauri/**', 'scripts/**', 'package.json', 'pnpm-lock.yaml', 'assets/**', '.github/**']
+    paths: ['src/**', 'src-tauri/**', 'scripts/**', 'package.json', 'pnpm-lock.yaml', 'assets/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'third-party/**', '.github/**']
   workflow_dispatch:
     inputs:
       signing:

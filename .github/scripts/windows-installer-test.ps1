@@ -7,6 +7,10 @@ $process = Start-Process -FilePath $installer[0].FullName -ArgumentList "/S /D=$
 if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
 $exe = Join-Path $directory 'peek-desktop.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Application executable was not installed' }
+foreach ($filename in @('LICENSE', 'THIRD_PARTY_NOTICES.md')) {
+  $file = Join-Path $directory "licenses\$filename"
+  if (-not (Test-Path -LiteralPath $file) -or (Get-Item -LiteralPath $file).Length -eq 0) { throw 'License resource is missing' }
+}
 $associations = @{}
 foreach ($extension in @('peek', 'peekbundle')) {
   $key = Get-Item -LiteralPath "HKCU:\Software\Classes\.$extension"

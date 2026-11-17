@@ -100,6 +100,13 @@ if (platform === "macos") {
   );
   if (!["peek", "peekbundle"].every((ext) => exts.includes(ext)))
     throw Error("应用包缺少文件关联");
+  for (const filename of ["LICENSE", "THIRD_PARTY_NOTICES.md"]) {
+    const bundled = readFileSync(
+      join(app, "Contents/Resources/licenses", filename),
+    );
+    if (!bundled.equals(readFileSync(filename)))
+      throw Error("应用包许可文件缺失或不一致");
+  }
   const signature =
     spawnSync("codesign", ["-d", "--verbose=4", app], { encoding: "utf8" })
       .stderr ?? "";

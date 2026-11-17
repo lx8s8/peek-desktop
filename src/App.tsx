@@ -822,7 +822,7 @@ export default function App() {
               </>
             )}
             <div className="sidebar-bottom">
-              <span className="development-label">P3 · {t("previewOnly")}</span>
+              <span className="development-label">{t("previewOnly")}</span>
               <p>{t("connectionReady")}</p>
             </div>
           </nav>

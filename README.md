@@ -2,7 +2,7 @@
 
 在电脑上查看 Flutter App 的网络请求、日志和异常堆栈。支持实时连接设备，也可以打开 `.peek` 文件和会话归档离线排查。
 
-项目基于 Tauri 2、Rust、React 和 TypeScript。当前处于开发阶段，已完成 macOS 本地构建和主要操作验证；Windows、物理移动设备及正式安装包仍在[待办列表](docs/待办.md)中。
+项目基于 Tauri 2、Rust、React 和 TypeScript。当前处于开发阶段，已完成 macOS 本地构建和主要操作验证；Windows CI 已验证构建、安装和卸载；实体 Windows、物理移动设备及正式分发签名仍在[待办列表](docs/待办.md)中。
 
 ## 功能
 
@@ -55,3 +55,7 @@ pnpm tauri dev
 - [待办与发布准备](docs/待办.md)
 
 本项目使用 Peek 公开的网络协议和会话格式，兼容样例的来源与许可见[上游样例说明](src-tauri/tests/fixtures/upstream/README.md)。它接收 App 已采集的数据，不需要安装代理证书。
+
+## 许可证
+
+本项目采用 [MIT](LICENSE)。依赖的许可与来源见[第三方软件声明](THIRD_PARTY_NOTICES.md)，安装包中同时附带许可文件。

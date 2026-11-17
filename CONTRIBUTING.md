@@ -39,6 +39,8 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml --test sdk_interop -- -
 
 测试启动临时 Rust 服务，以内存凭据驱动真实官方 Dart 客户端和日志 bridge，不读取系统配对库。常规 Rust 测试跳过这一项，需要显式运行。
 
+更新依赖后执行 `pnpm notices:generate`，同步第三方许可和来源。打包与签名配置见[桌面发布说明](docs/桌面发布.md)。
+
 SDK 改动在 [peek-flutter-sdk](https://github.com/lx8s8/peek-flutter-sdk) 提交，本仓库更新子模块指针。协议文档在两个仓库各保留一份，修改字段和限制时需同步。
 
 ## 合成数据与性能探针

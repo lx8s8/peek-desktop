@@ -16,7 +16,8 @@
     "release:test": "node --test scripts/*.test.mjs",
     "package:local": "node scripts/package-desktop.mjs preview",
     "package:development": "node scripts/package-desktop.mjs development",
-    "package:signed": "node scripts/package-desktop.mjs signed"
+    "package:signed": "node scripts/package-desktop.mjs signed",
+    "notices:generate": "node scripts/generate-notices.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
@@ -56,5 +57,6 @@
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22.12"
-  }
+  },
+  "license": "MIT"
 }
