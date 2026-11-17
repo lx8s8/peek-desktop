@@ -1274,3 +1274,40 @@ button.timeline-grid.selected {
   user-select: all;
   overflow-wrap: anywhere;
 }
+
+.body-search {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.body-search input {
+  flex: 1;
+  min-width: 50px;
+  width: 100%;
+}
+.body-search output {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.body-search .button {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.body-search [aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.raw-text mark {
+  background: #f7df86;
+  color: #252017;
+}
+.raw-text mark.current-match {
+  background: #f4a449;
+  outline: 1px solid #b96b0d;
+}
