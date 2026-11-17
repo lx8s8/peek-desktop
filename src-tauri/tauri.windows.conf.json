@@ -13,7 +13,9 @@
         ],
         "displayLanguageSelector": true,
         "installerIcon": "icons/icon.ico"
-      }
+      },
+      "certificateThumbprint": null,
+      "signCommand": null
     },
     "licenseFile": "../LICENSE"
   }

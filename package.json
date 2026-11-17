@@ -14,9 +14,7 @@
     "icons:generate": "node scripts/generate-icons.mjs",
     "release:check": "node scripts/check-release.mjs",
     "release:test": "node --test scripts/*.test.mjs",
-    "package:local": "node scripts/package-desktop.mjs preview",
-    "package:development": "node scripts/package-desktop.mjs development",
-    "package:signed": "node scripts/package-desktop.mjs signed",
+    "package:local": "node scripts/package-desktop.mjs unsigned",
     "notices:generate": "node scripts/generate-notices.mjs"
   },
   "dependencies": {

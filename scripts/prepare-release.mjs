@@ -10,7 +10,7 @@ import { versions } from "./release-config.mjs";
 
 const directory = "release-artifacts";
 const mode = process.env.PACKAGE_MODE;
-if (!["preview", "signed"].includes(mode)) throw Error("发布模式无效");
+if (mode !== "unsigned") throw Error("发布模式无效");
 const { version } = versions();
 const expected = new Set(["macos-arm64", "macos-x64", "windows-x64"]);
 const sums = [];
@@ -29,15 +29,12 @@ for (const name of files) {
     manifest.revision !== process.env.GITHUB_SHA
   )
     throw Error("安装包的平台、版本、源码或构建模式不一致");
-  if (
-    mode === "signed" &&
-    (!manifest.signed || (manifest.platform === "macos" && !manifest.notarized))
-  )
-    throw Error("正式安装包缺少签名或公证");
+  if (manifest.signed !== false || manifest.notarized !== false)
+    throw Error("安装包声明与无证书模式不符");
   if (manifest.files?.length !== 1) throw Error("安装包清单数量无效");
   for (const file of manifest.files) {
-    if (!/^Peek-Desktop_[\w.\-]+\.(dmg|exe)$/.test(file.name))
-      throw Error("安装包名称无效");
+    const expectedName = `Peek-Desktop_${version}_${manifest.platform}-${manifest.architecture}-unsigned.${manifest.platform === "macos" ? "dmg" : "exe"}`;
+    if (file.name !== expectedName) throw Error("安装包名称无效");
     const data = readFileSync(join(directory, file.name));
     const sha = createHash("sha256").update(data).digest("hex");
     if (data.length !== file.bytes || sha !== file.sha256)
@@ -46,9 +43,10 @@ for (const name of files) {
   }
 }
 writeFileSync(join(directory, "SHA256SUMS.txt"), `${sums.sort().join("\n")}\n`);
+const notes = readFileSync(`docs/releases/v${version}.md`, "utf8");
 writeFileSync(
   join(directory, "RELEASE_NOTES.md"),
-  `Peek Desktop ${version}\n\nmacOS 提供 Apple Silicon 和 Intel DMG，Windows 提供 x64 NSIS 安装包。\n\n${mode === "preview" ? "此版本为预览包：macOS 使用 ad-hoc 签名、未公证，Windows 未签名。适合开发验证。" : "macOS 已完成 Developer ID 签名和公证，Windows 已校验 Authenticode 签名。"}\n\n安装与升级说明：https://github.com/lx8s8/peek-desktop/blob/main/docs/桌面发布.md\n\n源码：${process.env.GITHUB_SHA}\n\n下载后可使用 SHA256SUMS.txt 核对文件。\n`,
+  `${notes.trim()}\n\n源码：${process.env.GITHUB_SHA}\n`,
 );
 if (process.env.GITHUB_OUTPUT)
   appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);

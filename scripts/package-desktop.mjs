@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import { resolve, join } from "node:path";
 import { signing, versions } from "./release-config.mjs";
 
-const mode = process.argv[2] ?? "preview";
+const mode = process.argv[2] ?? "unsigned";
 const options = process.argv.slice(3);
 let target;
 let debug = false;
@@ -53,8 +53,6 @@ const run = (command, args, capture = false, childEnv = env) => {
 };
 const revision = run("git", ["rev-parse", "HEAD"], true);
 const dirty = run("git", ["status", "--porcelain"], true) !== "";
-if (mode === "signed" && (dirty || debug))
-  throw Error("正式签名包要求已提交的源码及 Release 构建");
 if (checkOnly) {
   console.log(
     `${platform}/${architecture} · ${mode} · ${version} · ${dirty ? "包含未提交修改" : revision.slice(0, 8)}`,
@@ -110,28 +108,10 @@ if (platform === "macos") {
   const signature =
     spawnSync("codesign", ["-d", "--verbose=4", app], { encoding: "utf8" })
       .stderr ?? "";
-  if (mode === "preview" && !signature.includes("Signature=adhoc"))
-    throw Error("预览包签名模式不符");
-  if (
-    mode !== "preview" &&
-    (!signature.includes("TeamIdentifier=") ||
-      signature.includes("Signature=adhoc"))
-  )
-    throw Error("证书签名验证失败");
-  if (
-    mode !== "preview" &&
-    !signature.includes(
-      mode === "signed"
-        ? "Authority=Developer ID Application:"
-        : "Authority=Apple Development:",
-    )
-  )
-    throw Error("应用包实际证书类型与签名模式不符");
-  if (mode === "signed") {
-    run("xcrun", ["stapler", "validate", app]);
-    run("spctl", ["--assess", "--type", "execute", app]);
-  }
+  if (mode === "unsigned" && !signature.includes("Signature=adhoc"))
+    throw Error("无证书包签名模式不符");
 }
+
 const packageDirectory = join(bundle, platform === "macos" ? "dmg" : "nsis");
 const extension = platform === "macos" ? ".dmg" : ".exe";
 const packages = readdirSync(packageDirectory).filter(
@@ -141,62 +121,7 @@ const packages = readdirSync(packageDirectory).filter(
 );
 if (packages.length !== 1) throw Error("未找到本次构建生成的唯一安装包");
 const installer = join(packageDirectory, packages[0]);
-if (platform === "macos") {
-  run("hdiutil", ["verify", installer]);
-  if (mode === "signed") {
-    const auth = env.APPLE_API_KEY
-      ? [
-          "--key",
-          env.APPLE_API_KEY_PATH,
-          "--key-id",
-          env.APPLE_API_KEY,
-          "--issuer",
-          env.APPLE_API_ISSUER,
-        ]
-      : [
-          "--apple-id",
-          env.APPLE_ID,
-          "--team-id",
-          env.APPLE_TEAM_ID,
-          "--password",
-          env.APPLE_PASSWORD,
-        ];
-    // Tauri notarizes the app. Notarize and staple the final DMG as well.
-    const result = JSON.parse(
-      run(
-        "xcrun",
-        [
-          "notarytool",
-          "submit",
-          installer,
-          "--wait",
-          "--output-format",
-          "json",
-          ...auth,
-        ],
-        true,
-      ),
-    );
-    if (result.status !== "Accepted") throw Error("DMG 公证未通过");
-    run("xcrun", ["stapler", "staple", installer]);
-    run("xcrun", ["stapler", "validate", installer]);
-  }
-} else if (mode === "signed") {
-  const executable = resolve(bundle, "..", "peek-desktop.exe");
-  for (const file of [executable, installer]) {
-    run(
-      "powershell",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        'if ((Get-AuthenticodeSignature -LiteralPath $env:PEEK_VERIFY_FILE).Status -ne "Valid") { throw "Invalid Authenticode signature" }',
-      ],
-      false,
-      { ...env, PEEK_VERIFY_FILE: file },
-    );
-  }
-}
+if (platform === "macos") run("hdiutil", ["verify", installer]);
 const output = resolve("release-artifacts");
 mkdirSync(output, { recursive: true });
 const suffix = `${platform}-${architecture}-${mode}${debug ? "-debug" : ""}`;
@@ -213,8 +138,8 @@ const manifest = {
   architecture,
   mode,
   profile,
-  signed: mode !== "preview",
-  notarized: platform === "macos" && mode === "signed",
+  signed: false,
+  notarized: false,
   files: [{ name: filename, bytes: data.length, sha256 }],
 };
 writeFileSync(

@@ -4,43 +4,29 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
 import { signing, versions } from "./release-config.mjs";
-test("preview never inherits an Apple signing identity or notarization credentials", () => {
-  const result = signing("darwin", "preview", {
-    APPLE_SIGNING_IDENTITY: "unexpected",
-    APPLE_PASSWORD: "synthetic",
-    PATH: "test",
-  });
-  assert.equal(result.config.bundle.macOS.signingIdentity, "-");
-  assert.equal(result.env.APPLE_PASSWORD, undefined);
-  assert.equal(result.env.APPLE_SIGNING_IDENTITY, undefined);
-  assert.equal(result.env.PATH, "test");
+test("unsigned packaging never inherits certificate credentials on either platform", () => {
+  for (const platform of ["darwin", "win32"]) {
+    const result = signing(platform, "unsigned", {
+      APPLE_SIGNING_IDENTITY: "unexpected",
+      APPLE_PASSWORD: "synthetic",
+      WINDOWS_CERTIFICATE: "synthetic",
+      WINDOWS_CERTIFICATE_THUMBPRINT: "synthetic",
+      TAURI_SIGNING_PRIVATE_KEY: "synthetic",
+      PATH: "test",
+    });
+    assert.deepEqual(result.env, { PATH: "test" });
+    if (platform === "darwin")
+      assert.equal(result.config.bundle.macOS.signingIdentity, "-");
+    else {
+      assert.equal(result.config.bundle.windows.certificateThumbprint, null);
+      assert.equal(result.config.bundle.windows.signCommand, null);
+    }
+  }
 });
-test("distribution refuses development certificates and incomplete notarization", () => {
-  assert.throws(
-    () =>
-      signing("darwin", "signed", {
-        APPLE_SIGNING_IDENTITY: "Apple Development: synthetic",
-      }),
-    /Developer ID/,
-  );
-  assert.throws(
-    () =>
-      signing("darwin", "signed", {
-        APPLE_SIGNING_IDENTITY: "Developer ID Application: synthetic",
-      }),
-    /公证/,
-  );
-  assert.throws(() => signing("win32", "signed", {}), /证书指纹/);
-  assert.throws(() => signing("darwin", "unknown", {}), /模式/);
-});
-test("development signing is explicit and cannot inherit notarization", () => {
-  const result = signing("darwin", "development", {
-    APPLE_SIGNING_IDENTITY: "Apple Development: synthetic",
-    APPLE_ID: "synthetic",
-  });
-  assert.equal(result.env.APPLE_ID, undefined);
-  assert.equal(result.config.bundle.macOS.hardenedRuntime, true);
-  assert.throws(() => signing("win32", "development", {}), /macOS/);
+test("certificate modes and unsupported platforms are rejected", () => {
+  for (const mode of ["signed", "development", "preview", "unknown"])
+    assert.throws(() => signing("darwin", mode, {}), /unsigned/);
+  assert.throws(() => signing("linux", "unsigned", {}), /macOS/);
 });
 test("release preflight rejects version drift", () => {
   assert.match(versions().version, /^\d+\.\d+\.\d+$/);

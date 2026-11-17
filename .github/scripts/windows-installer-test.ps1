@@ -11,6 +11,9 @@ foreach ($filename in @('LICENSE', 'THIRD_PARTY_NOTICES.md')) {
   $file = Join-Path $directory "licenses\$filename"
   if (-not (Test-Path -LiteralPath $file) -or (Get-Item -LiteralPath $file).Length -eq 0) { throw 'License resource is missing' }
 }
+foreach ($file in @($installer[0].FullName, $exe)) {
+  if ((Get-AuthenticodeSignature -LiteralPath $file).Status -ne 'NotSigned') { throw 'Unsigned packaging unexpectedly used a certificate' }
+}
 $associations = @{}
 foreach ($extension in @('peek', 'peekbundle')) {
   $key = Get-Item -LiteralPath "HKCU:\Software\Classes\.$extension"

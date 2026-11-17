@@ -4,6 +4,8 @@ import {
   mkdtempSync,
   mkdirSync,
   writeFileSync,
+  readFileSync,
+  unlinkSync,
   existsSync,
   rmSync,
 } from "node:fs";
@@ -16,6 +18,11 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), "peek-release-test-"));
   mkdirSync(join(root, "src-tauri"));
   mkdirSync(join(root, "release-artifacts"));
+  mkdirSync(join(root, "docs/releases"), { recursive: true });
+  writeFileSync(
+    join(root, "docs/releases/v1.2.3.md"),
+    "Synthetic release notes",
+  );
   writeFileSync(
     join(root, "package.json"),
     JSON.stringify({ version: "1.2.3" }),
@@ -34,7 +41,7 @@ function fixture() {
     ["macos", "x64"],
     ["windows", "x64"],
   ]) {
-    const name = `Peek-Desktop_1.2.3_${platform}-${architecture}-signed.${platform === "macos" ? "dmg" : "exe"}`;
+    const name = `Peek-Desktop_1.2.3_${platform}-${architecture}-unsigned.${platform === "macos" ? "dmg" : "exe"}`;
     const data = Buffer.from(`synthetic ${platform}/${architecture}`);
     writeFileSync(join(root, "release-artifacts", name), data);
     const manifest = {
@@ -42,11 +49,11 @@ function fixture() {
       platform,
       architecture,
       revision: "test-revision",
-      mode: "signed",
+      mode: "unsigned",
       dirty: false,
       profile: "release",
-      signed: true,
-      notarized: platform === "macos",
+      signed: false,
+      notarized: false,
       files: [
         {
           name,
@@ -59,7 +66,7 @@ function fixture() {
       join(
         root,
         "release-artifacts",
-        `manifest-${platform}-${architecture}-signed.json`,
+        `manifest-${platform}-${architecture}-unsigned.json`,
       ),
       JSON.stringify(manifest),
     );
@@ -71,7 +78,7 @@ function run(root) {
     cwd: root,
     env: {
       ...process.env,
-      PACKAGE_MODE: "signed",
+      PACKAGE_MODE: "unsigned",
       GITHUB_SHA: "test-revision",
       GITHUB_OUTPUT: join(root, "output"),
     },
@@ -92,7 +99,10 @@ test("tampered installers cannot reach a release draft", () => {
   const root = fixture();
   try {
     writeFileSync(
-      join(root, "release-artifacts/Peek-Desktop_1.2.3_windows-x64-signed.exe"),
+      join(
+        root,
+        "release-artifacts/Peek-Desktop_1.2.3_windows-x64-unsigned.exe",
+      ),
       "tampered",
     );
     const result = run(root);
@@ -102,6 +112,44 @@ test("tampered installers cannot reach a release draft", () => {
       existsSync(join(root, "release-artifacts/SHA256SUMS.txt")),
       false,
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("missing platforms and mismatched source or signing state cannot be released", () => {
+  for (const change of ["missing", "revision", "dirty", "signed", "filename"]) {
+    const root = fixture();
+    try {
+      const path = join(
+        root,
+        "release-artifacts/manifest-windows-x64-unsigned.json",
+      );
+      if (change === "missing") unlinkSync(path);
+      else {
+        const manifest = JSON.parse(readFileSync(path, "utf8"));
+        if (change === "revision") manifest.revision = "other-source";
+        if (change === "dirty") manifest.dirty = true;
+        if (change === "signed") manifest.signed = true;
+        if (change === "filename") manifest.files[0].name = "../outside.exe";
+        writeFileSync(path, JSON.stringify(manifest));
+      }
+      assert.notEqual(run(root).status, 0, change);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+test("a tag that differs from the application version stops before publishing", () => {
+  const root = fixture();
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [resolve("scripts/check-release.mjs"), "v9.9.9"],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /发布标签必须为 v1.2.3/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
