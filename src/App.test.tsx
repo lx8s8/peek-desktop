@@ -78,6 +78,45 @@ vi.mock("./features/timeline/TimelineTable", () => ({
     </button>
   ),
 }));
+vi.mock("./features/stream/ConsoleStream", () => ({
+  emptyStreamView: {
+    search: "",
+    searchMode: "filter",
+    kindFilter: "all",
+    following: true,
+    autoLoadBody: true,
+    minTimestampMicros: null,
+    compactAll: false,
+    collapsedBlocks: [],
+  },
+  ConsoleStream: ({
+    onSelect,
+  }: {
+    onSelect: (selection: {
+      blockId: string;
+      kind: string;
+      sessionId: string | null;
+      entryId: string | null;
+      runId: string | null;
+      eventId: string | null;
+    }) => void;
+  }) => (
+    <button
+      onClick={() =>
+        onSelect({
+          blockId: "res:live-one:chosen",
+          kind: "http-response",
+          sessionId: "live-one",
+          entryId: "chosen",
+          runId: null,
+          eventId: null,
+        })
+      }
+    >
+      choose stream request
+    </button>
+  ),
+}));
 vi.mock("./lib/ipc/client", () => ({
   desktop: true,
   api: {
@@ -86,6 +125,12 @@ vi.mock("./lib/ipc/client", () => ({
     openPending: vi.fn(async () => null),
     hasPendingFiles: vi.fn(async () => false),
     archive: vi.fn(),
+    listPlugins: vi.fn(async () => ({
+      defaultPluginId: null,
+      discoveryDir: null,
+      plugins: [],
+    })),
+    parsePluginFilePath: vi.fn(),
     recoveryStatus: vi.fn(async () => ({
       enabled: false,
       pending: false,
@@ -242,4 +287,18 @@ it("continues queued file imports after a bad file and releases the workspace", 
       ).disabled,
     ).toBe(false),
   );
+});
+
+it("provides an independent console stream tab that links network entries without affecting network view", async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "控制台" }));
+  fireEvent.click(screen.getByText("choose stream request"));
+  await screen.findByText("chosen");
+  fireEvent.click(screen.getByRole("button", { name: "网络" }));
+  expect(screen.getByText("request table")).toBeTruthy();
+  expect(screen.getByTestId("network-detail").textContent).toBe(
+    "no network selection",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "控制台" }));
+  await screen.findByText("chosen");
 });

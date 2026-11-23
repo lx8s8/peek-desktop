@@ -50,6 +50,9 @@ pub struct AppState {
     subscriptions: Mutex<std::collections::HashMap<String, Subscription>>,
     library: Arc<Mutex<Library>>,
     import: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+    stream_cache: Arc<Mutex<crate::stream::StreamCache>>,
+    timeline_cache: Arc<Mutex<crate::query::TimelineCache>>,
+    plugins: Arc<Mutex<crate::plugins::PluginManager>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -241,12 +244,15 @@ pub async fn query_entries(
     limit: usize,
     revision: u32,
     range: Option<crate::query::TimeRange>,
+    host_filter: Option<String>,
+    exclude_patterns: Option<Vec<String>>,
 ) -> Result<QueryPage> {
     let range = range.unwrap_or_default().parse()?;
+    let excludes = exclude_patterns.unwrap_or_default();
     if session_id.starts_with("live-") {
         let remote = state.remote.clone();
         return tauri::async_runtime::spawn_blocking(move || {
-            remote.query_range(
+            remote.query_range_filtered(
                 &session_id,
                 &search,
                 &filter,
@@ -254,6 +260,8 @@ pub async fn query_entries(
                 limit,
                 revision,
                 &range,
+                host_filter.as_deref(),
+                &excludes,
             )
         })
         .await
@@ -265,7 +273,59 @@ pub async fn query_entries(
         .map_err(|_| "internalError")?
         .get(&session_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(session.query_range(&search, &filter, offset, limit, revision, &range))
+        Ok(session.query_range_filtered(
+            &search,
+            &filter,
+            offset,
+            limit,
+            revision,
+            &range,
+            host_filter.as_deref(),
+            &excludes,
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 切换抓包请求的固定（Pinned）状态，支持实时会话与已打开离线会话。
+#[tauri::command]
+pub fn toggle_entry_pin(
+    state: State<'_, AppState>,
+    session_id: String,
+    entry_id: String,
+) -> Result<bool> {
+    if session_id.starts_with("live-") {
+        return state.remote.toggle_pin(&session_id, &entry_id);
+    }
+    let pinned = state
+        .library
+        .lock()
+        .map_err(|_| "internalError")?
+        .toggle_pin(&session_id, &entry_id)?;
+    state.remote.changed();
+    Ok(pinned)
+}
+
+/// 通过明确文件路径导入（供窗口拖放文件直开使用）。
+#[tauri::command]
+pub async fn open_file_path(
+    state: State<'_, AppState>,
+    path: String,
+    progress: Channel<ImportProgress>,
+) -> Result<Option<crate::archive::Imported>> {
+    let (cancelled, guard) = begin_import(&state)?;
+    let library = Arc::clone(&state.library);
+    let remote = state.remote.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = guard;
+        import_file(
+            std::path::PathBuf::from(path),
+            library,
+            remote,
+            cancelled,
+            progress,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -570,22 +630,153 @@ pub async fn query_timeline(
 ) -> Result<crate::query::TimelinePage> {
     let remote = state.remote.clone();
     let library = state.library.clone();
+    let timeline_cache = state.timeline_cache.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let network = match &scope {
-            crate::query::Scope::Network { id } if id.starts_with("live-") => {
-                remote.network_rows(id)?
+        let offline = match &scope {
+            crate::query::Scope::Network { id } if !id.starts_with("live-") => {
+                let session = library.lock().map_err(|_| "internalError")?.get(id)?;
+                Some((
+                    session.entries.len() as u64,
+                    session.entries.iter().map(|e| e.row.clone()).collect(),
+                ))
             }
-            crate::query::Scope::Network { id } => library
-                .lock()
-                .map_err(|_| "internalError")?
-                .get(id)?
-                .entries
-                .iter()
-                .map(|e| e.row.clone())
-                .collect(),
-            _ => vec![],
+            _ => None,
         };
-        remote.timeline(&scope, network, &query)
+        let mut cache = timeline_cache.lock().map_err(|_| "internalError")?;
+        remote.timeline_cached(&mut cache, &scope, offline, &query)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+/// 解析作用域并从两级流式缓存中构建或命中排好序的日志流快照。
+fn build_stream_snapshot(
+    remote: &Remote,
+    library: &Mutex<Library>,
+    stream_cache: &Mutex<crate::stream::StreamCache>,
+    scope: &crate::query::Scope,
+    query: &crate::stream::StreamQuery,
+) -> Result<Arc<crate::stream::StreamSnapshot>> {
+    let (net_version, network) = match scope {
+        crate::query::Scope::Network { id } if id.starts_with("live-") => {
+            remote.network_entries(id)?
+        }
+        crate::query::Scope::Network { id } => {
+            let session = library.lock().map_err(|_| "internalError")?.get(id)?;
+            (session.entries.len() as u64, session.entries.clone())
+        }
+        crate::query::Scope::Diagnostic { .. } => (0, Vec::new()),
+    };
+    let (diag_version, diagnostics) = remote.diagnostic_raw_items(scope)?;
+    let version_stamp = format!("{net_version}|{diag_version}");
+    let mut cache = stream_cache.lock().map_err(|_| "internalError")?;
+    cache.build_snapshot(scope, version_stamp, &network, &diagnostics, query)
+}
+
+#[tauri::command]
+pub async fn query_stream(
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::stream::StreamQuery,
+) -> Result<crate::stream::StreamPage> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    let stream_cache = state.stream_cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = build_stream_snapshot(&remote, &library, &stream_cache, &scope, &query)?;
+        Ok(snapshot.slice(query.line_offset, query.line_limit, query.revision))
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+/// 在保留上下文的定位模式下，返回日志流中全部匹配关键词的行号。
+#[tauri::command]
+pub async fn find_stream_matches(
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::stream::StreamQuery,
+) -> Result<crate::stream::StreamMatches> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    let stream_cache = state.stream_cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = build_stream_snapshot(&remote, &library, &stream_cache, &scope, &query)?;
+        Ok(snapshot.find_matches(&query.search))
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+/// 按网络请求 ID 定位该条目在日志流中的首行行号（供网络列表跨 Tab 跳转使用）。
+#[tauri::command]
+pub async fn locate_stream_entry(
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::stream::StreamQuery,
+    entry_id: String,
+    preferred_kind: Option<String>,
+) -> Result<Option<usize>> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    let stream_cache = state.stream_cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = build_stream_snapshot(&remote, &library, &stream_cache, &scope, &query)?;
+        Ok(snapshot.locate_entry(&entry_id, preferred_kind.as_deref()))
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+#[tauri::command]
+pub async fn copy_stream_block(
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::stream::StreamQuery,
+    block_id: String,
+) -> Result<String> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    let stream_cache = state.stream_cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = build_stream_snapshot(&remote, &library, &stream_cache, &scope, &query)?;
+        let text = snapshot.block_text(&block_id)?;
+        if text.len() > 1024 * 1024 {
+            return Err("selectionTooLarge".into());
+        }
+        Ok(text)
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+#[tauri::command]
+pub async fn export_stream_text(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    scope: crate::query::Scope,
+    query: crate::stream::StreamQuery,
+) -> Result<bool> {
+    let remote = state.remote.clone();
+    let library = state.library.clone();
+    let stream_cache = state.stream_cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = build_stream_snapshot(&remote, &library, &stream_cache, &scope, &query)?;
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("Console log", &["log", "txt"])
+            .set_file_name("console-stream.log")
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let mut path = path.into_path().map_err(|_| "invalidPath")?;
+        if path.extension().is_none() {
+            path.set_extension("log");
+        }
+        storage::save_stream(&path, &snapshot)?;
+        Ok(true)
     })
     .await
     .map_err(|_| "internalError")?
@@ -747,6 +938,45 @@ pub async fn copy_curl(
     tauri::async_runtime::spawn_blocking(move || crate::export::curl(&raw))
         .await
         .map_err(|_| "internalError")?
+}
+
+/// 生成多种客户端代码片段（`curl` / `dio` / `fetch`）。
+#[tauri::command]
+pub async fn copy_snippet(
+    state: State<'_, AppState>,
+    session_id: String,
+    entry_id: String,
+    format: String,
+) -> Result<String> {
+    let raw = if session_id.starts_with("live-") {
+        state.remote.entry(&session_id, &entry_id)?
+    } else {
+        state
+            .library
+            .lock()
+            .map_err(|_| "internalError")?
+            .get(&session_id)?
+            .entry(&entry_id)
+            .ok_or("entryNotFound")?
+            .raw
+            .clone()
+    };
+    tauri::async_runtime::spawn_blocking(move || match format.as_str() {
+        "curl" => crate::export::curl(&raw),
+        "dio" => crate::export::dart_dio(&raw),
+        "fetch" => crate::export::fetch_js(&raw),
+        _ => Err("invalidExport".into()),
+    })
+    .await
+    .map_err(|_| "internalError")?
+}
+
+/// 在桌面端直接重放自定义/微调后的 HTTP 请求。
+#[tauri::command]
+pub async fn replay_request(
+    request: crate::replay::ReplayRequest,
+) -> Result<crate::replay::ReplayResponse> {
+    crate::replay::send(request).await
 }
 
 fn persist_workspace(
@@ -926,4 +1156,225 @@ pub async fn open_release_link(app: tauri::AppHandle, url: String) -> Result<()>
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|_| "openLinkFailed".into())
+}
+
+/// 在应用启动时初始化堆栈还原插件管理器。
+pub fn start_plugins(app: &tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use tauri::Manager;
+    let base_dir = app
+        .path()
+        .app_config_dir()
+        .or_else(|_| app.path().app_data_dir())?;
+    let state = app.state::<AppState>();
+    if let Ok(mut mgr) = state.plugins.lock() {
+        mgr.initialize(base_dir);
+    }
+    Ok(())
+}
+
+/// 导出的插件文本与一键安装链接载体。
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedPluginBundle {
+    pub json: String,
+    pub link: String,
+}
+
+#[tauri::command]
+pub fn list_plugins(state: State<'_, AppState>) -> Result<crate::plugins::PluginListSnapshot> {
+    let mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    Ok(mgr.list())
+}
+
+#[tauri::command]
+pub fn upsert_plugin(
+    state: State<'_, AppState>,
+    plugin: crate::plugins::SymbolicatorPlugin,
+    keep_existing_secret: Option<bool>,
+    set_as_default: Option<bool>,
+) -> Result<crate::plugins::PluginListSnapshot> {
+    let mut mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    mgr.upsert(
+        plugin,
+        keep_existing_secret.unwrap_or(true),
+        set_as_default.unwrap_or(false),
+    )
+}
+
+#[tauri::command]
+pub fn remove_plugin(
+    state: State<'_, AppState>,
+    plugin_id: String,
+) -> Result<crate::plugins::PluginListSnapshot> {
+    let mut mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    mgr.remove(&plugin_id)
+}
+
+#[tauri::command]
+pub fn set_plugin_enabled(
+    state: State<'_, AppState>,
+    plugin_id: String,
+    enabled: bool,
+) -> Result<crate::plugins::PluginListSnapshot> {
+    let mut mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    mgr.set_enabled(&plugin_id, enabled)
+}
+
+#[tauri::command]
+pub fn set_default_plugin(
+    state: State<'_, AppState>,
+    plugin_id: String,
+) -> Result<crate::plugins::PluginListSnapshot> {
+    let mut mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    mgr.set_default(&plugin_id)
+}
+
+#[tauri::command]
+pub fn parse_plugin_input(raw_text: String) -> Result<crate::plugins::ParsedPluginPreview> {
+    crate::plugins::parse_plugin_package(&raw_text)
+}
+
+#[tauri::command]
+pub fn parse_plugin_file_path(path: String) -> Result<crate::plugins::ParsedPluginPreview> {
+    crate::plugins::parse_plugin_file(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+pub async fn fetch_plugin_from_url(
+    url: String,
+    token: Option<String>,
+) -> Result<crate::plugins::ParsedPluginPreview> {
+    crate::plugins::fetch_plugin_from_url(&url, token.as_deref()).await
+}
+
+#[tauri::command]
+pub async fn pick_plugin_file(
+    app: tauri::AppHandle,
+) -> Result<Option<crate::plugins::ParsedPluginPreview>> {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Peek Plugin", &["json", "peekplugin"])
+            .blocking_pick_file()
+            .and_then(|f| f.into_path().ok())
+    })
+    .await
+    .map_err(|_| "internalError")?;
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    crate::plugins::parse_plugin_file(&path).map(Some)
+}
+
+#[tauri::command]
+pub async fn pick_symbols_directory(app: tauri::AppHandle) -> Result<Option<String>> {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .blocking_pick_folder()
+            .and_then(|f| f.into_path().ok())
+            .map(|p| p.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|_| "internalError")?;
+    Ok(picked)
+}
+
+#[tauri::command]
+pub fn export_plugin_config(
+    state: State<'_, AppState>,
+    plugin_id: String,
+    include_secrets: Option<bool>,
+) -> Result<ExportedPluginBundle> {
+    let plugin = {
+        let mgr = state.plugins.lock().map_err(|_| "internalError")?;
+        mgr.find_plugin(&plugin_id)
+            .ok_or_else(|| "未找到指定插件".to_string())?
+    };
+    let (json, link) =
+        crate::plugins::export_plugin_bundle(&plugin, include_secrets.unwrap_or(false))?;
+    Ok(ExportedPluginBundle { json, link })
+}
+
+#[tauri::command]
+pub async fn save_plugin_file(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    plugin_id: String,
+    include_secrets: Option<bool>,
+) -> Result<bool> {
+    let (filename, content) = {
+        let mgr = state.plugins.lock().map_err(|_| "internalError")?;
+        let plugin = mgr
+            .find_plugin(&plugin_id)
+            .ok_or_else(|| "未找到指定插件".to_string())?;
+        let (json, _) =
+            crate::plugins::export_plugin_bundle(&plugin, include_secrets.unwrap_or(false))?;
+        (format!("{}.peekplugin.json", plugin.id), json)
+    };
+    let target = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_file_name(&filename)
+            .add_filter("Peek Plugin", &["json", "peekplugin"])
+            .blocking_save_file()
+            .and_then(|f| f.into_path().ok())
+    })
+    .await
+    .map_err(|_| "internalError")?;
+    let Some(path) = target else {
+        return Ok(false);
+    };
+    std::fs::write(&path, content.as_bytes()).map_err(|e| format!("保存插件文件失败: {e}"))?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn test_symbolicator_plugin(
+    state: State<'_, AppState>,
+    plugin_id: String,
+) -> Result<crate::plugins::PluginTestResult> {
+    let plugin = {
+        let mgr = state.plugins.lock().map_err(|_| "internalError")?;
+        mgr.find_plugin(&plugin_id)
+            .ok_or_else(|| "未找到指定插件".to_string())?
+    };
+    Ok(crate::plugins::test_plugin(&plugin).await)
+}
+
+#[tauri::command]
+pub async fn symbolicate_stack(
+    state: State<'_, AppState>,
+    request: crate::plugins::SymbolicateRequest,
+) -> Result<crate::plugins::SymbolicateResponse> {
+    let (plugin, key, cached) = {
+        let mgr = state.plugins.lock().map_err(|_| "internalError")?;
+        let plugin = mgr.resolve_plugin(request.plugin_id.as_deref())?;
+        let key = crate::plugins::cache_key(&plugin, &request);
+        let cached = if request.force_refresh {
+            None
+        } else {
+            mgr.get_cached(&key)
+        };
+        (plugin, key, cached)
+    };
+
+    if let Some(hit) = cached {
+        return Ok(hit);
+    }
+
+    let response = crate::plugins::execute_symbolicate(&plugin, &request).await;
+    if response.ok
+        && let Ok(mut mgr) = state.plugins.lock()
+    {
+        mgr.put_cached(key, response.clone());
+    }
+    Ok(response)
+}
+
+#[tauri::command]
+pub fn clear_symbolicate_cache(state: State<'_, AppState>) -> Result<()> {
+    let mut mgr = state.plugins.lock().map_err(|_| "internalError")?;
+    mgr.clear_cache();
+    Ok(())
 }

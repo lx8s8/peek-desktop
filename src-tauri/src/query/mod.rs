@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct TimeRange {
     pub from: Option<String>,
@@ -265,7 +265,7 @@ fn timestamp(value: &str) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value).ok()
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineRow {
     id: String,
@@ -328,12 +328,12 @@ pub fn timeline(
 ) -> Result<TimelinePage> {
     merge_timeline(scope, network, timeline_snapshot(scope, store)?, query)
 }
-fn merge_timeline(
+fn build_timeline_rows(
     scope: &Scope,
     network: Vec<EntryRow>,
     diagnostics: Vec<TimelineDiagnostic>,
     query: &ReviewQuery,
-) -> Result<TimelinePage> {
+) -> Result<Vec<TimelineRow>> {
     let range = query.range.parse()?;
     let search = query.search.to_lowercase();
     let network_id = match scope {
@@ -396,6 +396,16 @@ fn merge_timeline(
         });
     }
     rows.sort_by_cached_key(|row| (timestamp(&row.occurred_at), row.id.clone()));
+    Ok(rows)
+}
+
+fn merge_timeline(
+    scope: &Scope,
+    network: Vec<EntryRow>,
+    diagnostics: Vec<TimelineDiagnostic>,
+    query: &ReviewQuery,
+) -> Result<TimelinePage> {
+    let rows = build_timeline_rows(scope, network, diagnostics, query)?;
     let total = rows.len();
     let rows = rows
         .into_iter()
@@ -409,6 +419,78 @@ fn merge_timeline(
         rows,
     })
 }
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct TimelineCacheKey {
+    scope_kind: String,
+    scope_id: String,
+    version_stamp: String,
+    search: String,
+    from: Option<String>,
+    to: Option<String>,
+}
+
+/// 时间线快照缓存：避免滚动翻页时反复全量合并与重排。
+#[derive(Default)]
+pub struct TimelineCache {
+    entries: std::collections::VecDeque<(TimelineCacheKey, std::sync::Arc<Vec<TimelineRow>>)>,
+}
+
+impl TimelineCache {
+    fn query(
+        &mut self,
+        scope: &Scope,
+        version_stamp: String,
+        network: impl FnOnce() -> Result<Vec<EntryRow>>,
+        diagnostics: impl FnOnce() -> Result<Vec<TimelineDiagnostic>>,
+        query: &ReviewQuery,
+    ) -> Result<TimelinePage> {
+        let (scope_kind, scope_id) = match scope {
+            Scope::Network { id } => ("network".to_string(), id.clone()),
+            Scope::Diagnostic { id } => ("diagnostic".to_string(), id.clone()),
+        };
+        let key = TimelineCacheKey {
+            scope_kind,
+            scope_id,
+            version_stamp,
+            search: query.search.to_lowercase(),
+            from: query.range.from.clone(),
+            to: query.range.to.clone(),
+        };
+        let all_rows = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            let hit = self.entries.remove(pos).unwrap();
+            let rows = std::sync::Arc::clone(&hit.1);
+            self.entries.push_back(hit);
+            rows
+        } else {
+            let built = std::sync::Arc::new(build_timeline_rows(
+                scope,
+                network()?,
+                diagnostics()?,
+                query,
+            )?);
+            if self.entries.len() >= 6 {
+                self.entries.pop_front();
+            }
+            self.entries.push_back((key, std::sync::Arc::clone(&built)));
+            built
+        };
+        let total = all_rows.len();
+        let limit = query.limit.clamp(1, 300);
+        let rows = if query.offset >= total {
+            Vec::new()
+        } else {
+            all_rows[query.offset..(query.offset + limit).min(total)].to_vec()
+        };
+        Ok(TimelinePage {
+            total,
+            offset: query.offset,
+            revision: query.revision,
+            rows,
+        })
+    }
+}
+
 impl Remote {
     pub fn review_diagnostics(&self, id: &str, query: &ReviewQuery) -> Result<ReviewPage> {
         let store = self.diagnostics.lock().map_err(|_| "internalError")?;
@@ -426,6 +508,69 @@ impl Remote {
         };
         merge_timeline(scope, network, diagnostics, query)
     }
+
+    /// 获取作用域对应的网络与诊断版本戳，驱动时间线缓存 O(1) 命中。
+    pub fn timeline_cached(
+        &self,
+        cache: &mut TimelineCache,
+        scope: &Scope,
+        offline_network: Option<(u64, Vec<EntryRow>)>,
+        query: &ReviewQuery,
+    ) -> Result<TimelinePage> {
+        let net_ver = match scope {
+            Scope::Network { id } if id.starts_with("live-") => {
+                self.store
+                    .lock()
+                    .map_err(|_| "internalError")?
+                    .sessions
+                    .get(id)
+                    .ok_or("sessionNotFound")?
+                    .version
+            }
+            Scope::Network { .. } => offline_network.as_ref().map_or(0, |(v, _)| *v),
+            Scope::Diagnostic { .. } => 0,
+        };
+        let diag_ver = {
+            let store = self.diagnostics.lock().map_err(|_| "internalError")?;
+            if let Scope::Diagnostic { id } = scope
+                && !store.runs.contains_key(id)
+            {
+                return Err("diagnosticNotFound".into());
+            }
+            let mut vers: Vec<(String, u64)> = store
+                .runs
+                .iter()
+                .filter(|(key, run)| match scope {
+                    Scope::Network { id } => run.network_key.as_ref() == Some(id),
+                    Scope::Diagnostic { id } => id == *key,
+                })
+                .map(|(k, r)| (k.clone(), r.version))
+                .collect();
+            vers.sort_by(|a, b| a.0.cmp(&b.0));
+            vers.into_iter()
+                .map(|(k, v)| format!("{k}:{v}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let version_stamp = format!("{net_ver}|{diag_ver}");
+        cache.query(
+            scope,
+            version_stamp,
+            || match scope {
+                Scope::Network { id } if id.starts_with("live-") => self.network_rows(id),
+                Scope::Network { .. } => {
+                    Ok(offline_network.map(|(_, rows)| rows).unwrap_or_default())
+                }
+                Scope::Diagnostic { .. } => Ok(vec![]),
+            },
+            || {
+                let store = self.diagnostics.lock().map_err(|_| "internalError")?;
+                timeline_snapshot(scope, &store)
+            },
+            query,
+        )
+    }
+
     pub fn network_rows(&self, id: &str) -> Result<Vec<EntryRow>> {
         Ok(self
             .store
@@ -454,6 +599,32 @@ impl Remote {
         revision: u32,
         range: &ParsedRange,
     ) -> Result<crate::session::QueryPage> {
+        self.query_range_filtered(
+            id,
+            search,
+            filter,
+            offset,
+            limit,
+            revision,
+            range,
+            None,
+            &[],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn query_range_filtered(
+        &self,
+        id: &str,
+        search: &str,
+        filter: &str,
+        offset: usize,
+        limit: usize,
+        revision: u32,
+        range: &ParsedRange,
+        host_filter: Option<&str>,
+        exclude_patterns: &[String],
+    ) -> Result<crate::session::QueryPage> {
         Ok(self
             .store
             .lock()
@@ -462,7 +633,16 @@ impl Remote {
             .get(id)
             .ok_or("sessionNotFound")?
             .current
-            .query_range(search, filter, offset, limit, revision, range))
+            .query_range_filtered(
+                search,
+                filter,
+                offset,
+                limit,
+                revision,
+                range,
+                host_filter,
+                exclude_patterns,
+            ))
     }
 }
 

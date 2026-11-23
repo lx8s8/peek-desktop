@@ -12,7 +12,7 @@ const variants = cva("button", {
       primary: "button-primary",
       ghost: "button-ghost",
     },
-    size: { default: "", icon: "button-icon" },
+    size: { default: "", sm: "button-sm", icon: "button-icon" },
   },
   defaultVariants: { variant: "default", size: "default" },
 });

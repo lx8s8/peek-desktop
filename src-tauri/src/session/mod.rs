@@ -101,6 +101,14 @@ impl Session {
         self.index.get(id).map(|i| &self.entries[*i])
     }
 
+    /// 切换指定记录的桌面端固定状态（Pinned）。
+    pub fn toggle_pin(&mut self, id: &str) -> Result<bool> {
+        let index = *self.index.get(id).ok_or("entryNotFound")?;
+        let entry = &mut self.entries[index];
+        entry.row.pinned = !entry.row.pinned;
+        Ok(entry.row.pinned)
+    }
+
     pub fn write(&self, mut writer: impl Write) -> Result<()> {
         writeln!(writer, "{}", self.raw_header).map_err(|e| e.to_string())?;
         for entry in &self.entries {
@@ -136,7 +144,46 @@ impl Session {
         revision: u32,
         range: &crate::query::ParsedRange,
     ) -> QueryPage {
+        self.query_range_filtered(search, filter, offset, limit, revision, range, None, &[])
+    }
+
+    /// 支持 Host 快捷筛选与路径/关键词降噪屏蔽的窗口查询，同时汇总 Top 12 Host。
+    #[allow(clippy::too_many_arguments)]
+    pub fn query_range_filtered(
+        &self,
+        search: &str,
+        filter: &str,
+        offset: usize,
+        limit: usize,
+        revision: u32,
+        range: &crate::query::ParsedRange,
+        host_filter: Option<&str>,
+        exclude_patterns: &[String],
+    ) -> QueryPage {
         let search = search.to_lowercase();
+        let host_lower = host_filter
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_lowercase);
+        let excludes: Vec<String> = exclude_patterns
+            .iter()
+            .map(|p| p.trim().to_lowercase())
+            .filter(|p| !p.is_empty())
+            .collect();
+
+        // 统计当前会话频次最高的 Top 12 Host，供界面快速筛选胶囊使用
+        let mut host_counts: HashMap<String, usize> = HashMap::new();
+        for entry in &self.entries {
+            if let Ok(parsed) = url::Url::parse(&entry.row.url)
+                && let Some(host) = parsed.host_str()
+            {
+                *host_counts.entry(host.to_lowercase()).or_insert(0) += 1;
+            }
+        }
+        let mut host_list: Vec<(String, usize)> = host_counts.into_iter().collect();
+        host_list.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let hosts: Vec<String> = host_list.into_iter().take(12).map(|(h, _)| h).collect();
+
         let matches = |entry: &&StoredEntry| {
             let row = &entry.row;
             let accepted = match filter {
@@ -145,7 +192,25 @@ impl Session {
                 "pinned" => row.pinned,
                 _ => true,
             };
-            accepted && entry.search.contains(&search) && range.includes(&row.started_at)
+            if !accepted || !entry.search.contains(&search) || !range.includes(&row.started_at) {
+                return false;
+            }
+            if let Some(target_host) = &host_lower {
+                let host_ok = url::Url::parse(&row.url)
+                    .ok()
+                    .and_then(|u| u.host_str().map(str::to_lowercase))
+                    .is_some_and(|h| h == *target_host);
+                if !host_ok {
+                    return false;
+                }
+            }
+            if !excludes.is_empty() {
+                let url_lower = row.url.to_lowercase();
+                if excludes.iter().any(|pattern| url_lower.contains(pattern)) {
+                    return false;
+                }
+            }
+            true
         };
         let total = self.entries.iter().filter(matches).count();
         let rows = self
@@ -161,6 +226,7 @@ impl Session {
             offset,
             rows,
             revision,
+            hosts,
         }
     }
 }
@@ -171,6 +237,7 @@ pub struct QueryPage {
     pub offset: usize,
     pub rows: Vec<EntryRow>,
     pub revision: u32,
+    pub hosts: Vec<String>,
 }
 
 pub fn read_session(
@@ -342,6 +409,12 @@ impl Library {
             .get(id)
             .map(|(_, s)| Arc::clone(s))
             .ok_or_else(|| "sessionNotFound".into())
+    }
+
+    /// 切换离线会话中某条记录的固定状态。
+    pub fn toggle_pin(&mut self, id: &str, entry_id: &str) -> Result<bool> {
+        let (_, session) = self.sessions.get_mut(id).ok_or("sessionNotFound")?;
+        Arc::make_mut(session).toggle_pin(entry_id)
     }
 
     pub fn summaries(&self) -> Vec<SessionSummary> {

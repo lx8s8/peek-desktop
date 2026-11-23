@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { api, desktop } from "../../lib/ipc/client";
 import { Button } from "../../components/ui/button";
 import { JsonViewer } from "../detail/JsonViewer";
+import { StackSymbolicator } from "../plugins/StackSymbolicator";
+import type { PluginView } from "../../lib/ipc/types";
 import type { LogSelection } from "./DiagnosticsTable";
 export function DiagnosticDetail({
   selected,
@@ -12,6 +14,10 @@ export function DiagnosticDetail({
   networkSessionId,
   networkVersion,
   onNetwork,
+  plugins,
+  defaultPluginId,
+  autoSymbolicateNonce,
+  onOpenPlugins,
 }: {
   selected: LogSelection | null;
   theme: string;
@@ -19,6 +25,10 @@ export function DiagnosticDetail({
   networkSessionId?: string | null;
   networkVersion?: string;
   onNetwork?: (sessionId: string, entryId: string) => void;
+  plugins?: PluginView[];
+  defaultPluginId?: string | null;
+  autoSymbolicateNonce?: number;
+  onOpenPlugins?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const detailKey = JSON.stringify([selected?.runId, selected?.eventId]);
@@ -161,16 +171,17 @@ export function DiagnosticDetail({
             />
           )}
           {event.kind === "exception" || event.exception ? (
-            <section className="stack-section">
-              <div className="section-label">
-                {t("originalStack")}
-                <Button disabled={!stack} onClick={() => void copy(stack)}>
-                  {t("copyStack")}
-                </Button>
-              </div>
-              {event.exception?.message && <p>{event.exception.message}</p>}
-              {stack ? <pre>{stack}</pre> : <p>{t("noStack")}</p>}
-            </section>
+            <StackSymbolicator
+              stack={stack}
+              stackFormat={event.exception?.stackFormat}
+              attributes={event.attributes}
+              exceptionMessage={event.exception?.message}
+              plugins={plugins}
+              defaultPluginId={defaultPluginId}
+              autoTriggerNonce={autoSymbolicateNonce}
+              onOpenPlugins={onOpenPlugins}
+              onCopySuccess={(msg) => setNotice(msg)}
+            />
           ) : null}
           <div className="section-label">{t("diagnosticRaw")}</div>
           <div className="diagnostic-json">

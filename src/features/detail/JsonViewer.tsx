@@ -1,5 +1,5 @@
 import { writeClipboard } from "../../lib/clipboard";
-import { Fragment, lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   CaseSensitive,
   Check,
@@ -7,12 +7,14 @@ import {
   ChevronUp,
   Copy,
   Search,
+  WrapText,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 
 import type { TextSearchResult } from "./text-search";
+import { renderFormattedText } from "./jsonHighlight";
 
 const JsonTree = lazy(() => import("./JsonTree"));
 type Analysis = { formatted: string; error: string; treeSafe: boolean };
@@ -31,6 +33,7 @@ export function JsonViewer({
   const [mode, setMode] = useState("raw");
   const manualMode = useRef(false);
   const [copyState, setCopyState] = useState("");
+  const [wrap, setWrap] = useState(false);
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [found, setFound] = useState<{
@@ -134,6 +137,18 @@ export function JsonViewer({
       setCopyState("copyFailed");
     }
   }
+  const highlightJson = json && !!analysis && !analysis.error;
+  const renderedText = useMemo(
+    () =>
+      renderFormattedText(
+        displayedText,
+        highlightJson,
+        result?.matches.length ? result.matches : null,
+        current,
+        currentMatch,
+      ),
+    [displayedText, highlightJson, result, current],
+  );
   return (
     <div
       className="json-viewer"
@@ -187,15 +202,30 @@ export function JsonViewer({
             </>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => void copy()}
-          title={t("copy")}
-          aria-label={t("copy")}
-        >
-          {copyState === "copied" ? <Check /> : <Copy />}
-        </Button>
+        <div className="viewer-toolbar-actions">
+          {displayedMode !== "tree" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-pressed={wrap}
+              className={wrap ? "is-active-toggle" : ""}
+              onClick={() => setWrap((value) => !value)}
+              title={t("wrapLines")}
+              aria-label={t("wrapLines")}
+            >
+              <WrapText />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => void copy()}
+            title={t("copy")}
+            aria-label={t("copy")}
+          >
+            {copyState === "copied" ? <Check /> : <Copy />}
+          </Button>
+        </div>
       </div>
       <div className="body-search" role="search" aria-label={t("bodySearch")}>
         <Search size={14} />
@@ -289,30 +319,11 @@ export function JsonViewer({
             <JsonTree text={text} theme={theme} />
           </Suspense>
         ) : (
-          <pre className="raw-text" tabIndex={0}>
-            {result?.matches.length ? (
-              <>
-                {result.matches.map((match, index) => (
-                  <Fragment key={match.start}>
-                    {displayedText.slice(
-                      index ? result.matches[index - 1].end : 0,
-                      match.start,
-                    )}
-                    <mark
-                      className={index === current ? "current-match" : ""}
-                      ref={index === current ? currentMatch : undefined}
-                    >
-                      {displayedText.slice(match.start, match.end)}
-                    </mark>
-                  </Fragment>
-                ))}
-                {displayedText.slice(
-                  result.matches[result.matches.length - 1].end,
-                )}
-              </>
-            ) : (
-              displayedText
-            )}
+          <pre
+            className={`raw-text${wrap ? " is-wrapped" : ""}${highlightJson ? " is-json" : ""}`}
+            tabIndex={0}
+          >
+            {renderedText}
           </pre>
         )}
       </div>

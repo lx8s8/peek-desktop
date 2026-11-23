@@ -150,6 +150,79 @@ export interface TimelinePage {
   revision: number;
   rows: TimelineRow[];
 }
+export type StreamKindFilter = "all" | "network" | "logs" | "errors";
+export type StreamSearchMode = "filter" | "locate";
+export type StreamLineRole =
+  "top" | "header" | "meta" | "body" | "error" | "remote" | "bottom";
+export interface RemoteBodyHint {
+  sessionId: string;
+  entryId: string;
+  side: "request" | "response";
+  size: number | null;
+  mediaType: string | null;
+}
+export interface StreamLine {
+  lineIndex: number;
+  blockId: string;
+  blockStartLine: number;
+  blockLineCount: number;
+  kind: string;
+  level: string;
+  role: StreamLineRole;
+  text: string;
+  occurredAt: string;
+  sessionId: string | null;
+  entryId: string | null;
+  runId: string | null;
+  eventId: string | null;
+  remoteBody: RemoteBodyHint | null;
+  collapsed?: boolean;
+  hiddenLines?: number;
+  pairLine?: number | null;
+  pairLabel?: string | null;
+}
+export interface StreamQuery {
+  search: string;
+  searchMode?: StreamSearchMode;
+  kindFilter: StreamKindFilter;
+  range: TimeRange;
+  minTimestampMicros?: number | null;
+  collapsedBlocks?: string[];
+  compactAll?: boolean;
+  lineOffset: number;
+  lineLimit: number;
+  tzOffsetEastSeconds: number;
+  revision: number;
+}
+export interface StreamPage {
+  totalLines: number;
+  totalBlocks: number;
+  lineOffset: number;
+  revision: number;
+  latestTimestampMicros?: number | null;
+  lines: StreamLine[];
+}
+export interface StreamMatches {
+  lineIndices: number[];
+  limited: boolean;
+}
+export type SnippetFormat = "curl" | "dio" | "fetch";
+export interface ReplayRequest {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: string | null;
+}
+export interface ReplayResponse {
+  status: number;
+  statusText: string;
+  durationMs: number;
+  headers: [string, string][];
+  mediaType: string | null;
+  body: string;
+  bytes: number;
+  truncated: boolean;
+}
 export interface DiagnosticRef {
   runId: string;
   eventId: string;
@@ -183,6 +256,7 @@ export interface QueryPage {
   offset: number;
   rows: EntryRow[];
   revision: number;
+  hosts?: string[];
 }
 export interface ImportProgress {
   bytesRead: number;
@@ -222,4 +296,157 @@ export interface UpdateInfo {
   releaseUrl: string | null;
   downloadUrl: string | null;
   notes: string;
+}
+
+export type PluginKind = "local" | "http" | "cli";
+
+export interface LocalPluginConfig {
+  symbolsDir: string;
+  flutterBin?: string | null;
+}
+
+export interface HttpPluginConfig {
+  endpoint: string;
+  healthEndpoint?: string | null;
+  authHeader?: string | null;
+  token?: string | null;
+  headers: Record<string, string>;
+}
+
+export interface HttpPluginView {
+  endpoint: string;
+  healthEndpoint?: string | null;
+  authHeader?: string | null;
+  hasToken: boolean;
+  maskedToken?: string | null;
+  headers: Record<string, string>;
+}
+
+export interface CliPluginConfig {
+  command: string;
+  args: string[];
+  workingDir?: string | null;
+  env: Record<string, string>;
+}
+
+export interface SymbolicatorPlugin {
+  schemaVersion: number;
+  id: string;
+  name: string;
+  description?: string | null;
+  enabled: boolean;
+  kind: PluginKind;
+  timeoutMs: number;
+  local?: LocalPluginConfig | null;
+  http?: HttpPluginConfig | null;
+  cli?: CliPluginConfig | null;
+}
+
+export interface PluginView {
+  schemaVersion: number;
+  id: string;
+  name: string;
+  description?: string | null;
+  enabled: boolean;
+  kind: PluginKind;
+  timeoutMs: number;
+  source: "managed" | "discovered" | string;
+  isDefault: boolean;
+  hasSecret: boolean;
+  maskedToken?: string | null;
+  local?: LocalPluginConfig | null;
+  http?: HttpPluginView | null;
+  cli?: CliPluginConfig | null;
+}
+
+export interface PluginListSnapshot {
+  defaultPluginId: string | null;
+  discoveryDir: string | null;
+  plugins: PluginView[];
+}
+
+export interface ServiceBuildSummary {
+  jobId?: string | null;
+  appVersion?: string | null;
+  flavor?: string | null;
+  brand?: string | null;
+  target?: string | null;
+  finishedAt?: string | null;
+}
+
+export interface ServiceDiscoveryInfo {
+  availableBuilds?: number | null;
+  symbolCount?: number | null;
+  recentBuilds: ServiceBuildSummary[];
+  message?: string | null;
+}
+
+export interface ParsedPluginPreview {
+  plugin: SymbolicatorPlugin;
+  hasSecret: boolean;
+  maskedToken?: string | null;
+  requiresTrustWarning: boolean;
+  serviceInfo?: ServiceDiscoveryInfo | null;
+}
+
+export interface ExportedPluginBundle {
+  json: string;
+  link: string;
+}
+
+export interface AotStackInfo {
+  isAot: boolean;
+  buildId: string | null;
+  os: string | null;
+  arch: string | null;
+}
+
+export interface MatchedBuildInfo {
+  jobId?: string | null;
+  appVersion?: string | null;
+  flavor?: string | null;
+  brand?: string | null;
+  target?: string | null;
+  sourceSha?: string | null;
+  sourceBranch?: string | null;
+  matchedBy?: string | null;
+  symbolFile?: string | null;
+}
+
+export interface SymbolicateRequest {
+  pluginId?: string | null;
+  stackTrace: string;
+  stackFormat?: string | null;
+  buildId?: string | null;
+  platform?: string | null;
+  arch?: string | null;
+  appVersion?: string | null;
+  buildNumber?: string | null;
+  flavor?: string | null;
+  brand?: string | null;
+  jobId?: string | null;
+  attributes?: Record<string, unknown> | null;
+  forceRefresh?: boolean;
+}
+
+export interface SymbolicateResponse {
+  ok: boolean;
+  symbolizedStack: string | null;
+  providerId: string;
+  providerName: string;
+  cached: boolean;
+  durationMs: number;
+  detected: AotStackInfo;
+  matchedBuild: MatchedBuildInfo | null;
+  warnings: string[];
+  error: string | null;
+}
+
+export interface PluginTestResult {
+  ok: boolean;
+  message: string;
+  latencyMs: number;
+  availableBuilds: number | null;
+  details: string | null;
+  recentBuilds?: ServiceBuildSummary[];
 }

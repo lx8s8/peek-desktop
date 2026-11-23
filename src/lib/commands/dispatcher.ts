@@ -33,6 +33,7 @@ export const definitions = {
   "view.logs": { label: "logs", accelerator: "CmdOrCtrl+2" },
   "view.exceptions": { label: "exceptions", accelerator: "CmdOrCtrl+3" },
   "view.timeline": { label: "timeline", accelerator: "CmdOrCtrl+4" },
+  "view.stream": { label: "stream", accelerator: "CmdOrCtrl+5" },
   "view.follow": { label: "followLatest", accelerator: "CmdOrCtrl+Shift+F" },
   "view.theme": { label: "menuDark", accelerator: "CmdOrCtrl+Shift+D" },
   "view.language": { label: "language", accelerator: "CmdOrCtrl+Shift+L" },

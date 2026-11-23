@@ -153,10 +153,19 @@ export function ConnectionPanel({
       <Button
         ref={trigger}
         disabled={!desktop}
+        aria-label={t("connection")}
+        className={`connection-trigger ${remote.listening ? "is-listening" : ""}`}
         onClick={() => commands.dispatch("connection.open")}
       >
+        <span
+          className={`live-dot ${remote.listening ? "is-online" : ""}`}
+          aria-hidden="true"
+        />
         <Radio />
-        {t("connection")}
+        <span>{t("connection")}</span>
+        {remote.listening && remote.port ? (
+          <span className="connection-port-pill">:{remote.port}</span>
+        ) : null}
       </Button>
       {open && (
         <div

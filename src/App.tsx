@@ -18,9 +18,12 @@ import {
   Monitor,
   Ellipsis,
   Moon,
+  Puzzle,
+  Radio,
   Save,
   Search,
   Sun,
+  Terminal,
   X,
 } from "lucide-react";
 import { Group, Panel, Separator, type Layout } from "react-resizable-panels";
@@ -28,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "./components/ui/button";
 import { FileTools } from "./features/files/FileTools";
 import { useFileOpen } from "./features/files/useFileOpen";
+import { useFileDrop } from "./features/files/useFileDrop";
 import { AboutPanel } from "./features/about/AboutPanel";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
 import { useWorkspace } from "./features/connection/useWorkspace";
@@ -40,18 +44,32 @@ import {
   TimelineTable,
   type TimelineView,
 } from "./features/timeline/TimelineTable";
+import {
+  ConsoleStream,
+  emptyStreamView,
+  type StreamSelection,
+  type StreamViewState,
+} from "./features/stream/ConsoleStream";
 import { TimeRangeBar } from "./features/console/TimeRangeBar";
 import {
   emptyDiagnosticView,
   type DiagnosticView,
 } from "./features/diagnostics/view";
-import { RequestTable } from "./features/console/RequestTable";
+import {
+  RequestTable,
+  type RequestCopyKind,
+} from "./features/console/RequestTable";
+import { RequestDiffDialog } from "./features/diff/RequestDiffDialog";
+import { PluginManagerDialog } from "./features/plugins/PluginManagerDialog";
 import { DetailPane } from "./features/detail/DetailPane";
+import { writeClipboard } from "./lib/clipboard";
 import { api, desktop } from "./lib/ipc/client";
 import type {
   EntryRow,
   Filter,
   ImportProgress,
+  ParsedPluginPreview,
+  PluginListSnapshot,
   TimeRange,
   TimelineRow,
 } from "./lib/ipc/types";
@@ -76,11 +94,18 @@ const emptyDiagnosticPane: DiagnosticPaneState = {
 interface ViewState {
   search: string;
   filter: Filter;
+  hostFilter: string | null;
+  excludePatterns: string[];
+  hosts: string[];
+  compareAnchor: EntryRow | null;
   selected: EntryRow | null;
-  tab: "network" | "logs" | "exceptions" | "timeline";
+  tab: "network" | "logs" | "exceptions" | "timeline" | "stream";
   timeline: TimelineView;
   timelineSelected: TimelineRow | null;
   timelineEntry: EntryRow | null;
+  stream: StreamViewState;
+  streamSelected: StreamSelection | null;
+  streamEntry: EntryRow | null;
   logs: DiagnosticPaneState;
   exceptions: DiagnosticPaneState;
   range: TimeRange;
@@ -88,6 +113,10 @@ interface ViewState {
 const emptyView: ViewState = {
   search: "",
   filter: "all",
+  hostFilter: null,
+  excludePatterns: [],
+  hosts: [],
+  compareAnchor: null,
   selected: null,
   tab: "network",
   logs: emptyDiagnosticPane,
@@ -99,6 +128,9 @@ const emptyView: ViewState = {
   timeline: { search: "", following: true },
   timelineSelected: null,
   timelineEntry: null,
+  stream: emptyStreamView,
+  streamSelected: null,
+  streamEntry: null,
 };
 function readLayout(): Layout | undefined {
   try {
@@ -143,6 +175,16 @@ export default function App() {
     null,
   );
   const [count, setCount] = useState(0);
+  const [pinTick, setPinTick] = useState(0);
+  const [diffPair, setDiffPair] = useState<{
+    sessionId: string;
+    left: EntryRow;
+    right: EntryRow;
+  } | null>(null);
+  const [streamLocate, setStreamLocate] = useState<{
+    entryId: string;
+    nonce: number;
+  } | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const [layout] = useState(readLayout);
 
@@ -164,6 +206,28 @@ export default function App() {
     [i18n],
   );
   const { sessions, remote, refresh } = useWorkspace(reportError);
+  const [pluginSnapshot, setPluginSnapshot] = useState<PluginListSnapshot>({
+    defaultPluginId: null,
+    discoveryDir: null,
+    plugins: [],
+  });
+  const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [pendingPluginPreview, setPendingPluginPreview] =
+    useState<ParsedPluginPreview | null>(null);
+  const [symbolicateNonce, setSymbolicateNonce] = useState(0);
+  useEffect(() => {
+    if (!desktop) return;
+    let activeFlag = true;
+    void api
+      .listPlugins()
+      .then((snap) => {
+        if (activeFlag) setPluginSnapshot(snap);
+      })
+      .catch(() => {});
+    return () => {
+      activeFlag = false;
+    };
+  }, []);
   const active = independent
     ? undefined
     : sessions.find((session) => session.id === activeId);
@@ -195,6 +259,8 @@ export default function App() {
           selected: null,
           timelineSelected: null,
           timelineEntry: null,
+          streamSelected: null,
+          streamEntry: null,
         },
       }));
   }, [active?.id, active?.generation, active?.deviceId]);
@@ -276,8 +342,19 @@ export default function App() {
           eventId: view.timelineSelected.eventId,
         }
       : null;
+  const streamLog =
+    view.streamSelected?.runId && view.streamSelected.eventId
+      ? {
+          runId: view.streamSelected.runId,
+          eventId: view.streamSelected.eventId,
+        }
+      : null;
   const detailLog =
-    currentTab === "timeline" ? timelineLog : diagnostic.selected;
+    currentTab === "timeline"
+      ? timelineLog
+      : currentTab === "stream"
+        ? streamLog
+        : diagnostic.selected;
   const selectedRun = remote.diagnosticRuns.find(
     (run) => run.id === detailLog?.runId,
   );
@@ -292,6 +369,20 @@ export default function App() {
         const entry = await api.entryInfo(row.sessionId, row.entryId);
         if (request === navigation.current)
           updateView({ timelineEntry: entry });
+      } catch (error) {
+        if (request === navigation.current) reportError(String(error));
+      }
+  };
+  const selectStream = async (selection: StreamSelection | null) => {
+    const request = ++navigation.current;
+    updateView({ streamSelected: selection, streamEntry: null });
+    if (selection?.sessionId && selection.entryId)
+      try {
+        const entry = await api.entryInfo(
+          selection.sessionId,
+          selection.entryId,
+        );
+        if (request === navigation.current) updateView({ streamEntry: entry });
       } catch (error) {
         if (request === navigation.current) reportError(String(error));
       }
@@ -358,6 +449,97 @@ export default function App() {
     return true;
   }, [refresh, reportError, t]);
   useFileOpen(busy || saving, openPending, reportError);
+
+  const openDroppedFiles = useCallback(
+    async (paths: string[]) => {
+      if (!desktop || busyRef.current || saveRef.current) return;
+      // 优先识别 .peekplugin / .peekplugin.json 插件清单，直接唤起安装预览弹窗
+      const pluginFile = paths.find((p) =>
+        /(\.peekplugin\.json|\.peekplugin)$/i.test(p),
+      );
+      if (pluginFile) {
+        try {
+          const preview = await api.parsePluginFilePath(pluginFile);
+          setPendingPluginPreview(preview);
+          setPluginsOpen(true);
+        } catch (error) {
+          reportError(String(error));
+        }
+        return;
+      }
+      const supported = paths.filter((p) =>
+        /\.(peek|peekbundle|jsonl)$/i.test(p),
+      );
+      if (supported.length === 0) {
+        reportError("unsupportedFile");
+        return;
+      }
+      busyRef.current = true;
+      setBusy(true);
+      setProgress(null);
+      setNotice(null);
+      try {
+        for (const path of supported) {
+          const imported = await api.openPath(path, setProgress);
+          if (imported) {
+            await refresh();
+            setIndependent(imported.sessionId ? null : imported.runId);
+            setActiveId(imported.sessionId);
+          }
+        }
+      } catch (error) {
+        if (String(error) === "cancelled") {
+          setNotice({ text: t("cancelled"), error: false });
+        } else {
+          reportError(String(error));
+        }
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+        setProgress(null);
+      }
+    },
+    [refresh, reportError, t],
+  );
+  const draggingFiles = useFileDrop((paths) => void openDroppedFiles(paths));
+
+  const handleTogglePin = async (entry: EntryRow) => {
+    if (!active) return;
+    try {
+      const pinned = await api.togglePin(active.id, entry.id);
+      setPinTick((v) => v + 1);
+      if (view.selected?.id === entry.id) {
+        updateView({ selected: { ...view.selected, pinned } });
+      }
+    } catch (error) {
+      reportError(String(error));
+    }
+  };
+
+  const handleRequestCopy = async (entry: EntryRow, kind: RequestCopyKind) => {
+    if (!active) return;
+    try {
+      let text = "";
+      if (kind === "url") {
+        text = entry.url;
+      } else if (kind === "curl") {
+        text = await api.copyCurl(active.id, entry.id);
+      } else if (kind === "dio" || kind === "fetch") {
+        text = await api.copySnippet(active.id, entry.id, kind);
+      } else if (kind === "body") {
+        const resBody = await api.body(active.id, entry.id, "response");
+        text = resBody.text;
+        if (!text) {
+          setNotice({ text: t("emptyBody"), error: false });
+          return;
+        }
+      }
+      await writeClipboard(text);
+      setNotice({ text: t("copied"), error: false });
+    } catch (error) {
+      reportError(String(error));
+    }
+  };
 
   const save = useCallback(async () => {
     if (!active || saveRef.current || busyRef.current || !desktop) return;
@@ -453,6 +635,7 @@ export default function App() {
     !!(active?.deviceId || runs.length || independentRun),
   );
   useCommand("view.timeline", () => updateView({ tab: "timeline" }), !!scopeId);
+  useCommand("view.stream", () => updateView({ tab: "stream" }), !!scopeId);
   useCommand("view.theme", () =>
     setTheme((value) => (value === "dark" ? "light" : "dark")),
   );
@@ -480,6 +663,7 @@ export default function App() {
       "view.logs": !!scopeId && currentTab === "logs",
       "view.exceptions": !!scopeId && currentTab === "exceptions",
       "view.timeline": !!scopeId && currentTab === "timeline",
+      "view.stream": !!scopeId && currentTab === "stream",
       "view.theme": theme === "dark",
       "language.zh-CN": i18n.language !== "en",
       "language.en": i18n.language === "en",
@@ -487,9 +671,11 @@ export default function App() {
         !!scopeId &&
         (currentTab === "timeline"
           ? view.timeline.following
-          : currentTab === "logs" || currentTab === "exceptions"
-            ? diagnostic.view.following
-            : false),
+          : currentTab === "stream"
+            ? view.stream.following
+            : currentTab === "logs" || currentTab === "exceptions"
+              ? diagnostic.view.following
+              : false),
     },
     reportError,
   );
@@ -560,7 +746,9 @@ export default function App() {
               ? view.selected?.id
               : currentTab === "timeline"
                 ? view.timelineEntry?.id
-                : undefined
+                : currentTab === "stream"
+                  ? view.streamEntry?.id
+                  : undefined
           }
           onError={reportError}
           onNotice={(text) => setNotice({ text, error: false })}
@@ -575,6 +763,24 @@ export default function App() {
           {t(remote.listening ? "listening" : "offline")}
         </span>
         <div className="toolbar-end">
+          {desktop && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPendingPluginPreview(null);
+                setPluginsOpen(true);
+              }}
+              title={t("pluginsTitle")}
+            >
+              <Puzzle size={14} />
+              {t("plugins")}
+              {pluginSnapshot.plugins.some((p) => p.enabled) && (
+                <span className="plugin-count-badge">
+                  {pluginSnapshot.plugins.filter((p) => p.enabled).length}
+                </span>
+              )}
+            </Button>
+          )}
           <AboutPanel />
           <Button
             size="icon"
@@ -636,12 +842,21 @@ export default function App() {
               {t("devices")}
             </div>
             <div className="device-placeholder">
-              <span className="offline-dot" />
-              {new Set(
-                remote.sessions
-                  .filter((session) => session.online)
-                  .map((session) => session.deviceId),
-              ).size || t("noConnectedDevice")}
+              {(() => {
+                const onlineDevices = new Set(
+                  remote.sessions
+                    .filter((session) => session.online)
+                    .map((session) => session.deviceId),
+                ).size;
+                return (
+                  <>
+                    <span
+                      className={`live-dot ${onlineDevices > 0 ? "is-online" : ""}`}
+                    />
+                    {onlineDevices || t("noConnectedDevice")}
+                  </>
+                );
+              })()}
             </div>
             <div className="sidebar-section-title files-title">
               <FileStack size={13} />
@@ -729,30 +944,32 @@ export default function App() {
                         </small>
                       </span>
                     </button>
-                    {desktop && (
+                    <div className="session-item-actions">
+                      {desktop && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-haspopup="menu"
+                          aria-label={`${t("menuActions")} ${session.header.name || session.filename}`}
+                          onClick={(event) => {
+                            setIndependent(null);
+                            setActiveId(session.id);
+                            sessionContextMenu(event);
+                          }}
+                        >
+                          <Ellipsis />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-haspopup="menu"
-                        aria-label={`${t("menuActions")} ${session.header.name || session.filename}`}
-                        onClick={(event) => {
-                          setIndependent(null);
-                          setActiveId(session.id);
-                          sessionContextMenu(event);
-                        }}
+                        aria-label={`${t("close")} ${session.filename}`}
+                        disabled={session.online || busy || saving}
+                        onClick={() => void close(session.id)}
                       >
-                        <Ellipsis />
+                        <X />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`${t("close")} ${session.filename}`}
-                      disabled={session.online || busy || saving}
-                      onClick={() => void close(session.id)}
-                    >
-                      <X />
-                    </Button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -827,33 +1044,21 @@ export default function App() {
         <Separator className="panel-separator" />
         <Panel id="console" defaultSize="49%" minSize={360}>
           <section className="console">
-            <div className="console-heading">
-              <span>
-                <Activity size={14} />
-                {t(currentTab)}
-              </span>
-              {active && (
-                <span className="muted filename">{active.filename}</span>
-              )}
-            </div>
             {independentRun || active ? (
               <>
-                <TimeRangeBar
-                  range={view.range}
-                  onChange={(range) => updateView({ range })}
-                />
-                {(independentRun || active) && (
+                <div className="console-bar">
                   <div className="live-tabs segmented">
                     {(independentRun
-                      ? (["logs", "exceptions", "timeline"] as const)
+                      ? (["logs", "exceptions", "timeline", "stream"] as const)
                       : active?.deviceId || runs.length
                         ? ([
                             "network",
                             "logs",
                             "exceptions",
                             "timeline",
+                            "stream",
                           ] as const)
-                        : (["network", "timeline"] as const)
+                        : (["network", "timeline", "stream"] as const)
                     ).map((tab) => (
                       <button
                         key={tab}
@@ -863,6 +1068,7 @@ export default function App() {
                           commands.dispatch(`view.${tab}` as CommandId)
                         }
                       >
+                        {tab === "stream" && <Terminal size={12} />}
                         {t(tab)}
                         {tab === "logs"
                           ? ` (${independentRun?.count ?? runs.reduce((total, run) => total + run.count, 0)})`
@@ -870,8 +1076,54 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                )}
-                {currentTab === "timeline" ? (
+                  <div className="console-bar-meta">
+                    {active && (
+                      <span className="muted filename" title={active.filename}>
+                        {active.filename}
+                      </span>
+                    )}
+                    <TimeRangeBar
+                      range={view.range}
+                      onChange={(range) => updateView({ range })}
+                    />
+                  </div>
+                </div>
+                {currentTab === "stream" ? (
+                  <ConsoleStream
+                    key={scopeId}
+                    scope={{
+                      kind: independentRun ? "diagnostic" : "network",
+                      id: scopeId!,
+                    }}
+                    live={!!active?.deviceId && !!active?.online}
+                    range={view.range}
+                    view={view.stream}
+                    selected={view.streamSelected}
+                    locateEntry={streamLocate}
+                    onLocateHandled={() => setStreamLocate(null)}
+                    version={`${active?.version ?? 0}:${(independentRun
+                      ? [independentRun]
+                      : runs
+                    )
+                      .map((run) => `${run.id}:${run.version}`)
+                      .sort()
+                      .join(",")}`}
+                    onViewChange={(update) =>
+                      updateView({ stream: { ...view.stream, ...update } })
+                    }
+                    onSelect={(selection) => void selectStream(selection)}
+                    onQuickSymbolicate={(selection) => {
+                      void selectStream(selection);
+                      if (!pluginSnapshot.plugins.some((p) => p.enabled)) {
+                        setPendingPluginPreview(null);
+                        setPluginsOpen(true);
+                      } else {
+                        setSymbolicateNonce((n) => n + 1);
+                      }
+                    }}
+                    onError={reportError}
+                  />
+                ) : currentTab === "timeline" ? (
                   <TimelineTable
                     key={scopeId}
                     scope={{
@@ -956,10 +1208,95 @@ export default function App() {
                             </button>
                           ))}
                         </div>
-                        <span>
+                        <span className="num-cell">
                           {count.toLocaleString()} {t("matches")}
                         </span>
                       </div>
+                      {(view.hosts.length > 1 ||
+                        view.hostFilter ||
+                        view.excludePatterns.length > 0 ||
+                        view.compareAnchor) && (
+                        <div className="host-chips-row">
+                          {view.hosts.length > 1 && (
+                            <>
+                              <button
+                                type="button"
+                                className={`host-chip ${!view.hostFilter ? "active" : ""}`}
+                                onClick={() =>
+                                  updateView({
+                                    hostFilter: null,
+                                    selected: null,
+                                  })
+                                }
+                              >
+                                {t("clearHostFilter")}
+                              </button>
+                              {view.hosts.slice(0, 6).map((host) => (
+                                <button
+                                  key={host}
+                                  type="button"
+                                  className={`host-chip ${view.hostFilter === host ? "active" : ""}`}
+                                  onClick={() =>
+                                    updateView({
+                                      hostFilter:
+                                        view.hostFilter === host ? null : host,
+                                      selected: null,
+                                    })
+                                  }
+                                >
+                                  {host}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          {view.hostFilter &&
+                            !view.hosts
+                              .slice(0, 6)
+                              .includes(view.hostFilter) && (
+                              <button
+                                type="button"
+                                className="host-chip active"
+                                onClick={() =>
+                                  updateView({
+                                    hostFilter: null,
+                                    selected: null,
+                                  })
+                                }
+                              >
+                                {view.hostFilter} ×
+                              </button>
+                            )}
+                          {view.excludePatterns.map((pattern) => (
+                            <button
+                              key={pattern}
+                              type="button"
+                              className="host-chip is-exclude"
+                              title={t("hiddenPathChip")}
+                              onClick={() =>
+                                updateView({
+                                  excludePatterns: view.excludePatterns.filter(
+                                    (p) => p !== pattern,
+                                  ),
+                                })
+                              }
+                            >
+                              -{pattern} ×
+                            </button>
+                          ))}
+                          {view.compareAnchor && (
+                            <button
+                              type="button"
+                              className="host-chip is-compare"
+                              onClick={() =>
+                                updateView({ compareAnchor: null })
+                              }
+                            >
+                              {t("compareBaselineReady")}:{" "}
+                              {view.compareAnchor.method} ×
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {(active.skipped > 0 || active.newerFormat) && (
                       <div className="session-warning">
@@ -970,7 +1307,7 @@ export default function App() {
                     )}
                     <RequestTable
                       key={`${active.id}:${active.generation ?? 0}`}
-                      version={active.version}
+                      version={(active.version ?? 0) + pinTick}
                       live={!!active.deviceId}
                       sessionId={active.id}
                       search={
@@ -979,10 +1316,69 @@ export default function App() {
                           : view.search
                       }
                       filter={view.filter}
+                      hostFilter={view.hostFilter}
+                      excludePatterns={view.excludePatterns}
                       range={view.range}
                       selectedId={view.selected?.id}
+                      compareAnchor={view.compareAnchor}
                       onSelect={(entry) => updateView({ selected: entry })}
                       onCount={setCount}
+                      onHosts={(hosts) => {
+                        if (
+                          JSON.stringify(hosts) !== JSON.stringify(view.hosts)
+                        ) {
+                          updateView({ hosts });
+                        }
+                      }}
+                      onPinToggle={(entry) => void handleTogglePin(entry)}
+                      onFilterHost={(host) =>
+                        updateView({ hostFilter: host, selected: null })
+                      }
+                      onExcludePath={(pattern) => {
+                        if (!view.excludePatterns.includes(pattern)) {
+                          updateView({
+                            excludePatterns: [...view.excludePatterns, pattern],
+                          });
+                        }
+                      }}
+                      onLocateInStream={(entry) => {
+                        updateView({
+                          tab: "stream",
+                          stream: {
+                            ...view.stream,
+                            following: false,
+                            minTimestampMicros: null,
+                          },
+                          streamEntry: entry,
+                          streamSelected: {
+                            blockId: `req:${active.id}:${entry.id}`,
+                            kind: "http-request",
+                            sessionId: active.id,
+                            entryId: entry.id,
+                            runId: null,
+                            eventId: null,
+                          },
+                        });
+                        setStreamLocate({
+                          entryId: entry.id,
+                          nonce: Date.now(),
+                        });
+                      }}
+                      onSetCompareAnchor={(entry) =>
+                        updateView({ compareAnchor: entry })
+                      }
+                      onCompareWithAnchor={(entry) => {
+                        if (view.compareAnchor) {
+                          setDiffPair({
+                            sessionId: active.id,
+                            left: view.compareAnchor,
+                            right: entry,
+                          });
+                        }
+                      }}
+                      onCopyAction={(entry, kind) =>
+                        void handleRequestCopy(entry, kind)
+                      }
                       onError={reportError}
                     />
                     {active.deviceId && (
@@ -1006,16 +1402,30 @@ export default function App() {
               </>
             ) : (
               <div className="empty-workspace">
+                <span className="empty-workspace-icon">
+                  <Activity size={24} />
+                </span>
                 <h2>{t("emptyFiles")}</h2>
                 <p>{t("connectionReady")}</p>
-                <Button
-                  variant="primary"
-                  disabled={!desktop || busy || saving}
-                  onClick={() => commands.dispatch("session.open")}
-                >
-                  <FolderOpen />
-                  {t("open")}
-                </Button>
+                <div className="empty-workspace-actions">
+                  {desktop && (
+                    <Button
+                      variant="primary"
+                      onClick={() => commands.dispatch("connection.open")}
+                    >
+                      <Radio />
+                      {t("connectNow")}
+                    </Button>
+                  )}
+                  <Button
+                    variant={desktop ? "default" : "primary"}
+                    disabled={!desktop || busy || saving}
+                    onClick={() => commands.dispatch("session.open")}
+                  >
+                    <FolderOpen />
+                    {t("open")}
+                  </Button>
+                </div>
                 <span className="file-hint">{t("fileHint")}</span>
               </div>
             )}
@@ -1028,11 +1438,18 @@ export default function App() {
               <h2>{t("selectTimelineEvent")}</h2>
               <p>{t("selectTimelineHint")}</p>
             </aside>
+          ) : currentTab === "stream" && !view.streamSelected ? (
+            <aside className="detail-empty">
+              <Terminal />
+              <h2>{t("selectTimelineEvent")}</h2>
+              <p>{t("selectTimelineHint")}</p>
+            </aside>
           ) : currentTab !== "network" &&
             !(
               currentTab === "timeline" &&
               view.timelineSelected?.kind === "network"
-            ) ? (
+            ) &&
+            !(currentTab === "stream" && !!view.streamSelected?.entryId) ? (
             <DiagnosticDetail
               selected={detailLog}
               evictionVersion={selectedRun?.evicted}
@@ -1041,6 +1458,13 @@ export default function App() {
               onNetwork={(sessionId, entryId) =>
                 void openNetwork(sessionId, entryId)
               }
+              plugins={pluginSnapshot.plugins}
+              defaultPluginId={pluginSnapshot.defaultPluginId}
+              autoSymbolicateNonce={symbolicateNonce}
+              onOpenPlugins={() => {
+                setPendingPluginPreview(null);
+                setPluginsOpen(true);
+              }}
               theme={theme}
             />
           ) : (
@@ -1049,13 +1473,45 @@ export default function App() {
               version={active?.version}
               sessionId={active?.id ?? null}
               entry={
-                currentTab === "timeline" ? view.timelineEntry : view.selected
+                currentTab === "timeline"
+                  ? view.timelineEntry
+                  : currentTab === "stream"
+                    ? view.streamEntry
+                    : view.selected
               }
               theme={theme}
             />
           )}
         </Panel>
       </Group>
+      {diffPair && (
+        <RequestDiffDialog
+          sessionId={diffPair.sessionId}
+          left={diffPair.left}
+          right={diffPair.right}
+          onClose={() => setDiffPair(null)}
+        />
+      )}
+      {pluginsOpen && (
+        <PluginManagerDialog
+          snapshot={pluginSnapshot}
+          initialPreview={pendingPluginPreview}
+          onSnapshotChange={setPluginSnapshot}
+          onClose={() => {
+            setPluginsOpen(false);
+            setPendingPluginPreview(null);
+          }}
+        />
+      )}
+      {draggingFiles && (
+        <div className="drop-overlay" role="status">
+          <div className="drop-overlay-card">
+            <FolderOpen size={28} />
+            <strong>{t("dropFilesTitle")}</strong>
+            <span>{t("dropFilesHint")}</span>
+          </div>
+        </div>
+      )}
       {busy && (
         <div className="import-progress" role="status">
           <div className="spinner" />
@@ -1076,7 +1532,7 @@ export default function App() {
       )}
       <footer className="status-bar">
         <span className="status-left">
-          <span className="offline-dot" />
+          <span className={`live-dot ${remote.listening ? "is-online" : ""}`} />
           {t(
             active?.archive
               ? "archivedSession"

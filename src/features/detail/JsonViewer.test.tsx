@@ -63,6 +63,14 @@ it("defaults to lossless formatted JSON and searches keys and values with wrappi
   expect(container.querySelector("pre")?.textContent).toContain(
     "900719925474099312345",
   );
+  // 合法 JSON 应渲染语义着色标签，同时不破坏搜索与文本内容
+  expect(container.querySelector(".json-tok-key")?.textContent).toBe('"id"');
+  expect(container.querySelector(".json-tok-number")?.textContent).toBe(
+    "900719925474099312345",
+  );
+  expect(container.querySelector(".json-tok-string")?.textContent).toBe(
+    '"hello"',
+  );
   const input = screen.getByRole("searchbox", { name: "搜索正文" });
   fireEvent.change(input, { target: { value: "hello" } });
   await screen.findByText("1/2");

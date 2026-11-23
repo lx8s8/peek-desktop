@@ -310,19 +310,21 @@ export function DiagnosticsTable({
   return (
     <div className="diagnostics-console">
       <div className="diagnostic-filters">
-        <select
-          aria-label={t("diagnosticRun")}
-          value={run.id}
-          onChange={(event) =>
-            onViewChange({ runId: event.target.value, fingerprint: null })
-          }
-        >
-          {runs.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.runId} · {t(item.online ? "connected" : "disconnected")}
-            </option>
-          ))}
-        </select>
+        {runs.length > 1 && (
+          <select
+            aria-label={t("diagnosticRun")}
+            value={run.id}
+            onChange={(event) =>
+              onViewChange({ runId: event.target.value, fingerprint: null })
+            }
+          >
+            {runs.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.runId} · {t(item.online ? "connected" : "disconnected")}
+              </option>
+            ))}
+          </select>
+        )}
         <div>
           <input
             data-search
@@ -351,37 +353,50 @@ export function DiagnosticsTable({
             ))}
           </select>
         </div>
-        <div className="facet-filters">
-          {(
-            [
-              ["source", "sources", "allSources"],
-              ["tag", "tags", "allTags"],
-              ["emitter", "emitters", "allEmitters"],
-            ] as const
-          ).map(([field, facet, label]) => (
-            <select
-              key={field}
-              aria-label={t(field)}
-              value={view[field]}
-              onChange={(event) =>
-                onViewChange({ [field]: event.target.value })
-              }
-            >
-              <option value="">{t(label)}</option>
-              {view[field] && !page.facets[facet].includes(view[field]) && (
-                <option value={view[field]}>{view[field]}</option>
-              )}
-              {page.facets[facet].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          ))}
-        </div>
-        {page.facets.limited && (
-          <small className="muted">{t("facetLimit")}</small>
-        )}
+        <details
+          className="facet-disclosure"
+          open={!!(view.source || view.tag || view.emitter)}
+        >
+          <summary>
+            {t("advancedFilters")}
+            {!!(view.source || view.tag || view.emitter) && (
+              <span className="filter-count-pill">
+                {[view.source, view.tag, view.emitter].filter(Boolean).length}
+              </span>
+            )}
+          </summary>
+          <div className="facet-filters">
+            {(
+              [
+                ["source", "sources", "allSources"],
+                ["tag", "tags", "allTags"],
+                ["emitter", "emitters", "allEmitters"],
+              ] as const
+            ).map(([field, facet, label]) => (
+              <select
+                key={field}
+                aria-label={t(field)}
+                value={view[field]}
+                onChange={(event) =>
+                  onViewChange({ [field]: event.target.value })
+                }
+              >
+                <option value="">{t(label)}</option>
+                {view[field] && !page.facets[facet].includes(view[field]) && (
+                  <option value={view[field]}>{view[field]}</option>
+                )}
+                {page.facets[facet].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+          {page.facets.limited && (
+            <small className="muted">{t("facetLimit")}</small>
+          )}
+        </details>
         <div className="review-actions">
           {exceptions && (
             <label className="checkbox-label">

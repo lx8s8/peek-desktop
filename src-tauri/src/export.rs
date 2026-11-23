@@ -128,7 +128,13 @@ fn entry(raw: &str) -> Result<Value> {
 }
 pub fn har(path: &Path, session: &Session) -> Result<()> {
     atomic(path, |writer| {
-        writer.write_all(br#"{"log":{"version":"1.2","creator":{"name":"Peek Desktop","version":"0.1.0"},"entries":["#).map_err(|e|e.to_string())?;
+        let creator = format!(
+            "{{\"log\":{{\"version\":\"1.2\",\"creator\":{{\"name\":\"Peek Desktop\",\"version\":\"{}\"}},\"entries\":[",
+            env!("CARGO_PKG_VERSION")
+        );
+        writer
+            .write_all(creator.as_bytes())
+            .map_err(|e| e.to_string())?;
         for (index, stored) in session.entries.iter().enumerate() {
             if index > 0 {
                 writer.write_all(b",").map_err(|e| e.to_string())?;
@@ -222,6 +228,126 @@ pub fn curl(raw: &str) -> Result<String> {
         _ => return Err("curlUnsupported".into()),
     }
     let text = args.join(" ");
+    if text.len() > 1024 * 1024 {
+        return Err("selectionTooLarge".into());
+    }
+    Ok(text)
+}
+
+fn dart_string(text: &str) -> String {
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('$', "\\$")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r");
+    format!("'{escaped}'")
+}
+
+/// 生成可直接粘贴到 Flutter 项目的 Dart Dio 请求代码。
+pub fn dart_dio(raw: &str) -> Result<String> {
+    let entry: Value = serde_json::from_str(raw).map_err(|_| "invalidEntry")?;
+    let request = &entry["request"];
+    let url = request["url"].as_str().ok_or("invalidEntry")?;
+    let method = request["method"].as_str().ok_or("invalidEntry")?;
+    let parsed = url::Url::parse(url).map_err(|_| "curlUnsupported")?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("curlUnsupported".into());
+    }
+
+    let mut out = String::new();
+    out.push_str("final response = await dio.request(\n");
+    out.push_str(&format!("  {},\n", dart_string(url)));
+    out.push_str("  options: Options(\n");
+    out.push_str(&format!("    method: {},\n", dart_string(method)));
+
+    let header_pairs: Vec<(&str, &str)> = request["headers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| Some((p[0].as_str()?, p[1].as_str()?)))
+        .filter(|(k, _)| !k.starts_with(':'))
+        .collect();
+    if !header_pairs.is_empty() {
+        out.push_str("    headers: {\n");
+        for (name, val) in header_pairs {
+            out.push_str(&format!(
+                "      {}: {},\n",
+                dart_string(name),
+                dart_string(val)
+            ));
+        }
+        out.push_str("    },\n");
+    }
+    out.push_str("  ),\n");
+
+    let body = &request["body"];
+    if body["kind"].as_str() == Some("text")
+        && let Some(text) = body["text"].as_str()
+        && !text.is_empty()
+    {
+        if let Ok(json_val) = serde_json::from_str::<Value>(text)
+            && let Ok(pretty) = serde_json::to_string_pretty(&json_val)
+        {
+            let indented = pretty
+                .lines()
+                .enumerate()
+                .map(|(i, l)| {
+                    if i == 0 {
+                        l.to_string()
+                    } else {
+                        format!("  {l}")
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            out.push_str(&format!("  data: {indented},\n"));
+        } else {
+            out.push_str(&format!("  data: {},\n", dart_string(text)));
+        }
+    }
+    out.push_str(");");
+    if out.len() > 1024 * 1024 {
+        return Err("selectionTooLarge".into());
+    }
+    Ok(out)
+}
+
+/// 生成标准 JavaScript Fetch 请求代码。
+pub fn fetch_js(raw: &str) -> Result<String> {
+    let entry: Value = serde_json::from_str(raw).map_err(|_| "invalidEntry")?;
+    let request = &entry["request"];
+    let url = request["url"].as_str().ok_or("invalidEntry")?;
+    let method = request["method"].as_str().ok_or("invalidEntry")?;
+    let parsed = url::Url::parse(url).map_err(|_| "curlUnsupported")?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("curlUnsupported".into());
+    }
+
+    let mut headers_obj = serde_json::Map::new();
+    for pair in request["headers"].as_array().into_iter().flatten() {
+        if let (Some(k), Some(v)) = (pair[0].as_str(), pair[1].as_str())
+            && !k.starts_with(':')
+        {
+            headers_obj.insert(k.to_string(), Value::String(v.to_string()));
+        }
+    }
+    let mut init = serde_json::Map::new();
+    init.insert("method".into(), Value::String(method.to_string()));
+    if !headers_obj.is_empty() {
+        init.insert("headers".into(), Value::Object(headers_obj));
+    }
+    let body = &request["body"];
+    if body["kind"].as_str() == Some("text")
+        && let Some(text) = body["text"].as_str()
+        && !text.is_empty()
+    {
+        init.insert("body".into(), Value::String(text.to_string()));
+    }
+    let url_json = serde_json::to_string(url).map_err(|e| e.to_string())?;
+    let init_json =
+        serde_json::to_string_pretty(&Value::Object(init)).map_err(|e| e.to_string())?;
+    let text = format!("const response = await fetch({url_json}, {init_json});");
     if text.len() > 1024 * 1024 {
         return Err("selectionTooLarge".into());
     }

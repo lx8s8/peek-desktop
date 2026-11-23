@@ -143,6 +143,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
         item("view.logs"),
         item("view.exceptions"),
         item("view.timeline"),
+        item("view.stream"),
         separator(),
         item("view.follow"),
         item("view.theme"),

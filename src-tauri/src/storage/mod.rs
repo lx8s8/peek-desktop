@@ -45,3 +45,17 @@ pub fn save_diagnostics(path: &Path, records: &[std::sync::Arc<str>]) -> Result<
     temp.persist(path).map_err(|e| e.error.to_string())?;
     Ok(())
 }
+
+/// 将控制台日志流快照原子写入目标文本文件。
+pub fn save_stream(path: &Path, snapshot: &crate::stream::StreamSnapshot) -> Result<()> {
+    let parent = path.parent().ok_or("invalidPath")?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+    {
+        let mut writer = BufWriter::new(temp.as_file_mut());
+        snapshot.write_all(&mut writer)?;
+        writer.flush().map_err(|e| e.to_string())?;
+    }
+    temp.as_file().sync_all().map_err(|e| e.to_string())?;
+    temp.persist(path).map_err(|e| e.error.to_string())?;
+    Ok(())
+}

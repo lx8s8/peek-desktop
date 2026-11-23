@@ -11,7 +11,14 @@ import { api } from "../../lib/ipc/client";
 import type { BodyView, EntryRow } from "../../lib/ipc/types";
 
 vi.mock("../../lib/ipc/client", () => ({
-  api: { metadata: vi.fn(), body: vi.fn(), entryInfo: vi.fn() },
+  desktop: true,
+  api: {
+    metadata: vi.fn(),
+    body: vi.fn(),
+    entryInfo: vi.fn(),
+    copyCurl: vi.fn(),
+    writeClipboard: vi.fn(async () => {}),
+  },
 }));
 vi.mock("./JsonViewer", () => ({
   JsonViewer: ({ text }: { text: string }) => <pre>{text}</pre>,

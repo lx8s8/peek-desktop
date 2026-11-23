@@ -182,6 +182,19 @@ impl Remote {
             .row
             .clone())
     }
+
+    /// 切换实时会话中某条网络请求的固定状态，并触发视图版本刷新。
+    pub fn toggle_pin(&self, id: &str, entry: &str) -> Result<bool> {
+        let pinned = {
+            let mut store = self.store.lock().map_err(|_| "internalError")?;
+            let session = store.sessions.get_mut(id).ok_or("sessionNotFound")?;
+            let pinned = session.current.toggle_pin(entry)?;
+            session.version += 1;
+            pinned
+        };
+        self.changed();
+        Ok(pinned)
+    }
     pub fn export(&self, id: &str) -> Result<Arc<Session>> {
         Ok(Arc::new(
             self.store
