@@ -204,13 +204,29 @@ impl Pairing {
             return Err("protocolVersion".into());
         }
         if let Some(token) = token {
-            return self
-                .device_for_token(token, false)
-                .map(|id| Authorization {
-                    device_id: id,
-                    issued_token: None,
-                })
-                .ok_or_else(|| "token".into());
+            let Some(id) = self.device_for_token(token, false) else {
+                return Err("token".into());
+            };
+            // 已配对设备在 App 端修改名称或切为真实机型重连时，同步刷新已配对设备列表里的展示名称
+            if !name.trim().is_empty() {
+                let normalized = display_name(name);
+                if self
+                    .registry
+                    .devices
+                    .iter()
+                    .any(|d| d.id == id && d.name != normalized)
+                {
+                    let mut next = self.registry.clone();
+                    if let Some(dev) = next.devices.iter_mut().find(|d| d.id == id) {
+                        dev.name = normalized;
+                    }
+                    let _ = self.commit(next);
+                }
+            }
+            return Ok(Authorization {
+                device_id: id,
+                issued_token: None,
+            });
         }
         let Some(attempt) = code else {
             return Err("token".into());
@@ -377,5 +393,23 @@ mod tests {
         assert!(pairing.info(100).code.is_some());
         vault.fail.store(false, Ordering::Relaxed);
         assert!(pairing.authorize(1, None, Some(&code), "App", 100).is_ok());
+    }
+    #[test]
+    fn reconnect_updates_device_name_when_app_renames() {
+        let vault = Arc::new(Vault::default());
+        let mut pairing = Pairing::load(vault).unwrap();
+        pairing.issue_code(true, 100).unwrap();
+        let code = pairing.info(100).code.unwrap();
+        let first = pairing
+            .authorize(1, None, Some(&code), "Demo App", 100)
+            .unwrap();
+        let token = first.issued_token.unwrap();
+        assert_eq!(pairing.info(101).devices[0].name, "Demo App");
+
+        let second = pairing
+            .authorize(1, Some(&token), None, "iPhone 16 Pro", 102)
+            .unwrap();
+        assert_eq!(second.device_id, first.device_id);
+        assert_eq!(pairing.info(103).devices[0].name, "iPhone 16 Pro");
     }
 }

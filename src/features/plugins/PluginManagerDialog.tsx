@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Check,
@@ -405,7 +406,7 @@ export function PluginManagerDialog({
     return <HardDrive size={14} />;
   }
 
-  return (
+  return createPortal(
     <div
       className="dialog-backdrop"
       role="dialog"
@@ -1226,6 +1227,7 @@ export function PluginManagerDialog({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -264,6 +264,19 @@ export const reviewZh = {
   pluginFetchUrlAction: "拉取配置并预览",
   pluginFetchingUrl: "正在拉取…",
   pluginServiceReady: "服务在线，已索引 {{count}} 个构建符号",
+  deviceAliasAction: "备注",
+  deviceAliasTitle: "设置设备名称 / 备注",
+  deviceAliasHint:
+    "在桌面端为该测试机添加自定义备注（仅保存在本机，不影响其他电脑）；留空保存将恢复显示设备上报名称。",
+  deviceAliasPlaceholder: "例如：测试机 03 · 联调账号",
+  deviceAliasReported: "设备上报名称",
+  deviceAliasReset: "恢复默认",
+  deviceAliasSave: "保存备注",
+  dialogMaximize: "全屏展开",
+  dialogRestore: "还原窗口大小",
+  replayTabRequest: "请求编辑",
+  replayTabResponse: "响应结果",
+  replayInMenu: "重发请求…",
 };
 export const reviewEn: Record<keyof typeof reviewZh, string> = {
   diagnosticsLive: "Diagnostics online",
@@ -538,4 +551,17 @@ export const reviewEn: Record<keyof typeof reviewZh, string> = {
   pluginFetchUrlAction: "Fetch & preview",
   pluginFetchingUrl: "Fetching…",
   pluginServiceReady: "Online · {{count}} builds indexed",
+  deviceAliasAction: "Rename",
+  deviceAliasTitle: "Set device alias / note",
+  deviceAliasHint:
+    "Add a local note for this test device on this computer. Leave empty to show the device's reported name.",
+  deviceAliasPlaceholder: "e.g. QA Phone 03 · Staging",
+  deviceAliasReported: "Reported by device",
+  deviceAliasReset: "Reset",
+  deviceAliasSave: "Save",
+  dialogMaximize: "Maximize",
+  dialogRestore: "Restore size",
+  replayTabRequest: "Request",
+  replayTabResponse: "Response",
+  replayInMenu: "Replay request…",
 };

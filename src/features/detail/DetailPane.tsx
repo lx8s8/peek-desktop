@@ -95,11 +95,13 @@ export function DetailPane({
   entry: selected,
   version,
   theme,
+  onReplay,
 }: {
   sessionId: string | null;
   entry: EntryRow | null;
   theme: string;
   version?: number;
+  onReplay?: (entry: EntryRow, metadata: string) => void;
 }) {
   const { t } = useTranslation();
   const [liveEntry, setLiveEntry] = useState<{
@@ -341,7 +343,13 @@ export function DetailPane({
                 <Button
                   size="sm"
                   variant="default"
-                  onClick={() => setReplayOpen(true)}
+                  onClick={() => {
+                    if (onReplay) {
+                      onReplay(entry, metadata);
+                    } else {
+                      setReplayOpen(true);
+                    }
+                  }}
                   title={t("replayRequest")}
                 >
                   <Play size={11} />

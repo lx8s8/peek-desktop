@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   flexRender,
   getCoreRowModel,
@@ -13,6 +14,7 @@ import {
   Filter as FilterIcon,
   GitCompareArrows,
   Pin,
+  Play,
   SearchX,
   Terminal,
   TerminalSquare,
@@ -72,6 +74,7 @@ export function RequestTable({
   onFilterHost,
   onExcludePath,
   onLocateInStream,
+  onReplay,
   onSetCompareAnchor,
   onCompareWithAnchor,
   onCopyAction,
@@ -94,6 +97,7 @@ export function RequestTable({
   onFilterHost?: (host: string) => void;
   onExcludePath?: (pattern: string) => void;
   onLocateInStream?: (entry: EntryRow) => void;
+  onReplay?: (entry: EntryRow) => void;
   onSetCompareAnchor?: (entry: EntryRow) => void;
   onCompareWithAnchor?: (entry: EntryRow) => void;
   onCopyAction?: (entry: EntryRow, kind: RequestCopyKind) => void;
@@ -496,139 +500,154 @@ export function RequestTable({
         )}
       </div>
 
-      {menu && menuParts && (
-        <div
-          className="req-context-menu"
-          style={{ left: menu.x, top: menu.y }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          {onPinToggle && (
-            <button
-              type="button"
-              onClick={() => {
-                onPinToggle(menu.entry);
-                setMenu(null);
-              }}
-            >
-              <Pin size={13} />
-              {t(menu.entry.pinned ? "unpinRequest" : "pinRequest")}
-            </button>
-          )}
-          {onLocateInStream && (
-            <button
-              type="button"
-              onClick={() => {
-                onLocateInStream(menu.entry);
-                setMenu(null);
-              }}
-            >
-              <Terminal size={13} />
-              {t("locateInConsole")}
-            </button>
-          )}
-          <div className="req-menu-sep" />
-          {onCopyAction && (
-            <>
+      {menu &&
+        menuParts &&
+        createPortal(
+          <div
+            className="req-context-menu"
+            style={{ left: menu.x, top: menu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {onReplay && (
               <button
                 type="button"
                 onClick={() => {
-                  onCopyAction(menu.entry, "url");
+                  onReplay(menu.entry);
                   setMenu(null);
                 }}
               >
-                <Copy size={13} />
-                {t("copyUrl")}
+                <Play size={13} />
+                {t("replayInMenu")}
               </button>
+            )}
+            {onPinToggle && (
               <button
                 type="button"
                 onClick={() => {
-                  onCopyAction(menu.entry, "curl");
+                  onPinToggle(menu.entry);
                   setMenu(null);
                 }}
               >
-                <TerminalSquare size={13} />
-                {t("copyCurl")}
+                <Pin size={13} />
+                {t(menu.entry.pinned ? "unpinRequest" : "pinRequest")}
               </button>
+            )}
+            {onLocateInStream && (
               <button
                 type="button"
                 onClick={() => {
-                  onCopyAction(menu.entry, "dio");
+                  onLocateInStream(menu.entry);
                   setMenu(null);
                 }}
               >
-                <Code2 size={13} />
-                {t("copyDartDio")}
+                <Terminal size={13} />
+                {t("locateInConsole")}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onCopyAction(menu.entry, "body");
-                  setMenu(null);
-                }}
-              >
-                <Copy size={13} />
-                {t("copyResponseBody")}
-              </button>
-            </>
-          )}
-          <div className="req-menu-sep" />
-          {onFilterHost && menuParts.host && (
-            <button
-              type="button"
-              onClick={() => {
-                onFilterHost(menuParts.host);
-                setMenu(null);
-              }}
-            >
-              <FilterIcon size={13} />
-              {t("onlyThisHost")} ({menuParts.host})
-            </button>
-          )}
-          {onExcludePath && menuParts.pathname && (
-            <button
-              type="button"
-              onClick={() => {
-                onExcludePath(menuParts.pathname);
-                setMenu(null);
-              }}
-            >
-              <EyeOff size={13} />
-              {t("hideThisPath")}
-            </button>
-          )}
-          {(onSetCompareAnchor || onCompareWithAnchor) && (
-            <>
-              <div className="req-menu-sep" />
-              {onSetCompareAnchor && (
+            )}
+            <div className="req-menu-sep" />
+            {onCopyAction && (
+              <>
                 <button
                   type="button"
                   onClick={() => {
-                    onSetCompareAnchor(menu.entry);
+                    onCopyAction(menu.entry, "url");
                     setMenu(null);
                   }}
                 >
-                  <GitCompareArrows size={13} />
-                  {t("setCompareBaseline")}
+                  <Copy size={13} />
+                  {t("copyUrl")}
                 </button>
-              )}
-              {onCompareWithAnchor &&
-                compareAnchor &&
-                compareAnchor.id !== menu.entry.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCopyAction(menu.entry, "curl");
+                    setMenu(null);
+                  }}
+                >
+                  <TerminalSquare size={13} />
+                  {t("copyCurl")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCopyAction(menu.entry, "dio");
+                    setMenu(null);
+                  }}
+                >
+                  <Code2 size={13} />
+                  {t("copyDartDio")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCopyAction(menu.entry, "body");
+                    setMenu(null);
+                  }}
+                >
+                  <Copy size={13} />
+                  {t("copyResponseBody")}
+                </button>
+              </>
+            )}
+            <div className="req-menu-sep" />
+            {onFilterHost && menuParts.host && (
+              <button
+                type="button"
+                onClick={() => {
+                  onFilterHost(menuParts.host);
+                  setMenu(null);
+                }}
+              >
+                <FilterIcon size={13} />
+                {t("onlyThisHost")} ({menuParts.host})
+              </button>
+            )}
+            {onExcludePath && menuParts.pathname && (
+              <button
+                type="button"
+                onClick={() => {
+                  onExcludePath(menuParts.pathname);
+                  setMenu(null);
+                }}
+              >
+                <EyeOff size={13} />
+                {t("hideThisPath")}
+              </button>
+            )}
+            {(onSetCompareAnchor || onCompareWithAnchor) && (
+              <>
+                <div className="req-menu-sep" />
+                {onSetCompareAnchor && (
                   <button
                     type="button"
                     onClick={() => {
-                      onCompareWithAnchor(menu.entry);
+                      onSetCompareAnchor(menu.entry);
                       setMenu(null);
                     }}
                   >
                     <GitCompareArrows size={13} />
-                    {t("compareWithBaseline")}
+                    {t("setCompareBaseline")}
                   </button>
                 )}
-            </>
-          )}
-        </div>
-      )}
+                {onCompareWithAnchor &&
+                  compareAnchor &&
+                  compareAnchor.id !== menu.entry.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCompareWithAnchor(menu.entry);
+                        setMenu(null);
+                      }}
+                    >
+                      <GitCompareArrows size={13} />
+                      {t("compareWithBaseline")}
+                    </button>
+                  )}
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

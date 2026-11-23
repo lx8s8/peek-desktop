@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitCompareArrows, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { GitCompareArrows, Maximize2, Minimize2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api } from "../../lib/ipc/client";
@@ -122,6 +123,7 @@ export function RequestDiffDialog({
   const [loading, setLoading] = useState(true);
   const [leftData, setLeftData] = useState<LoadedSide | null>(null);
   const [rightData, setRightData] = useState<LoadedSide | null>(null);
+  const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -195,7 +197,7 @@ export function RequestDiffDialog({
 
   const changedCount = activeRows.filter((r) => r.status !== "equal").length;
 
-  return (
+  return createPortal(
     <div
       className="dialog-backdrop"
       onMouseDown={(e) => {
@@ -203,7 +205,7 @@ export function RequestDiffDialog({
       }}
     >
       <section
-        className="diff-dialog"
+        className={`diff-dialog ${maximized ? "is-maximized" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={t("diffTitle")}
@@ -213,14 +215,25 @@ export function RequestDiffDialog({
             <GitCompareArrows size={16} />
             <h2>{t("diffTitle")}</h2>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t("dismiss")}
-            onClick={onClose}
-          >
-            <X />
-          </Button>
+          <div className="replay-header-actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={maximized ? t("dialogRestore") : t("dialogMaximize")}
+              title={maximized ? t("dialogRestore") : t("dialogMaximize")}
+              onClick={() => setMaximized((value) => !value)}
+            >
+              {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("dismiss")}
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          </div>
         </header>
 
         <div className="diff-summary-cards">
@@ -302,6 +315,7 @@ export function RequestDiffDialog({
           )}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

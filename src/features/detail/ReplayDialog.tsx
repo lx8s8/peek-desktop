@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Play, Plus, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Maximize2, Minimize2, Play, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api } from "../../lib/ipc/client";
@@ -9,56 +10,71 @@ import { JsonViewer } from "./JsonViewer";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
+function parseRequestHeaders(metadata: string): [string, string][] {
+  if (!metadata) return [];
+  try {
+    const parsed = JSON.parse(metadata);
+    return Array.isArray(parsed?.request?.headers)
+      ? parsed.request.headers
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
- * 桌面端请求重放弹窗：
- * 自动载入当前抓包请求的 Method / URL / Headers / Body，支持编辑后直接发送并彩色预览最新响应。
+ * 桌面端请求重放独立居中弹窗：
+ * - 通过 React Portal 挂载到 document.body，避免被详情侧栏的 content-visibility 裁切；
+ * - 支持一键全屏展开与笔记本窄屏「请求编辑 / 响应结果」切换，确保小屏完整可用。
  */
 export function ReplayDialog({
   sessionId,
   entry,
-  metadata,
+  metadata = "",
   theme,
   onClose,
 }: {
   sessionId: string;
   entry: EntryRow;
-  metadata: string;
+  metadata?: string;
   theme: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [method, setMethod] = useState(entry.method.toUpperCase());
   const [url, setUrl] = useState(entry.url);
-  const [headers, setHeaders] = useState<[string, string][]>(() => {
-    try {
-      const parsed = JSON.parse(metadata);
-      return Array.isArray(parsed?.request?.headers)
-        ? parsed.request.headers
-        : [];
-    } catch {
-      return [];
-    }
-  });
+  const [headers, setHeaders] = useState<[string, string][]>(() =>
+    parseRequestHeaders(metadata),
+  );
   const [body, setBody] = useState("");
   const [loadingBody, setLoadingBody] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState<ReplayResponse | null>(null);
+  const [maximized, setMaximized] = useState(false);
+  const [compactTab, setCompactTab] = useState<"request" | "response">(
+    "request",
+  );
 
-  // 初始化时尝试拉取原始请求体作为可编辑初值
+  // 初始化时拉取原始请求体；若调用方未预传 metadata（例如从列表右键打开），同时拉取请求头
   useEffect(() => {
     let active = true;
     setLoadingBody(true);
-    void api
-      .body(sessionId, entry.id, "request")
-      .then((view) => {
+    const metaTask = metadata
+      ? Promise.resolve(metadata)
+      : api.metadata(sessionId, entry.id).catch(() => "");
+    void Promise.all([
+      metaTask,
+      api.body(sessionId, entry.id, "request").catch(() => null),
+    ])
+      .then(([loadedMeta, view]) => {
         if (!active) return;
-        if (view.kind === "text" || view.kind === "form") {
+        if (!metadata && loadedMeta) {
+          setHeaders(parseRequestHeaders(loadedMeta));
+        }
+        if (view && (view.kind === "text" || view.kind === "form")) {
           setBody(view.text);
         }
-      })
-      .catch(() => {
-        /* 无请求体或远端不可用时留空 */
       })
       .finally(() => {
         if (active) setLoadingBody(false);
@@ -66,7 +82,7 @@ export function ReplayDialog({
     return () => {
       active = false;
     };
-  }, [sessionId, entry.id]);
+  }, [sessionId, entry.id, metadata]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -88,14 +104,16 @@ export function ReplayDialog({
         body: body.length > 0 ? body : null,
       });
       setResponse(result);
+      setCompactTab("response");
     } catch (e) {
       setError(String(e));
+      setCompactTab("response");
     } finally {
       setSending(false);
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="dialog-backdrop"
       onMouseDown={(event) => {
@@ -103,21 +121,39 @@ export function ReplayDialog({
       }}
     >
       <section
-        className="replay-dialog"
+        className={`replay-dialog ${maximized ? "is-maximized" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={t("replayRequest")}
       >
         <header className="replay-header">
-          <h2>{t("replayRequest")}</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t("dismiss")}
-            onClick={onClose}
-          >
-            <X />
-          </Button>
+          <div className="diff-title-row">
+            <h2>{t("replayRequest")}</h2>
+            <span
+              className={`method-pill method method-${method.toLowerCase()}`}
+            >
+              {method}
+            </span>
+          </div>
+          <div className="replay-header-actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={maximized ? t("dialogRestore") : t("dialogMaximize")}
+              title={maximized ? t("dialogRestore") : t("dialogMaximize")}
+              onClick={() => setMaximized((value) => !value)}
+            >
+              {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("dismiss")}
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          </div>
         </header>
 
         <div className="replay-url-row">
@@ -147,7 +183,32 @@ export function ReplayDialog({
           </Button>
         </div>
 
-        <div className="replay-split">
+        {/* 笔记本或较窄窗口下提供清晰的双 Tab 切换，避免左右并排过窄 */}
+        <div className="replay-compact-tabs">
+          <div className="segmented" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={compactTab === "request"}
+              className={compactTab === "request" ? "active" : ""}
+              onClick={() => setCompactTab("request")}
+            >
+              {t("replayTabRequest")} ({headers.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={compactTab === "response"}
+              className={compactTab === "response" ? "active" : ""}
+              onClick={() => setCompactTab("response")}
+            >
+              {t("replayTabResponse")}
+              {response ? ` · ${response.status}` : ""}
+            </button>
+          </div>
+        </div>
+
+        <div className={`replay-split compact-${compactTab}`}>
           <div className="replay-editor">
             <div className="replay-subhead">
               <strong>
@@ -261,6 +322,7 @@ export function ReplayDialog({
           </div>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -27,6 +27,7 @@ export function detectAotStack(stackTrace: string): AotStackInfo {
     if (
       line.includes("isolate_instructions:") ||
       line.includes("_kDartIsolateSnapshotInstructions") ||
+      line.includes("_kDartSnapshotText") ||
       line.includes("isolate_dso_base:") ||
       /^#\d+\s+(?:abs|virt)\s+[0-9a-fA-F]+/.test(line)
     ) {

@@ -18,6 +18,7 @@ import {
   Monitor,
   Ellipsis,
   Moon,
+  Pencil,
   Puzzle,
   Radio,
   Save,
@@ -34,6 +35,7 @@ import { useFileOpen } from "./features/files/useFileOpen";
 import { useFileDrop } from "./features/files/useFileDrop";
 import { AboutPanel } from "./features/about/AboutPanel";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
+import { DeviceAliasDialog } from "./features/connection/DeviceAliasDialog";
 import { useWorkspace } from "./features/connection/useWorkspace";
 import {
   DiagnosticsTable,
@@ -62,6 +64,7 @@ import {
 import { RequestDiffDialog } from "./features/diff/RequestDiffDialog";
 import { PluginManagerDialog } from "./features/plugins/PluginManagerDialog";
 import { DetailPane } from "./features/detail/DetailPane";
+import { ReplayDialog } from "./features/detail/ReplayDialog";
 import { writeClipboard } from "./lib/clipboard";
 import { api, desktop } from "./lib/ipc/client";
 import type {
@@ -75,7 +78,10 @@ import type {
 } from "./lib/ipc/types";
 import {
   formatBytes,
+  readDeviceAliases,
   readPreference,
+  resolveDeviceDisplay,
+  writeDeviceAlias,
   writePreference,
 } from "./lib/preferences";
 import "./lib/i18n";
@@ -180,6 +186,18 @@ export default function App() {
     sessionId: string;
     left: EntryRow;
     right: EntryRow;
+  } | null>(null);
+  const [replayTarget, setReplayTarget] = useState<{
+    sessionId: string;
+    entry: EntryRow;
+    metadata?: string;
+  } | null>(null);
+  const [deviceAliases, setDeviceAliases] = useState<Record<string, string>>(
+    () => readDeviceAliases(),
+  );
+  const [aliasTarget, setAliasTarget] = useState<{
+    deviceId: string;
+    reportedName: string;
   } | null>(null);
   const [streamLocate, setStreamLocate] = useState<{
     entryId: string;
@@ -755,6 +773,10 @@ export default function App() {
         />
         <ConnectionPanel
           remote={remote}
+          deviceAliases={deviceAliases}
+          onEditDeviceAlias={(deviceId, reportedName) =>
+            setAliasTarget({ deviceId, reportedName })
+          }
           onChange={refresh}
           onError={reportError}
         />
@@ -874,104 +896,134 @@ export default function App() {
             </div>
             <div className="session-list">
               {sessions.length ? (
-                sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    onContextMenu={(event) => {
-                      setIndependent(null);
-                      setActiveId(session.id);
-                      sessionContextMenu(event);
-                    }}
-                    className={`session-item ${session.id === active?.id ? "active" : ""}`}
-                  >
-                    <button
-                      className="session-select"
-                      onClick={() => {
+                sessions.map((session) => {
+                  const reportedName = session.header.name || session.filename;
+                  const display = resolveDeviceDisplay(
+                    session.deviceId,
+                    reportedName,
+                    deviceAliases,
+                  );
+                  return (
+                    <div
+                      key={session.id}
+                      onContextMenu={(event) => {
                         setIndependent(null);
                         setActiveId(session.id);
+                        sessionContextMenu(event);
                       }}
-                      aria-current={
-                        session.id === active?.id ? "true" : undefined
-                      }
+                      className={`session-item ${session.id === active?.id ? "active" : ""}`}
                     >
-                      {session.deviceId ? (
-                        <Monitor size={16} />
-                      ) : (
-                        <FileCode2 size={16} />
-                      )}
-                      <span>
-                        <strong>
-                          {session.header.name || session.filename}
-                        </strong>
-                        {session.archive && (
-                          <small>
-                            {t(
-                              session.archive.recovered
-                                ? "recoveredSession"
-                                : "archivedSession",
-                            )}
-                            {` · ${t("archiveLoss", { dropped: session.archive.dropped, evicted: session.archive.evicted })}`}
-                            {session.archive.syncing
-                              ? ` · ${t("archiveSyncing")}`
-                              : ""}
-                          </small>
+                      <button
+                        className="session-select"
+                        onClick={() => {
+                          setIndependent(null);
+                          setActiveId(session.id);
+                        }}
+                        aria-current={
+                          session.id === active?.id ? "true" : undefined
+                        }
+                      >
+                        {session.deviceId ? (
+                          <Monitor size={16} />
+                        ) : (
+                          <FileCode2 size={16} />
                         )}
-                        <small>
-                          {session.deviceId
-                            ? t(
-                                session.syncing
-                                  ? "syncing"
-                                  : session.online
-                                    ? "connected"
-                                    : "disconnected",
-                              )
-                            : session.header.platform}{" "}
-                          · {session.entryCount.toLocaleString()}{" "}
-                          {t("requests")}
-                          {session.deviceId && (
-                            <>
-                              {" "}
-                              ·{" "}
-                              {t(
-                                session.diagnosticsOnline
-                                  ? "diagnosticsLive"
-                                  : session.diagnosticCount
-                                    ? "diagnosticsRetained"
-                                    : "diagnosticsNotConnected",
-                              )}
-                            </>
+                        <span>
+                          <strong title={display.title}>{display.title}</strong>
+                          {display.subtitle && (
+                            <small
+                              className="session-alias-origin"
+                              title={display.subtitle}
+                            >
+                              {display.subtitle}
+                            </small>
                           )}
-                        </small>
-                      </span>
-                    </button>
-                    <div className="session-item-actions">
-                      {desktop && (
+                          {session.archive && (
+                            <small>
+                              {t(
+                                session.archive.recovered
+                                  ? "recoveredSession"
+                                  : "archivedSession",
+                              )}
+                              {` · ${t("archiveLoss", { dropped: session.archive.dropped, evicted: session.archive.evicted })}`}
+                              {session.archive.syncing
+                                ? ` · ${t("archiveSyncing")}`
+                                : ""}
+                            </small>
+                          )}
+                          <small>
+                            {session.deviceId
+                              ? t(
+                                  session.syncing
+                                    ? "syncing"
+                                    : session.online
+                                      ? "connected"
+                                      : "disconnected",
+                                )
+                              : session.header.platform}{" "}
+                            · {session.entryCount.toLocaleString()}{" "}
+                            {t("requests")}
+                            {session.deviceId && (
+                              <>
+                                {" "}
+                                ·{" "}
+                                {t(
+                                  session.diagnosticsOnline
+                                    ? "diagnosticsLive"
+                                    : session.diagnosticCount
+                                      ? "diagnosticsRetained"
+                                      : "diagnosticsNotConnected",
+                                )}
+                              </>
+                            )}
+                          </small>
+                        </span>
+                      </button>
+                      <div className="session-item-actions">
+                        {session.deviceId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={t("deviceAliasTitle")}
+                            aria-label={`${t("deviceAliasTitle")} ${display.title}`}
+                            onClick={() =>
+                              setAliasTarget({
+                                deviceId: session.deviceId!,
+                                reportedName,
+                              })
+                            }
+                          >
+                            <Pencil size={12} />
+                          </Button>
+                        )}
+                        {desktop && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-haspopup="menu"
+                            aria-label={`${t("menuActions")} ${display.title}`}
+                            onClick={(event) => {
+                              setIndependent(null);
+                              setActiveId(session.id);
+                              sessionContextMenu(event);
+                            }}
+                          >
+                            <Ellipsis />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-haspopup="menu"
-                          aria-label={`${t("menuActions")} ${session.header.name || session.filename}`}
-                          onClick={(event) => {
-                            setIndependent(null);
-                            setActiveId(session.id);
-                            sessionContextMenu(event);
-                          }}
+                          aria-label={`${t("close")} ${session.filename}`}
+                          disabled={session.online || busy || saving}
+                          onClick={() => void close(session.id)}
                         >
-                          <Ellipsis />
+                          <X />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`${t("close")} ${session.filename}`}
-                        disabled={session.online || busy || saving}
-                        onClick={() => void close(session.id)}
-                      >
-                        <X />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="no-files">{t("emptyFiles")}</div>
               )}
@@ -1077,11 +1129,23 @@ export default function App() {
                     ))}
                   </div>
                   <div className="console-bar-meta">
-                    {active && (
-                      <span className="muted filename" title={active.filename}>
-                        {active.filename}
-                      </span>
-                    )}
+                    {active &&
+                      (() => {
+                        const reported = active.header.name || active.filename;
+                        const activeDisplay = resolveDeviceDisplay(
+                          active.deviceId,
+                          reported,
+                          deviceAliases,
+                        );
+                        const label = activeDisplay.subtitle
+                          ? `${activeDisplay.title} (${activeDisplay.subtitle})`
+                          : activeDisplay.title;
+                        return (
+                          <span className="muted filename" title={label}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     <TimeRangeBar
                       range={view.range}
                       onChange={(range) => updateView({ range })}
@@ -1364,6 +1428,12 @@ export default function App() {
                           nonce: Date.now(),
                         });
                       }}
+                      onReplay={
+                        desktop
+                          ? (entry) =>
+                              setReplayTarget({ sessionId: active.id, entry })
+                          : undefined
+                      }
                       onSetCompareAnchor={(entry) =>
                         updateView({ compareAnchor: entry })
                       }
@@ -1479,11 +1549,41 @@ export default function App() {
                     ? view.streamEntry
                     : view.selected
               }
+              onReplay={
+                active?.id
+                  ? (entry, metadata) =>
+                      setReplayTarget({
+                        sessionId: active.id,
+                        entry,
+                        metadata,
+                      })
+                  : undefined
+              }
               theme={theme}
             />
           )}
         </Panel>
       </Group>
+      {replayTarget && (
+        <ReplayDialog
+          sessionId={replayTarget.sessionId}
+          entry={replayTarget.entry}
+          metadata={replayTarget.metadata}
+          theme={theme}
+          onClose={() => setReplayTarget(null)}
+        />
+      )}
+      {aliasTarget && (
+        <DeviceAliasDialog
+          deviceId={aliasTarget.deviceId}
+          reportedName={aliasTarget.reportedName}
+          initialAlias={deviceAliases[aliasTarget.deviceId] ?? ""}
+          onSave={(deviceId, alias) =>
+            setDeviceAliases((prev) => writeDeviceAlias(prev, deviceId, alias))
+          }
+          onClose={() => setAliasTarget(null)}
+        />
+      )}
       {diffPair && (
         <RequestDiffDialog
           sessionId={diffPair.sessionId}

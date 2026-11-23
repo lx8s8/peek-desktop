@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
@@ -178,119 +179,123 @@ export function FileTools({
         {t("fileTools")}
         {recovery?.pending ? ` · ${t("recoveryTitle")}` : ""}
       </Button>
-      {open && (
-        <div
-          className="dialog-backdrop"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
-          }}
-        >
-          <section
-            className="connection-dialog file-tools"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("fileTools")}
-            ref={dialog}
+      {open &&
+        createPortal(
+          <div
+            className="dialog-backdrop"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
           >
-            <header>
-              <h2>{t("fileTools")}</h2>
-              <Button
-                autoFocus
-                variant="ghost"
-                size="icon"
-                aria-label={t("dismiss")}
-                onClick={() => setOpen(false)}
-              >
-                <X />
-              </Button>
-            </header>
-            <p className="muted">{t("exportBounds")}</p>
-            {feedback && (
-              <p role={feedback.error ? "alert" : "status"}>{feedback.text}</p>
-            )}
-            <div className="file-actions">
-              <Button
-                disabled={!networkId || busy}
-                onClick={() => commands.dispatch("export.har")}
-              >
-                {t("exportHar")}
-              </Button>
-              <Button
-                disabled={!hasLogs || busy}
-                onClick={() => commands.dispatch("export.logs")}
-              >
-                {t("exportAllLogs")}
-              </Button>
-              <Button
-                disabled={!hasLogs || busy}
-                onClick={() => commands.dispatch("export.text")}
-              >
-                {t("exportLogText")}
-              </Button>
-              <Button
-                disabled={!entryId || busy}
-                onClick={() => commands.dispatch("edit.copyCurl")}
-              >
-                {t("copyCurl")}
-              </Button>
-            </div>
-            <h3>{t("recoveryTitle")}</h3>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={recovery?.enabled ?? false}
-                disabled={busy || !recovery}
-                onChange={(event) => {
-                  const enabled = event.target.checked;
-                  void act(async () =>
-                    publishRecovery(await api.setRecoveryEnabled(enabled)),
-                  );
-                }}
-              />
-              {t("enableRecovery")}
-            </label>
-            <p className="muted">{t("recoveryHint")}</p>
-            {recovery?.pending && <p role="status">{t("pendingRecovery")}</p>}
-            {recovery?.error && <p role="alert">{t(recovery.error)}</p>}
-            <p className="muted">
-              {recovery?.updatedAt
-                ? t("recoveryInfo", {
-                    size: formatBytes(recovery.bytes),
-                    time: new Date(recovery.updatedAt * 1000).toLocaleString(
-                      i18n.language,
-                    ),
-                  })
-                : t("recoveryNotSaved")}
-            </p>
-            <div className="file-actions">
-              <Button
-                disabled={!recovery?.pending || busy}
-                onClick={() => commands.dispatch("recovery.restore")}
-              >
-                {t("restoreWorkspace")}
-              </Button>
-              <Button
-                disabled={!hasData || !recovery || recovery.pending || busy}
-                onClick={() => commands.dispatch("recovery.save")}
-              >
-                {t("saveRecovery")}
-              </Button>
-              {recovery?.pending && (
+            <section
+              className="connection-dialog file-tools"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("fileTools")}
+              ref={dialog}
+            >
+              <header>
+                <h2>{t("fileTools")}</h2>
                 <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () =>
-                      publishRecovery(await api.startNewRecovery()),
-                    )
-                  }
+                  autoFocus
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("dismiss")}
+                  onClick={() => setOpen(false)}
                 >
-                  {t("startNewRecovery")}
+                  <X />
                 </Button>
+              </header>
+              <p className="muted">{t("exportBounds")}</p>
+              {feedback && (
+                <p role={feedback.error ? "alert" : "status"}>
+                  {feedback.text}
+                </p>
               )}
-            </div>
-          </section>
-        </div>
-      )}
+              <div className="file-actions">
+                <Button
+                  disabled={!networkId || busy}
+                  onClick={() => commands.dispatch("export.har")}
+                >
+                  {t("exportHar")}
+                </Button>
+                <Button
+                  disabled={!hasLogs || busy}
+                  onClick={() => commands.dispatch("export.logs")}
+                >
+                  {t("exportAllLogs")}
+                </Button>
+                <Button
+                  disabled={!hasLogs || busy}
+                  onClick={() => commands.dispatch("export.text")}
+                >
+                  {t("exportLogText")}
+                </Button>
+                <Button
+                  disabled={!entryId || busy}
+                  onClick={() => commands.dispatch("edit.copyCurl")}
+                >
+                  {t("copyCurl")}
+                </Button>
+              </div>
+              <h3>{t("recoveryTitle")}</h3>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={recovery?.enabled ?? false}
+                  disabled={busy || !recovery}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    void act(async () =>
+                      publishRecovery(await api.setRecoveryEnabled(enabled)),
+                    );
+                  }}
+                />
+                {t("enableRecovery")}
+              </label>
+              <p className="muted">{t("recoveryHint")}</p>
+              {recovery?.pending && <p role="status">{t("pendingRecovery")}</p>}
+              {recovery?.error && <p role="alert">{t(recovery.error)}</p>}
+              <p className="muted">
+                {recovery?.updatedAt
+                  ? t("recoveryInfo", {
+                      size: formatBytes(recovery.bytes),
+                      time: new Date(recovery.updatedAt * 1000).toLocaleString(
+                        i18n.language,
+                      ),
+                    })
+                  : t("recoveryNotSaved")}
+              </p>
+              <div className="file-actions">
+                <Button
+                  disabled={!recovery?.pending || busy}
+                  onClick={() => commands.dispatch("recovery.restore")}
+                >
+                  {t("restoreWorkspace")}
+                </Button>
+                <Button
+                  disabled={!hasData || !recovery || recovery.pending || busy}
+                  onClick={() => commands.dispatch("recovery.save")}
+                >
+                  {t("saveRecovery")}
+                </Button>
+                {recovery?.pending && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () =>
+                        publishRecovery(await api.startNewRecovery()),
+                      )
+                    }
+                  >
+                    {t("startNewRecovery")}
+                  </Button>
+                )}
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
