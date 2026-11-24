@@ -1,16 +1,116 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, Minimize2, Play, Plus, Trash2, X } from "lucide-react";
+import {
+  Braces,
+  Check,
+  Copy,
+  Maximize2,
+  Minimize2,
+  Play,
+  Plus,
+  Repeat,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
+import { writeClipboard } from "../../lib/clipboard";
 import { api } from "../../lib/ipc/client";
-import type { EntryRow, ReplayResponse } from "../../lib/ipc/types";
+import type {
+  BodyView,
+  EntryRow,
+  ReplayBatchReport,
+  ReplayResponse,
+} from "../../lib/ipc/types";
 import { formatBytes } from "../../lib/preferences";
+import { diffBodies } from "../diff/jsonDiff";
+import { losslessParser } from "./json";
 import { JsonViewer } from "./JsonViewer";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
-function parseRequestHeaders(metadata: string): [string, string][] {
+interface BodyNotice {
+  key: string;
+  warning: boolean;
+  params?: Record<string, string>;
+}
+
+/**
+ * 将后端返回的 `BodyView` 还原为可直接重放的请求正文文本：
+ * - `form` 类型从内部 JSON 结构还原为标准 `application/x-www-form-urlencoded` 编码，避免误发内部包装 JSON；
+ * - 截断、远端未拉取或二进制请求体给出明确提示，防止静默发出空正文。
+ */
+export function extractReplayBody(view: BodyView | null): {
+  text: string;
+  notice: BodyNotice | null;
+} {
+  if (!view || view.kind === "empty") {
+    return { text: "", notice: null };
+  }
+  if (view.kind === "text") {
+    return {
+      text: view.text,
+      notice:
+        view.truncated || view.previewTruncated
+          ? { key: "replayBodyTruncatedHint", warning: true }
+          : null,
+    };
+  }
+  if (view.kind === "form") {
+    try {
+      const parsed = JSON.parse(view.text) as {
+        fields?: unknown;
+        files?: unknown;
+      };
+      const params = new URLSearchParams();
+      if (Array.isArray(parsed.fields)) {
+        for (const pair of parsed.fields) {
+          if (
+            Array.isArray(pair) &&
+            typeof pair[0] === "string" &&
+            typeof pair[1] === "string"
+          ) {
+            params.append(pair[0], pair[1]);
+          }
+        }
+      }
+      const fileNames = Array.isArray(parsed.files)
+        ? parsed.files
+            .map((item) =>
+              item &&
+              typeof item === "object" &&
+              typeof (item as { name?: unknown }).name === "string"
+                ? (item as { name: string }).name
+                : null,
+            )
+            .filter((name): name is string => !!name)
+        : [];
+      return {
+        text: params.toString(),
+        notice:
+          fileNames.length > 0
+            ? {
+                key: "replayMultipartFilesHint",
+                warning: true,
+                params: { files: fileNames.join(", ") },
+              }
+            : { key: "replayFormEncodedHint", warning: false },
+      };
+    } catch {
+      return { text: view.text, notice: null };
+    }
+  }
+  return {
+    text: "",
+    notice: {
+      key: "replayBodyUnavailableHint",
+      warning: true,
+      params: { reason: view.reason ?? view.kind },
+    },
+  };
+}
+
+export function parseRequestHeaders(metadata: string): [string, string][] {
   if (!metadata) return [];
   try {
     const parsed = JSON.parse(metadata);
@@ -22,21 +122,46 @@ function parseRequestHeaders(metadata: string): [string, string][] {
   }
 }
 
+function statusPillClass(status: number): string {
+  if (status >= 500) return "status-5xx";
+  if (status >= 400) return "status-4xx";
+  if (status >= 300) return "status-3xx";
+  return "status-2xx";
+}
+
+function statusCodeLabelClass(code: string): string {
+  if (code === "ERR") return "status-failed";
+  const num = Number(code);
+  if (Number.isFinite(num)) return statusPillClass(num);
+  return "status-pending";
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
 /**
  * 桌面端请求重放独立居中弹窗：
  * - 通过 React Portal 挂载到 document.body，避免被详情侧栏的 content-visibility 裁切；
- * - 支持一键全屏展开与笔记本窄屏「请求编辑 / 响应结果」切换，确保小屏完整可用。
+ * - 支持 GET/POST/PUT/PATCH/DELETE 全方法编辑、Form 表单正确还原、JSON 一键格式化、测试环境自签名证书开关；
+ * - 支持单次发送与可控次数/并发的批量重复重发（输出状态分布、分位耗时与逐次响应明细）；
+ * - 支持查看最新响应正文、响应头以及与原抓包响应的一键字段级 Diff 对比。
  */
 export function ReplayDialog({
   sessionId,
   entry,
   metadata = "",
+  initialBatchMode = false,
+  initialResponse = null,
   theme,
   onClose,
 }: {
   sessionId: string;
   entry: EntryRow;
   metadata?: string;
+  initialBatchMode?: boolean;
+  initialResponse?: ReplayResponse | null;
   theme: string;
   onClose: () => void;
 }) {
@@ -47,19 +172,39 @@ export function ReplayDialog({
     parseRequestHeaders(metadata),
   );
   const [body, setBody] = useState("");
+  const [bodyNotice, setBodyNotice] = useState<BodyNotice | null>(null);
   const [loadingBody, setLoadingBody] = useState(true);
+  const [acceptInvalidCerts, setAcceptInvalidCerts] = useState(false);
+  const [repeatCount, setRepeatCount] = useState(initialBatchMode ? 5 : 1);
+  const [concurrency, setConcurrency] = useState(2);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [response, setResponse] = useState<ReplayResponse | null>(null);
+  const [response, setResponse] = useState<ReplayResponse | null>(
+    initialResponse,
+  );
+  const [batchReport, setBatchReport] = useState<ReplayBatchReport | null>(
+    null,
+  );
+  const [selectedBatchIdx, setSelectedBatchIdx] = useState<number | null>(null);
+  const [responseTab, setResponseTab] = useState<"body" | "headers" | "diff">(
+    "body",
+  );
+  const [originalResponse, setOriginalResponse] = useState<{
+    loaded: boolean;
+    text: string;
+  }>({ loaded: false, text: "" });
+  const [diffOnlyChanges, setDiffOnlyChanges] = useState(true);
+  const [copiedHeaderIdx, setCopiedHeaderIdx] = useState<number | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [compactTab, setCompactTab] = useState<"request" | "response">(
-    "request",
+    initialResponse ? "response" : "request",
   );
 
   // 初始化时拉取原始请求体；若调用方未预传 metadata（例如从列表右键打开），同时拉取请求头
   useEffect(() => {
     let active = true;
     setLoadingBody(true);
+    setBodyNotice(null);
     const metaTask = metadata
       ? Promise.resolve(metadata)
       : api.metadata(sessionId, entry.id).catch(() => "");
@@ -72,9 +217,9 @@ export function ReplayDialog({
         if (!metadata && loadedMeta) {
           setHeaders(parseRequestHeaders(loadedMeta));
         }
-        if (view && (view.kind === "text" || view.kind === "form")) {
-          setBody(view.text);
-        }
+        const extracted = extractReplayBody(view);
+        setBody(extracted.text);
+        setBodyNotice(extracted.notice);
       })
       .finally(() => {
         if (active) setLoadingBody(false);
@@ -84,26 +229,75 @@ export function ReplayDialog({
     };
   }, [sessionId, entry.id, metadata]);
 
+  // 当用户切换到「与原响应对比」时按需加载原抓包响应正文
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+    if (responseTab !== "diff" || originalResponse.loaded) return;
+    let active = true;
+    void api
+      .body(sessionId, entry.id, "response")
+      .then((view) => {
+        if (active) {
+          setOriginalResponse({
+            loaded: true,
+            text: view.kind === "text" || view.kind === "form" ? view.text : "",
+          });
+        }
+      })
+      .catch(() => {
+        if (active) setOriginalResponse({ loaded: true, text: "" });
+      });
+    return () => {
+      active = false;
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [responseTab, originalResponse.loaded, sessionId, entry.id]);
 
-  async function handleSend() {
-    if (sending) return;
+  const clampedRepeat = clampInt(repeatCount, 1, 50);
+  const clampedConcurrency = clampInt(concurrency, 1, 10);
+  const isBatchRequest = clampedRepeat > 1;
+
+  const selectedBatchItem = useMemo(() => {
+    if (!batchReport || batchReport.items.length === 0) return null;
+    if (selectedBatchIdx !== null) {
+      const found = batchReport.items.find(
+        (item) => item.index === selectedBatchIdx,
+      );
+      if (found) return found;
+    }
+    return batchReport.items[0];
+  }, [batchReport, selectedBatchIdx]);
+
+  const activeResponse = batchReport
+    ? (selectedBatchItem?.response ?? null)
+    : response;
+
+  const handleSend = useCallback(async () => {
+    if (sending || !url.trim()) return;
     setSending(true);
     setError("");
+    const payload = {
+      method,
+      url,
+      headers: headers.filter(([k]) => k.trim().length > 0),
+      body: body.length > 0 ? body : null,
+      acceptInvalidCerts,
+    };
     try {
-      const result = await api.replay({
-        method,
-        url,
-        headers: headers.filter(([k]) => k.trim().length > 0),
-        body: body.length > 0 ? body : null,
-      });
-      setResponse(result);
+      if (clampedRepeat > 1) {
+        const report = await api.replayBatch({
+          ...payload,
+          count: clampedRepeat,
+          concurrency: clampedConcurrency,
+        });
+        setBatchReport(report);
+        setResponse(null);
+        setSelectedBatchIdx(report.items[0]?.index ?? null);
+      } else {
+        const result = await api.replay(payload);
+        setBatchReport(null);
+        setSelectedBatchIdx(null);
+        setResponse(result);
+      }
+      setCopiedHeaderIdx(null);
       setCompactTab("response");
     } catch (e) {
       setError(String(e));
@@ -111,7 +305,54 @@ export function ReplayDialog({
     } finally {
       setSending(false);
     }
+  }, [
+    sending,
+    url,
+    method,
+    headers,
+    body,
+    acceptInvalidCerts,
+    clampedRepeat,
+    clampedConcurrency,
+  ]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        void handleSend();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, handleSend]);
+
+  function handleFormatBodyJson() {
+    if (!body.trim()) return;
+    try {
+      const parsed = losslessParser.parse(body);
+      setBody(losslessParser.stringify(parsed, null, 2));
+      setBodyNotice(null);
+    } catch {
+      setBodyNotice({ key: "replayInvalidJsonBody", warning: true });
+    }
   }
+
+  const responseDiff = useMemo(() => {
+    if (responseTab !== "diff" || !activeResponse || !originalResponse.loaded) {
+      return null;
+    }
+    if (!originalResponse.text) return null;
+    const result = diffBodies(originalResponse.text, activeResponse.body);
+    const rows = diffOnlyChanges
+      ? result.rows.filter((row) => row.status !== "equal")
+      : result.rows;
+    return { mode: result.mode, rows };
+  }, [responseTab, activeResponse, originalResponse, diffOnlyChanges]);
 
   return createPortal(
     <div
@@ -136,6 +377,9 @@ export function ReplayDialog({
             </span>
           </div>
           <div className="replay-header-actions">
+            <span className="replay-shortcut-hint muted">
+              {t("replayShortcutHint")}
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -178,9 +422,55 @@ export function ReplayDialog({
             disabled={sending || !url.trim()}
             onClick={() => void handleSend()}
           >
-            <Play size={13} />
-            {sending ? t("replaySending") : t("replaySend")}
+            {isBatchRequest ? <Repeat size={13} /> : <Play size={13} />}
+            {sending
+              ? t("replaySending")
+              : isBatchRequest
+                ? t("replayRunBatch", { count: clampedRepeat })
+                : t("replaySend")}
           </Button>
+        </div>
+
+        <div className="replay-options-bar">
+          <label className="replay-cert-toggle">
+            <input
+              type="checkbox"
+              checked={acceptInvalidCerts}
+              onChange={(e) => setAcceptInvalidCerts(e.target.checked)}
+            />
+            <span>{t("replayAcceptInvalidCerts")}</span>
+          </label>
+          <div className="replay-batch-controls">
+            <label className="replay-batch-field">
+              <span>{t("replayRepeatCount")}</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                aria-label={t("replayRepeatCount")}
+                value={repeatCount}
+                onChange={(e) =>
+                  setRepeatCount(clampInt(Number(e.target.value) || 1, 1, 50))
+                }
+              />
+            </label>
+            <label
+              className={`replay-batch-field${!isBatchRequest ? " is-disabled" : ""}`}
+            >
+              <span>{t("replayConcurrency")}</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                disabled={!isBatchRequest}
+                aria-label={t("replayConcurrency")}
+                value={concurrency}
+                onChange={(e) =>
+                  setConcurrency(clampInt(Number(e.target.value) || 1, 1, 10))
+                }
+              />
+            </label>
+          </div>
         </div>
 
         {/* 笔记本或较窄窗口下提供清晰的双 Tab 切换，避免左右并排过窄 */}
@@ -203,7 +493,11 @@ export function ReplayDialog({
               onClick={() => setCompactTab("response")}
             >
               {t("replayTabResponse")}
-              {response ? ` · ${response.status}` : ""}
+              {batchReport
+                ? ` · ${batchReport.succeeded}/${batchReport.total}`
+                : activeResponse
+                  ? ` · ${activeResponse.status}`
+                  : ""}
             </button>
           </div>
         </div>
@@ -264,8 +558,30 @@ export function ReplayDialog({
 
             <div className="replay-subhead">
               <strong>{t("body")}</strong>
-              {loadingBody && <span className="muted">{t("loading")}</span>}
+              <div className="replay-body-tools">
+                {loadingBody && <span className="muted">{t("loading")}</span>}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!body.trim()}
+                  onClick={handleFormatBodyJson}
+                  title={t("replayFormatJson")}
+                >
+                  <Braces size={12} />
+                  {t("replayFormatJson")}
+                </Button>
+              </div>
             </div>
+            {bodyNotice && (
+              <div
+                className={`inline-note replay-body-note${bodyNotice.warning ? " warning" : ""}`}
+                role={bodyNotice.warning ? "alert" : "status"}
+              >
+                {bodyNotice.params
+                  ? t(bodyNotice.key, bodyNotice.params)
+                  : t(bodyNotice.key)}
+              </div>
+            )}
             <textarea
               className="replay-body-input"
               value={body}
@@ -276,19 +592,24 @@ export function ReplayDialog({
 
           <div className="replay-result">
             <div className="replay-subhead">
-              <strong>{t("response")}</strong>
-              {response && (
+              <strong>
+                {t("response")}
+                {batchReport && selectedBatchItem
+                  ? ` · #${selectedBatchItem.index}`
+                  : ""}
+              </strong>
+              {activeResponse && (
                 <div className="replay-meta-pills">
                   <span
-                    className={`status-pill ${response.status >= 500 ? "status-5xx" : response.status >= 400 ? "status-4xx" : response.status >= 300 ? "status-3xx" : "status-2xx"}`}
+                    className={`status-pill ${statusPillClass(activeResponse.status)}`}
                   >
-                    {response.status} {response.statusText}
+                    {activeResponse.status} {activeResponse.statusText}
                   </span>
                   <span className="num-cell muted">
-                    {response.durationMs.toFixed(0)} ms
+                    {activeResponse.durationMs.toFixed(0)} ms
                   </span>
                   <span className="num-cell muted">
-                    {formatBytes(response.bytes)}
+                    {formatBytes(activeResponse.bytes)}
                   </span>
                 </div>
               )}
@@ -298,22 +619,214 @@ export function ReplayDialog({
                 {error}
               </div>
             )}
-            {response ? (
-              <div className="replay-response-body">
-                {response.truncated && (
-                  <div className="inline-note warning">
-                    {t("previewTruncated")}
+            {batchReport && (
+              <div className="replay-batch-panel">
+                <div className="replay-batch-summary">
+                  <div className="replay-batch-summary-top">
+                    <strong>
+                      {t("replayBatchSummary", {
+                        ok: batchReport.succeeded,
+                        total: batchReport.total,
+                        fail: batchReport.failed,
+                      })}
+                    </strong>
+                    <div className="replay-batch-statuses">
+                      {batchReport.statusCounts.map(([code, cnt]) => (
+                        <span
+                          key={code}
+                          className={`status-pill ${statusCodeLabelClass(code)}`}
+                        >
+                          {code} ×{cnt}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                )}
-                <JsonViewer
-                  text={response.body}
-                  theme={theme}
-                  json={
-                    /json/i.test(response.mediaType ?? "") ||
-                    /^[\s]*[{[]/.test(response.body)
-                  }
-                />
+                  <div className="replay-batch-latency num-cell muted">
+                    {t("replayBatchLatency", {
+                      total: Math.round(batchReport.totalDurationMs),
+                      min: Math.round(batchReport.minMs),
+                      p50: Math.round(batchReport.p50Ms),
+                      p95: Math.round(batchReport.p95Ms),
+                      max: Math.round(batchReport.maxMs),
+                    })}
+                  </div>
+                </div>
+                <div
+                  className="replay-batch-list"
+                  role="listbox"
+                  aria-label={t("replayBatchIndex")}
+                >
+                  {batchReport.items.map((item) => {
+                    const isSelected = selectedBatchItem?.index === item.index;
+                    return (
+                      <button
+                        key={item.index}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`replay-batch-row${isSelected ? " active" : ""}${item.ok ? "" : " is-failed"}`}
+                        onClick={() => {
+                          setSelectedBatchIdx(item.index);
+                          setCopiedHeaderIdx(null);
+                        }}
+                      >
+                        <span className="num-cell muted">#{item.index}</span>
+                        {item.response ? (
+                          <span
+                            className={`status-pill ${statusPillClass(item.response.status)}`}
+                          >
+                            {item.response.status}
+                          </span>
+                        ) : (
+                          <span className="status-pill status-failed">ERR</span>
+                        )}
+                        <span className="num-cell">
+                          {item.durationMs.toFixed(0)} ms
+                        </span>
+                        <span className="num-cell muted">
+                          {item.response
+                            ? formatBytes(item.response.bytes)
+                            : item.error || "—"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            )}
+            {batchReport && selectedBatchItem && !selectedBatchItem.response ? (
+              <div className="inline-note warning" role="alert">
+                #{selectedBatchItem.index}:{" "}
+                {selectedBatchItem.error || t("unexpected", { error: "" })}
+              </div>
+            ) : activeResponse ? (
+              <>
+                <div className="replay-response-tabs">
+                  <div className="segmented" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={responseTab === "body"}
+                      className={responseTab === "body" ? "active" : ""}
+                      onClick={() => setResponseTab("body")}
+                    >
+                      {t("replayResponseBody")}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={responseTab === "headers"}
+                      className={responseTab === "headers" ? "active" : ""}
+                      onClick={() => setResponseTab("headers")}
+                    >
+                      {t("replayResponseHeaders")} (
+                      {activeResponse.headers.length})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={responseTab === "diff"}
+                      className={responseTab === "diff" ? "active" : ""}
+                      onClick={() => setResponseTab("diff")}
+                    >
+                      {t("replayResponseDiff")}
+                    </button>
+                  </div>
+                  {responseTab === "diff" && (
+                    <label className="replay-cert-toggle">
+                      <input
+                        type="checkbox"
+                        checked={diffOnlyChanges}
+                        onChange={(e) => setDiffOnlyChanges(e.target.checked)}
+                      />
+                      <span>{t("diffOnlyChanges")}</span>
+                    </label>
+                  )}
+                </div>
+                <div className="replay-response-body">
+                  {responseTab === "body" ? (
+                    <>
+                      {activeResponse.truncated && (
+                        <div className="inline-note warning">
+                          {t("previewTruncated")}
+                        </div>
+                      )}
+                      <JsonViewer
+                        text={activeResponse.body}
+                        theme={theme}
+                        json={
+                          /json/i.test(activeResponse.mediaType ?? "") ||
+                          /^[\s]*[{[]/.test(activeResponse.body)
+                        }
+                      />
+                    </>
+                  ) : responseTab === "headers" ? (
+                    <div
+                      className="replay-response-headers"
+                      data-select-scope="replay-headers"
+                      tabIndex={0}
+                    >
+                      {activeResponse.headers.length > 0 ? (
+                        <dl className="headers-section replay-headers-dl">
+                          {activeResponse.headers.map(([name, val], idx) => (
+                            <div key={`${name}-${idx}`} className="kv-row">
+                              <dt>{name}</dt>
+                              <dd>
+                                <span>{val}</span>
+                                <button
+                                  type="button"
+                                  className="kv-copy-btn"
+                                  title={t("clickToCopyValue")}
+                                  aria-label={`${t("copy")} ${name}`}
+                                  onClick={() =>
+                                    void writeClipboard(val).then(() =>
+                                      setCopiedHeaderIdx(idx),
+                                    )
+                                  }
+                                >
+                                  {copiedHeaderIdx === idx ? (
+                                    <Check size={11} />
+                                  ) : (
+                                    <Copy size={11} />
+                                  )}
+                                </button>
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : (
+                        <div className="body-empty">{t("noHeaders")}</div>
+                      )}
+                    </div>
+                  ) : !originalResponse.loaded ? (
+                    <div className="loading">{t("loading")}</div>
+                  ) : !originalResponse.text ? (
+                    <div className="body-empty">{t("replayOriginalEmpty")}</div>
+                  ) : responseDiff && responseDiff.rows.length > 0 ? (
+                    <div className="diff-table-wrap">
+                      <div className="diff-grid diff-head">
+                        <span>{t("diffField")}</span>
+                        <span>{t("replayDiffBaseline")}</span>
+                        <span>{t("replayDiffLatest")}</span>
+                      </div>
+                      <div className="diff-rows">
+                        {responseDiff.rows.map((row, idx) => (
+                          <div
+                            key={`${row.path}-${idx}`}
+                            className={`diff-grid diff-row diff-status-${row.status}`}
+                          >
+                            <span className="diff-path">{row.path}</span>
+                            <span className="diff-val">{row.left || "—"}</span>
+                            <span className="diff-val">{row.right || "—"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="body-empty">{t("diffNoChanges")}</div>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="table-empty">
                 <p>{t("replayEmptyHint")}</p>

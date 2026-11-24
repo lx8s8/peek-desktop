@@ -246,13 +246,20 @@ pub async fn query_entries(
     range: Option<crate::query::TimeRange>,
     host_filter: Option<String>,
     exclude_patterns: Option<Vec<String>>,
+    method_filter: Option<String>,
+    status_filter: Option<String>,
+    search_body: Option<bool>,
+    sort_by: Option<String>,
+    sort_dir: Option<String>,
+    after_seq: Option<u64>,
 ) -> Result<QueryPage> {
     let range = range.unwrap_or_default().parse()?;
     let excludes = exclude_patterns.unwrap_or_default();
+    let search_body = search_body.unwrap_or(false);
     if session_id.starts_with("live-") {
         let remote = state.remote.clone();
         return tauri::async_runtime::spawn_blocking(move || {
-            remote.query_range_filtered(
+            remote.query_range_with_options(
                 &session_id,
                 &search,
                 &filter,
@@ -260,8 +267,17 @@ pub async fn query_entries(
                 limit,
                 revision,
                 &range,
-                host_filter.as_deref(),
-                &excludes,
+                crate::session::QueryOptions {
+                    host_filter: host_filter.as_deref(),
+                    exclude_patterns: &excludes,
+                    method_filter: method_filter.as_deref(),
+                    status_filter: status_filter.as_deref(),
+                    search_body,
+                    sort_by: sort_by.as_deref(),
+                    sort_dir: sort_dir.as_deref(),
+                    after_seq,
+                    max_bytes: None,
+                },
             )
         })
         .await
@@ -273,15 +289,24 @@ pub async fn query_entries(
         .map_err(|_| "internalError")?
         .get(&session_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(session.query_range_filtered(
+        Ok(session.query_with_options(
             &search,
             &filter,
             offset,
             limit,
             revision,
             &range,
-            host_filter.as_deref(),
-            &excludes,
+            crate::session::QueryOptions {
+                host_filter: host_filter.as_deref(),
+                exclude_patterns: &excludes,
+                method_filter: method_filter.as_deref(),
+                status_filter: status_filter.as_deref(),
+                search_body,
+                sort_by: sort_by.as_deref(),
+                sort_dir: sort_dir.as_deref(),
+                after_seq,
+                max_bytes: None,
+            },
         ))
     })
     .await
@@ -977,6 +1002,14 @@ pub async fn replay_request(
     request: crate::replay::ReplayRequest,
 ) -> Result<crate::replay::ReplayResponse> {
     crate::replay::send(request).await
+}
+
+/// 在桌面端并发/连续重复重放同一请求（Repeat Advanced），输出耗时分布与逐次明细。
+#[tauri::command]
+pub async fn replay_request_batch(
+    request: crate::replay::ReplayBatchRequest,
+) -> Result<crate::replay::ReplayBatchReport> {
+    crate::replay::send_batch(request).await
 }
 
 fn persist_workspace(

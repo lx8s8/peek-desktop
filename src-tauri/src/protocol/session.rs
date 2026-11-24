@@ -9,6 +9,12 @@ pub fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
     value[key].as_str().ok_or_else(|| format!("invalid {key}"))
 }
 
+pub fn parse_timestamp_micros(text: &str) -> i64 {
+    DateTime::parse_from_rfc3339(text)
+        .map(|time| time.timestamp_micros())
+        .unwrap_or(0)
+}
+
 fn timestamp(value: &Value, key: &str) -> Result<i64> {
     let text = required_string(value, key)?;
     if !text.ends_with('Z') {
@@ -58,6 +64,7 @@ impl Header {
 pub struct EntryRow {
     pub content_revision: String,
     pub id: String,
+    pub seq: u64,
     pub source: String,
     pub method: String,
     pub url: String,
@@ -134,6 +141,7 @@ pub fn parse_entry(value: &Value) -> Result<EntryRow> {
     Ok(EntryRow {
         content_revision: String::new(),
         id: id.into(),
+        seq: 0,
         source: required_string(value, "source")?.into(),
         method: method.into(),
         url: url.into(),

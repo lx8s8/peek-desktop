@@ -157,38 +157,37 @@ impl Remote {
             .query(search, filter, offset, limit, revision))
     }
     pub fn entry(&self, id: &str, entry: &str) -> Result<Arc<str>> {
-        let store = self.store.lock().map_err(|_| "internalError")?;
-        Ok(store
-            .sessions
-            .get(id)
-            .ok_or("sessionNotFound")?
-            .current
-            .entry(entry)
-            .ok_or("entryNotFound")?
-            .raw
-            .clone())
+        let mut store = self.store.lock().map_err(|_| "internalError")?;
+        let session = store.sessions.get_mut(id).ok_or("sessionNotFound")?;
+        if let Some(hot) = session.current.entry(entry) {
+            return Ok(hot.raw.clone());
+        }
+        session
+            .spill
+            .read_raw(entry)
+            .ok_or_else(|| "entryNotFound".into())
     }
     pub fn entry_info(&self, id: &str, entry: &str) -> Result<crate::protocol::session::EntryRow> {
-        Ok(self
-            .store
-            .lock()
-            .map_err(|_| "internalError")?
-            .sessions
-            .get(id)
-            .ok_or("sessionNotFound")?
-            .current
-            .entry(entry)
-            .ok_or("entryNotFound")?
-            .row
-            .clone())
+        let store = self.store.lock().map_err(|_| "internalError")?;
+        let session = store.sessions.get(id).ok_or("sessionNotFound")?;
+        if let Some(hot) = session.current.entry(entry) {
+            return Ok(hot.row.clone());
+        }
+        session
+            .spill
+            .entry_row(entry)
+            .ok_or_else(|| "entryNotFound".into())
     }
 
-    /// 切换实时会话中某条网络请求的固定状态，并触发视图版本刷新。
+    /// 切换实时会话中某条网络请求的固定状态（支持热区与磁盘冷存历史），并触发视图版本刷新。
     pub fn toggle_pin(&self, id: &str, entry: &str) -> Result<bool> {
         let pinned = {
             let mut store = self.store.lock().map_err(|_| "internalError")?;
             let session = store.sessions.get_mut(id).ok_or("sessionNotFound")?;
-            let pinned = session.current.toggle_pin(entry)?;
+            let pinned = match session.current.toggle_pin(entry) {
+                Ok(val) => val,
+                Err(_) => session.spill.toggle_pin(entry).ok_or("entryNotFound")?,
+            };
             session.version += 1;
             pinned
         };
@@ -809,15 +808,17 @@ impl Remote {
         let result = (|| {
             let session = store
                 .sessions
-                .get(&pending.session_id)
+                .get_mut(&pending.session_id)
                 .filter(|s| {
                     s.connection_id == connection && s.generation == pending.generation && s.online
                 })
                 .ok_or("bodyStale")?;
-            let original = session
+            let original_raw = session
                 .current
                 .entry(&pending.entry_id)
-                .filter(|entry| entry.raw == pending.original)
+                .map(|entry| entry.raw.clone())
+                .or_else(|| session.spill.read_raw(&pending.entry_id))
+                .filter(|raw| *raw == pending.original)
                 .ok_or("bodyStale")?;
             if value["body"].is_null() {
                 return Err(match value["error"].as_str() {
@@ -832,7 +833,7 @@ impl Remote {
                 return Err("bodyFailed".into());
             }
             let mut entry: Value =
-                serde_json::from_str(&original.raw).map_err(|_| "invalidEntry")?;
+                serde_json::from_str(&original_raw).map_err(|_| "invalidEntry")?;
             entry[&pending.side]["body"] = value["body"].clone();
             let entry = StoredEntry::parse(&entry.to_string())?;
             store.upsert(&pending.session_id, connection, entry)

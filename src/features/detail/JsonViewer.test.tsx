@@ -93,6 +93,67 @@ it("defaults to lossless formatted JSON and searches keys and values with wrappi
   expect((input as HTMLInputElement).value).toBe("");
   expect(container.querySelectorAll("mark")).toHaveLength(0);
 });
+
+it("preserves syntax highlighting for all following JSON tokens when searching inside a string or key", async () => {
+  const text =
+    '{"userName":"alice","age":42,"active":true,"empty":null,"city":"shanghai"}';
+  const { container } = render(<JsonViewer text={text} theme="light" />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "格式化" }).className).toBe(
+      "active",
+    ),
+  );
+
+  // 搜索键名内部子串（劈开带引号的 key）
+  const input = screen.getByRole("searchbox", { name: "搜索正文" });
+  fireEvent.change(input, { target: { value: "user" } });
+  await screen.findByText("1/1");
+
+  const pre = container.querySelector("pre")!;
+  // 原文逐字符无损
+  expect(JSON.parse(pre.textContent ?? "")).toEqual(JSON.parse(text));
+  // 命中下方的各个 token 仍严格保持各自词法类型，不会因引号错位全变色
+  const keys = Array.from(pre.querySelectorAll(".json-tok-key")).map(
+    (el) => el.textContent,
+  );
+  expect(keys).toContain('"');
+  expect(keys).toContain('Name"');
+  expect(keys).toContain('"age"');
+  expect(keys).toContain('"active"');
+  expect(keys).toContain('"empty"');
+  expect(keys).toContain('"city"');
+
+  const strings = Array.from(pre.querySelectorAll(".json-tok-string")).map(
+    (el) => el.textContent,
+  );
+  expect(strings).toEqual(['"alice"', '"shanghai"']);
+
+  expect(pre.querySelector(".json-tok-number")?.textContent).toBe("42");
+  expect(pre.querySelector(".json-tok-boolean")?.textContent).toBe("true");
+  expect(pre.querySelector(".json-tok-null")?.textContent).toBe("null");
+});
+
+it("scopes Cmd/Ctrl+A inside JsonViewer to the JSON content without selecting external UI", async () => {
+  const { container } = render(
+    <div>
+      <button type="button">外部菜单按钮</button>
+      <JsonViewer text='{"hello":"world"}' theme="light" />
+    </div>,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "格式化" }).className).toBe(
+      "active",
+    ),
+  );
+
+  const pre = container.querySelector("pre.raw-text") as HTMLElement;
+  pre.focus();
+  fireEvent.keyDown(pre, { key: "a", metaKey: true });
+  const selected = window.getSelection()?.toString() ?? "";
+  expect(selected).toContain('"hello"');
+  expect(selected).not.toContain("外部菜单按钮");
+  expect(selected).not.toContain("原文");
+});
 it("ignores a terminated search when the selected body changes", async () => {
   const { rerender, container } = render(
     <JsonViewer text="old old" json={false} theme="light" />,

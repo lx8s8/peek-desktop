@@ -1,6 +1,6 @@
 use crate::{
     protocol::session::{Header, Result},
-    session::{LiveInfo, Session, SessionSummary, StoredEntry},
+    session::{LiveInfo, Session, SessionSummary, StoredEntry, spill::SpillStore},
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 pub const MAX_LIVE_SESSIONS: usize = 8;
-const MAX_LIVE_BYTES: usize = 8 * 1024 * 1024;
+pub(crate) const MAX_LIVE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LIVE_ENTRIES: usize = 10_000;
 
 pub struct LiveSession {
@@ -17,6 +17,9 @@ pub struct LiveSession {
     pub connection_id: String,
     pub current: Session,
     pub staging: Option<Session>,
+    /// 磁盘溢出冷存储：热内存满 8 MiB / 10,000 条后自动转存旧记录，支持清屏后完整回溯。
+    pub spill: SpillStore,
+    pub staging_spill: Option<SpillStore>,
     pub generation: u64,
     pub version: u64,
     pub online: bool,
@@ -127,6 +130,7 @@ impl LiveStore {
             session.sender = sender;
             session.cancel = cancel;
             session.staging = Some(Session::empty(parsed, raw));
+            session.staging_spill = Some(SpillStore::default());
         } else {
             self.sessions.insert(
                 key.clone(),
@@ -136,6 +140,8 @@ impl LiveStore {
                     connection_id: connection_id.into(),
                     current: Session::empty(parsed.clone(), raw.clone()),
                     staging: Some(Session::empty(parsed, raw)),
+                    spill: SpillStore::default(),
+                    staging_spill: Some(SpillStore::default()),
                     generation: 1,
                     version: 1,
                     online: true,
@@ -161,19 +167,39 @@ impl LiveStore {
         if entry.raw.len() + session.current.raw_header.len() > MAX_LIVE_BYTES {
             return Err("entryTooLarge".into());
         }
-        let target = session.staging.as_mut().unwrap_or(&mut session.current);
-        target.upsert(entry);
+        let (target, spill) = if let Some(staging) = session.staging.as_mut() {
+            let staging_spill = session
+                .staging_spill
+                .get_or_insert_with(SpillStore::default);
+            (staging, staging_spill)
+        } else {
+            (&mut session.current, &mut session.spill)
+        };
+        // 若更新的记录先前已溢出到磁盘冷存储，将其移出冷区并继承原 seq 与 pinned 状态
+        let inherited = spill.remove(&entry.row.id);
+        target.upsert_with_inherited(entry, inherited);
         while target.raw_bytes > MAX_LIVE_BYTES || target.entries.len() > MAX_LIVE_ENTRIES {
             let count = (target.entries.len() / 8).max(1);
-            target.evict_prefix(count);
-            session.evicted += count as u64;
+            let evicted = target.evict_prefix_extract(count);
+            session.evicted += evicted.len() as u64;
+            for item in evicted {
+                spill.push(item.row, item.search, item.started_at_micros, &item.raw);
+            }
         }
         session.version += 1;
         Ok(())
     }
     pub fn remove(&mut self, key: &str, connection_id: &str, id: &str) {
         if let Some(s) = self.active_mut(key, connection_id) {
-            s.staging.as_mut().unwrap_or(&mut s.current).remove(id);
+            if let Some(staging) = s.staging.as_mut() {
+                staging.remove(id);
+                if let Some(spill) = s.staging_spill.as_mut() {
+                    let _ = spill.remove(id);
+                }
+            } else {
+                s.current.remove(id);
+                let _ = s.spill.remove(id);
+            }
             s.version += 1;
         }
     }
@@ -182,6 +208,7 @@ impl LiveStore {
             && let Some(staging) = s.staging.take()
         {
             s.current = staging;
+            s.spill = s.staging_spill.take().unwrap_or_default();
             s.version += 1;
         }
     }
@@ -191,8 +218,12 @@ impl LiveStore {
         }
         if let Some(s) = self.active_mut(key, connection_id) {
             s.current = Session::empty(s.current.header.clone(), s.current.raw_header.to_string());
+            s.spill.clear();
             if let Some(staging) = &mut s.staging {
                 *staging = Session::empty(staging.header.clone(), staging.raw_header.to_string());
+            }
+            if let Some(staging_spill) = &mut s.staging_spill {
+                staging_spill.clear();
             }
             s.generation += 1;
             s.version += 1;
@@ -203,6 +234,7 @@ impl LiveStore {
         if let Some(s) = self.active_mut(key, connection_id) {
             s.online = false;
             s.staging = None;
+            s.staging_spill = None;
             s.version += 1;
             self.cancel_pending(key, "deviceOffline");
         }
@@ -232,7 +264,7 @@ impl LiveStore {
                     .clone()
                     .unwrap_or_else(|| s.current.header.platform.clone()),
                 header: s.current.header.clone(),
-                entry_count: s.current.entries.len(),
+                entry_count: s.current.entries.len() + s.spill.len(),
                 skipped: s.current.skipped,
                 newer_format: false,
                 raw_bytes: s.current.raw_bytes,
@@ -246,6 +278,8 @@ impl LiveStore {
                     version: s.version,
                     dropped: s.dropped,
                     evicted: s.evicted,
+                    spilled_count: s.spill.len(),
+                    spilled_bytes: s.spill.retained_bytes(),
                     diagnostic_count: 0,
                     diagnostics_online: false,
                 }),

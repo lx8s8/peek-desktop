@@ -16,6 +16,7 @@ export const definitions = {
   "connection.open": { label: "connection", accelerator: "CmdOrCtrl+K" },
   "connection.stop": { label: "stopListening" },
   "connection.pair": { label: "newPairingCode" },
+  "edit.selectAll": { label: "menuSelectAll", accelerator: "CmdOrCtrl+A" },
   "edit.find": { label: "menuFind", accelerator: "CmdOrCtrl+F" },
   "edit.copyMessage": {
     label: "menuCopyMessages",

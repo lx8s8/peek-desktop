@@ -107,7 +107,12 @@ export default function JsonTree({ text }: { text: string; theme: string }) {
           {t("collapseAll")}
         </Button>
       </div>
-      <div className="json-tree-scroll" key={treeEpoch}>
+      <div
+        className="json-tree-scroll"
+        data-select-scope="json-tree"
+        tabIndex={0}
+        key={treeEpoch}
+      >
         <TreeNode
           value={parsed.value}
           path={[]}

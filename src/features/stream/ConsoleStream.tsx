@@ -61,6 +61,7 @@ export interface StreamViewState {
   following: boolean;
   autoLoadBody: boolean;
   minTimestampMicros: number | null;
+  savedClearMicros?: number | null;
   compactAll: boolean;
   collapsedBlocks: string[];
 }
@@ -72,6 +73,7 @@ export const emptyStreamView: StreamViewState = {
   following: true,
   autoLoadBody: true,
   minTimestampMicros: null,
+  savedClearMicros: null,
   compactAll: false,
   collapsedBlocks: [],
 };
@@ -550,7 +552,11 @@ export function ConsoleStream({
 
   const handleClearScreen = useCallback(() => {
     const baseline = latestTs ?? Date.now() * 1000;
-    onViewChange({ minTimestampMicros: baseline, following: true });
+    onViewChange({
+      minTimestampMicros: baseline,
+      savedClearMicros: null,
+      following: true,
+    });
     setNotice(t("streamClearedHint"));
   }, [latestTs, onViewChange, t]);
 
@@ -745,23 +751,59 @@ export function ConsoleStream({
                 size="sm"
                 variant="default"
                 className="is-cleared-chip"
-                onClick={() => onViewChange({ minTimestampMicros: null })}
+                onClick={() =>
+                  onViewChange({
+                    savedClearMicros: minTimestampMicros,
+                    minTimestampMicros: null,
+                  })
+                }
                 title={t("streamRestoreHistory")}
               >
                 <RotateCcw size={12} />
                 {t("streamRestoreHistory")}
               </Button>
             ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={totalBlocks === 0}
-                onClick={handleClearScreen}
-                title={t("streamClear")}
-              >
-                <Eraser size={12} />
-                {t("streamClear")}
-              </Button>
+              <>
+                {view.savedClearMicros != null && (
+                  <span className="clear-toggle-group">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="is-cleared-chip"
+                      onClick={() =>
+                        onViewChange({
+                          minTimestampMicros: view.savedClearMicros ?? null,
+                          savedClearMicros: null,
+                        })
+                      }
+                      title={t("streamReturnCleared")}
+                    >
+                      <Eraser size={12} />
+                      {t("streamReturnCleared")}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="clear-dismiss-btn"
+                      aria-label={t("networkClearDismiss")}
+                      title={t("networkClearDismiss")}
+                      onClick={() => onViewChange({ savedClearMicros: null })}
+                    >
+                      <X size={11} />
+                    </Button>
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={totalBlocks === 0}
+                  onClick={handleClearScreen}
+                  title={t("streamClear")}
+                >
+                  <Eraser size={12} />
+                  {t("streamClear")}
+                </Button>
+              </>
             )}
             <Button
               size="sm"
@@ -861,7 +903,12 @@ export function ConsoleStream({
               {minTimestampMicros !== null && (
                 <Button
                   size="sm"
-                  onClick={() => onViewChange({ minTimestampMicros: null })}
+                  onClick={() =>
+                    onViewChange({
+                      savedClearMicros: minTimestampMicros,
+                      minTimestampMicros: null,
+                    })
+                  }
                 >
                   <RotateCcw size={12} />
                   {t("streamRestoreHistory")}

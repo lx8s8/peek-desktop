@@ -22,8 +22,13 @@ import type {
   StreamPage,
   StreamMatches,
   SnippetFormat,
+  ReplayBatchReport,
+  ReplayBatchRequest,
   ReplayRequest,
   ReplayResponse,
+  RequestSortField,
+  RequestStatusFilter,
+  SortDirection,
   DiagnosticRef,
   TimeRange,
   PluginListSnapshot,
@@ -69,6 +74,8 @@ export const api = {
     invoke<string>("copy_snippet", { sessionId, entryId, format }),
   replay: (request: ReplayRequest) =>
     invoke<ReplayResponse>("replay_request", { request }),
+  replayBatch: (request: ReplayBatchRequest) =>
+    invoke<ReplayBatchReport>("replay_request_batch", { request }),
   togglePin: (sessionId: string, entryId: string) =>
     invoke<boolean>("toggle_entry_pin", { sessionId, entryId }),
   popupContextMenu: (rid: number, x: number, y: number) =>
@@ -197,6 +204,12 @@ export const api = {
     range: TimeRange = {},
     hostFilter?: string | null,
     excludePatterns?: string[],
+    sortBy?: RequestSortField | null,
+    sortDir?: SortDirection | null,
+    afterSeq?: number | null,
+    methodFilter?: string | null,
+    statusFilter?: RequestStatusFilter | null,
+    searchBody?: boolean,
   ) =>
     invoke<QueryPage>("query_entries", {
       sessionId,
@@ -208,6 +221,11 @@ export const api = {
       range,
       ...(hostFilter ? { hostFilter } : {}),
       ...(excludePatterns?.length ? { excludePatterns } : {}),
+      ...(sortBy ? { sortBy, sortDir: sortDir ?? "desc" } : {}),
+      ...(afterSeq != null ? { afterSeq } : {}),
+      ...(methodFilter ? { methodFilter } : {}),
+      ...(statusFilter ? { statusFilter } : {}),
+      ...(searchBody ? { searchBody: true } : {}),
     }),
   metadata: (sessionId: string, entryId: string) =>
     invoke<string>("get_entry_metadata", { sessionId, entryId }),

@@ -156,7 +156,13 @@ export function DiagnosticDetail({
                 </div>
               ))}
           </dl>
-          <pre className="log-message">{message}</pre>
+          <pre
+            className="log-message"
+            data-select-scope="log-message"
+            tabIndex={0}
+          >
+            {message}
+          </pre>
           {event.relatedNetworkEntryId && (
             <RelatedRequest
               key={JSON.stringify([

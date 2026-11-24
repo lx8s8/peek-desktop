@@ -27,6 +27,8 @@ export interface SessionSummary {
   version?: number;
   dropped?: number;
   evicted?: number;
+  spilledCount?: number;
+  spilledBytes?: number;
   diagnosticCount?: number;
   diagnosticsOnline?: boolean;
   id: string;
@@ -47,6 +49,7 @@ export interface SessionSummary {
 export interface EntryRow {
   contentRevision?: string;
   id: string;
+  seq?: number;
   source: string;
   method: string;
   url: string;
@@ -57,6 +60,9 @@ export interface EntryRow {
   pinned: boolean;
   responseBytes: number | null;
 }
+
+export type RequestSortField = "time" | "duration" | "size";
+export type SortDirection = "asc" | "desc";
 
 export interface DiagnosticRun {
   id: string;
@@ -212,6 +218,11 @@ export interface ReplayRequest {
   url: string;
   headers: [string, string][];
   body: string | null;
+  acceptInvalidCerts?: boolean;
+}
+export interface ReplayBatchRequest extends ReplayRequest {
+  count: number;
+  concurrency: number;
 }
 export interface ReplayResponse {
   status: number;
@@ -222,6 +233,26 @@ export interface ReplayResponse {
   body: string;
   bytes: number;
   truncated: boolean;
+}
+export interface ReplayBatchItem {
+  index: number;
+  ok: boolean;
+  durationMs: number;
+  error: string | null;
+  response: ReplayResponse | null;
+}
+export interface ReplayBatchReport {
+  total: number;
+  succeeded: number;
+  failed: number;
+  totalDurationMs: number;
+  minMs: number;
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  maxMs: number;
+  statusCounts: [string, number][];
+  items: ReplayBatchItem[];
 }
 export interface DiagnosticRef {
   runId: string;
@@ -251,12 +282,19 @@ export interface RemoteSnapshot {
 }
 
 export type Filter = "all" | "errors" | "pending" | "pinned";
+export type RequestStatusFilter = "2xx" | "3xx" | "4xx" | "5xx" | "failed";
 export interface QueryPage {
   total: number;
   offset: number;
   rows: EntryRow[];
   revision: number;
   hosts?: string[];
+  latestSeq?: number;
+  hiddenCount?: number;
+  totalBytes?: number;
+  maxBytes?: number | null;
+  spilledCount?: number;
+  spilledBytes?: number;
 }
 export interface ImportProgress {
   bytesRead: number;

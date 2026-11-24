@@ -468,6 +468,7 @@ export function DiagnosticsTable({
       )}
       <div
         className="diagnostic-table"
+        data-select-window-grid
         ref={grid}
         role="grid"
         aria-label={t(exceptions ? "exceptions" : "logs")}

@@ -1,4 +1,5 @@
 import { writeClipboard } from "../../lib/clipboard";
+import { isTextInputElement, selectElementContents } from "../../lib/selection";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   CaseSensitive,
@@ -14,7 +15,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 
 import type { TextSearchResult } from "./text-search";
-import { renderFormattedText } from "./jsonHighlight";
+import {
+  MAX_HIGHLIGHT_BYTES,
+  renderFormattedText,
+  tokenizeJson,
+} from "./jsonHighlight";
 
 const JsonTree = lazy(() => import("./JsonTree"));
 type Analysis = { formatted: string; error: string; treeSafe: boolean };
@@ -138,6 +143,14 @@ export function JsonViewer({
     }
   }
   const highlightJson = json && !!analysis && !analysis.error;
+  // 基于完整正文预计算 JSON 词法区间并缓存，切换搜索词或上下跳转匹配项时无需重复正则扫描
+  const jsonSpans = useMemo(
+    () =>
+      highlightJson && displayedText.length <= MAX_HIGHLIGHT_BYTES
+        ? tokenizeJson(displayedText)
+        : null,
+    [displayedText, highlightJson],
+  );
   const renderedText = useMemo(
     () =>
       renderFormattedText(
@@ -146,21 +159,35 @@ export function JsonViewer({
         result?.matches.length ? result.matches : null,
         current,
         currentMatch,
+        jsonSpans,
       ),
-    [displayedText, highlightJson, result, current],
+    [displayedText, highlightJson, result, current, jsonSpans],
   );
   return (
     <div
       className="json-viewer"
       onKeyDownCapture={(event) => {
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === "f"
-        ) {
-          event.preventDefault();
-          event.stopPropagation();
-          searchInput.current?.focus();
-          searchInput.current?.select();
+        const mod = event.metaKey || event.ctrlKey;
+        if (mod && !event.altKey && !event.shiftKey) {
+          const key = event.key.toLowerCase();
+          if (key === "f") {
+            event.preventDefault();
+            event.stopPropagation();
+            searchInput.current?.focus();
+            searchInput.current?.select();
+            return;
+          }
+          // ⌘/Ctrl + A 在非输入框内精确限定仅全选当前 JSON 预览区域，防止波及应用其他菜单与面板
+          if (key === "a" && !isTextInputElement(event.target)) {
+            const scope = event.currentTarget.querySelector<HTMLElement>(
+              "[data-select-scope]",
+            );
+            if (scope) {
+              event.preventDefault();
+              event.stopPropagation();
+              selectElementContents(scope);
+            }
+          }
         }
       }}
     >
@@ -321,6 +348,7 @@ export function JsonViewer({
         ) : (
           <pre
             className={`raw-text${wrap ? " is-wrapped" : ""}${highlightJson ? " is-json" : ""}`}
+            data-select-scope="json-text"
             tabIndex={0}
           >
             {renderedText}

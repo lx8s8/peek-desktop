@@ -123,7 +123,7 @@ export function menuItems(snapshot: MenuSnapshot): Items {
         native("Cut", "menuCut"),
         native("Copy", "menuCopy"),
         native("Paste", "menuPaste"),
-        native("SelectAll", "menuSelectAll"),
+        item("edit.selectAll"),
         separator(),
         item("edit.find"),
         item("edit.copyMessage"),

@@ -64,6 +64,7 @@ pub fn run() {
             commands::copy_curl,
             commands::copy_snippet,
             commands::replay_request,
+            commands::replay_request_batch,
             commands::recovery_status,
             commands::set_recovery_enabled,
             commands::save_recovery,

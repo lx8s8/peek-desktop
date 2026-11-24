@@ -334,21 +334,47 @@ export function StackSymbolicator({
                 <div className="symbolized-col-label">
                   {t("viewSymbolized")}
                 </div>
-                <pre className="symbolized-pre">{result.symbolizedStack}</pre>
+                <pre
+                  className="symbolized-pre"
+                  data-select-scope="stack-symbolized"
+                  tabIndex={0}
+                >
+                  {result.symbolizedStack}
+                </pre>
               </div>
               <div>
                 <div className="symbolized-col-label">{t("viewOriginal")}</div>
-                <pre className="original-pre">{stack}</pre>
+                <pre
+                  className="original-pre"
+                  data-select-scope="stack-original"
+                  tabIndex={0}
+                >
+                  {stack}
+                </pre>
               </div>
             </div>
           ) : viewMode === "symbolized" ? (
-            <pre className="symbolized-pre">{result.symbolizedStack}</pre>
+            <pre
+              className="symbolized-pre"
+              data-select-scope="stack-symbolized"
+              tabIndex={0}
+            >
+              {result.symbolizedStack}
+            </pre>
           ) : (
-            <pre className="original-pre">{stack}</pre>
+            <pre
+              className="original-pre"
+              data-select-scope="stack-original"
+              tabIndex={0}
+            >
+              {stack}
+            </pre>
           )}
         </div>
       ) : stack ? (
-        <pre>{stack}</pre>
+        <pre data-select-scope="stack-original" tabIndex={0}>
+          {stack}
+        </pre>
       ) : (
         <p>{t("noStack")}</p>
       )}

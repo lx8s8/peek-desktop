@@ -277,6 +277,74 @@ export const reviewZh = {
   replayTabRequest: "请求编辑",
   replayTabResponse: "响应结果",
   replayInMenu: "重发请求…",
+  networkClear: "清屏",
+  networkClearHint:
+    "隐藏当前已有请求，历史数据仍保留在内存中可随时切回查看（快捷键 ⌘/Ctrl+L）",
+  networkShowHistory: "查看历史 ({{count}})",
+  networkHideHistory: "回到清屏视图",
+  networkClearDismiss: "取消清屏分界",
+  networkClearedEmpty: "已清屏，等待新请求",
+  networkClearedHint:
+    "只显示清屏之后到达的新请求，历史数据仍完整保留，随时可点击「查看历史」切换回来。",
+  networkClearedWithEvictedHint:
+    "清屏前尚保留 {{retained}} 条历史可切回查看，另有 {{evicted}} 条因超出容量上限已自动淘汰。",
+  networkClearedAllEvictedHint:
+    "清屏前的 {{evicted}} 条历史已因超出容量上限自动淘汰；如需长期保存请及时导出会话。",
+  networkEvictedBadge: "超限淘汰 {{count}}",
+  networkBeforeClearBadge: "清屏前",
+  networkCapacityUsage: "缓存 {{used}} / {{limit}}",
+  networkCapacityNearLimit:
+    "会话缓存即将触顶，继续抓包将优先淘汰清屏前的最早历史记录",
+  saveSessionNow: "保存会话",
+  streamReturnCleared: "回到清屏",
+  sortColumnHint: "点击按{{column}}排序（降序 / 升序 / 恢复默认）",
+  sortAnnounceDesc: "已按{{column}}降序排列",
+  sortAnnounceAsc: "已按{{column}}升序排列",
+  sortAnnounceReset: "已恢复默认采集顺序",
+  replayFormatJson: "格式化 JSON",
+  replayInvalidJsonBody: "当前请求正文不是合法 JSON，无法格式化。",
+  replayAcceptInvalidCerts: "忽略自签名证书（仅测试环境）",
+  replayResponseBody: "响应正文",
+  replayResponseHeaders: "响应头",
+  replayResponseDiff: "与原响应对比",
+  replayShortcutHint: "⌘/Ctrl+Enter 发送",
+  replayFormEncodedHint:
+    "已自动将抓包表单字段还原为 application/x-www-form-urlencoded 请求体。",
+  replayMultipartFilesHint:
+    "原请求包含上传文件（{{files}}），仅还原了文本字段，二进制文件暂无法从抓包直接重放。",
+  replayBodyUnavailableHint:
+    "原请求正文未完整采集（{{reason}}），发送前请确认或手动补全请求正文。",
+  replayBodyTruncatedHint: "原请求正文已被截断，重发前请检查正文是否完整。",
+  replayOriginalEmpty: "原抓包请求未记录响应正文，无法进行差异对比。",
+  replayDiffBaseline: "原抓包响应",
+  replayDiffLatest: "本次重发响应",
+  searchBodyToggle: "正文",
+  searchBodyHint: "同时跨请求全文检索请求头、请求体与响应体内容",
+  allMethods: "全部方法",
+  allStatusCodes: "全部状态",
+  statusFailedOnly: "网络失败",
+  resetFilters: "重置筛选",
+  waterfall: "耗时分布",
+  tableColumns: "显示列配置",
+  resetTableColumns: "恢复默认列宽与列",
+  resizeColumnHint: "拖拽调整列宽，双击恢复默认",
+  networkSpilledBadge: "磁盘冷存 {{count}} 条 ({{size}})",
+  networkSpilledHint:
+    "超过热内存上限的历史已自动溢出至本地临时冷存储，可随时切回查看、搜索和重发，退出应用自动清理。",
+  repeatOnceInMenu: "原样重发一次",
+  repeatAdvancedInMenu: "批量重复重发…",
+  quickRepeatDone:
+    "已重发 {{method}} {{path}} → {{status}} · {{ms}} ms · {{size}}",
+  quickRepeatFailed: "快捷重发失败：{{error}}",
+  quickRepeatInspect: "查看响应",
+  replayRepeatCount: "重复次数",
+  replayConcurrency: "并发数",
+  replayRunBatch: "批量重发 ({{count}} 次)",
+  replayBatchSummary: "成功 {{ok}}/{{total}} · 失败 {{fail}}",
+  replayBatchLatency:
+    "总耗时 {{total}} ms · Min {{min}} · P50 {{p50}} · P95 {{p95}} · Max {{max}} ms",
+  replayBatchIndex: "序号",
+  replayBatchSelectHint: "点击左侧任意一次执行记录查看该次响应正文与响应头",
 };
 export const reviewEn: Record<keyof typeof reviewZh, string> = {
   diagnosticsLive: "Diagnostics online",
@@ -564,4 +632,75 @@ export const reviewEn: Record<keyof typeof reviewZh, string> = {
   replayTabRequest: "Request",
   replayTabResponse: "Response",
   replayInMenu: "Replay request…",
+  networkClear: "Clear",
+  networkClearHint:
+    "Hide current requests while keeping history retained to toggle back anytime (⌘/Ctrl+L)",
+  networkShowHistory: "Show history ({{count}})",
+  networkHideHistory: "Back to cleared",
+  networkClearDismiss: "Reset clear mark",
+  networkClearedEmpty: "Cleared, waiting for new requests",
+  networkClearedHint:
+    "Showing only requests received after clearing. Retained history can be toggled back anytime.",
+  networkClearedWithEvictedHint:
+    "{{retained}} pre-clear requests remain available; {{evicted}} older entries were evicted due to retention limits.",
+  networkClearedAllEvictedHint:
+    "All {{evicted}} pre-clear requests were evicted due to retention limits. Save the session to keep data permanently.",
+  networkEvictedBadge: "{{count}} evicted",
+  networkBeforeClearBadge: "Before clear",
+  networkCapacityUsage: "Buffer {{used}} / {{limit}}",
+  networkCapacityNearLimit:
+    "Session buffer is nearing capacity; oldest history will be evicted first",
+  saveSessionNow: "Save session",
+  streamReturnCleared: "Back to cleared",
+  sortColumnHint: "Sort by {{column}} (descending / ascending / default)",
+  sortAnnounceDesc: "Sorted by {{column}}, descending",
+  sortAnnounceAsc: "Sorted by {{column}}, ascending",
+  sortAnnounceReset: "Restored default capture order",
+  replayFormatJson: "Format JSON",
+  replayInvalidJsonBody: "Request body is not valid JSON.",
+  replayAcceptInvalidCerts: "Ignore invalid TLS certs (dev/test only)",
+  replayResponseBody: "Body",
+  replayResponseHeaders: "Headers",
+  replayResponseDiff: "Diff vs original",
+  replayShortcutHint: "⌘/Ctrl+Enter to send",
+  replayFormEncodedHint:
+    "Form fields were automatically restored as application/x-www-form-urlencoded.",
+  replayMultipartFilesHint:
+    "Original request included uploaded files ({{files}}); only text fields were restored.",
+  replayBodyUnavailableHint:
+    "Original request body was not fully captured ({{reason}}). Verify or complete it before sending.",
+  replayBodyTruncatedHint:
+    "Original request body was truncated. Verify completeness before sending.",
+  replayOriginalEmpty: "No captured response body available to diff against.",
+  replayDiffBaseline: "Captured response",
+  replayDiffLatest: "Replayed response",
+  searchBodyToggle: "Body",
+  searchBodyHint:
+    "Search across captured request headers, request bodies, and response bodies",
+  allMethods: "All methods",
+  allStatusCodes: "All statuses",
+  statusFailedOnly: "Failed",
+  resetFilters: "Reset",
+  waterfall: "Waterfall",
+  tableColumns: "Configure columns",
+  resetTableColumns: "Reset columns & widths",
+  resizeColumnHint: "Drag to resize column; double-click to reset",
+  networkSpilledBadge: "Disk cold store {{count}} ({{size}})",
+  networkSpilledHint:
+    "Entries beyond hot memory automatically spill to a temporary local cold store and remain searchable and inspectable until exit.",
+  repeatOnceInMenu: "Repeat once now",
+  repeatAdvancedInMenu: "Repeat multiple…",
+  quickRepeatDone:
+    "Repeated {{method}} {{path}} → {{status}} · {{ms}} ms · {{size}}",
+  quickRepeatFailed: "Repeat failed: {{error}}",
+  quickRepeatInspect: "Inspect",
+  replayRepeatCount: "Repeat",
+  replayConcurrency: "Concurrency",
+  replayRunBatch: "Repeat ({{count}}×)",
+  replayBatchSummary: "OK {{ok}}/{{total}} · Failed {{fail}}",
+  replayBatchLatency:
+    "Total {{total}} ms · Min {{min}} · P50 {{p50}} · P95 {{p95}} · Max {{max}} ms",
+  replayBatchIndex: "#",
+  replayBatchSelectHint:
+    "Select a run on the left to inspect its response body and headers",
 };

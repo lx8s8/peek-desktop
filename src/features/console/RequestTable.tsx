@@ -8,26 +8,72 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Code2,
+  Columns3,
   Copy,
+  Eraser,
   EyeOff,
   Filter as FilterIcon,
   GitCompareArrows,
   Pin,
   Play,
+  Repeat,
+  RotateCcw,
   SearchX,
   Terminal,
   TerminalSquare,
+  Zap,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Button } from "../../components/ui/button";
 import { api } from "../../lib/ipc/client";
 import type {
   EntryRow,
   Filter,
   QueryPage,
+  RequestSortField,
+  RequestStatusFilter,
+  SortDirection,
   TimeRange,
 } from "../../lib/ipc/types";
-import { formatBytes } from "../../lib/preferences";
+import {
+  DEFAULT_OPTIONAL_COLUMNS,
+  DEFAULT_REQUEST_COLUMN_WIDTHS,
+  formatBytes,
+  readRequestTableLayout,
+  writeRequestTableLayout,
+  type OptionalRequestColumn,
+  type RequestTableLayoutPrefs,
+} from "../../lib/preferences";
+
+const SORTABLE_COLUMN_MAP: Partial<Record<string, RequestSortField>> = {
+  durationMs: "duration",
+  responseBytes: "size",
+  startedAt: "time",
+};
+
+const OPTIONAL_COLUMN_LABELS: {
+  id: OptionalRequestColumn;
+  labelKey: string;
+}[] = [
+  { id: "durationMs", labelKey: "duration" },
+  { id: "waterfall", labelKey: "waterfall" },
+  { id: "responseBytes", labelKey: "size" },
+  { id: "startedAt", labelKey: "time" },
+  { id: "source", labelKey: "source" },
+];
+
+export interface RequestTableMeta {
+  latestSeq: number;
+  hiddenCount: number;
+  totalBytes: number;
+  maxBytes: number | null;
+  spilledCount: number;
+  spilledBytes: number;
+}
 
 /** 将完整 URL 拆分为高亮 Path+Query 与弱化 Host，方便抓包时快速扫读接口名。 */
 function splitUrl(raw: string): {
@@ -65,16 +111,30 @@ export function RequestTable({
   range,
   hostFilter,
   excludePatterns,
+  methodFilter,
+  statusFilter,
+  searchBody = false,
+  sortBy,
+  sortDir = "desc",
+  afterSeq,
+  clearMarkSeq,
+  clearEvictedCount = 0,
   selectedId,
   compareAnchor,
   onSelect,
   onCount,
+  onMeta,
   onHosts,
+  onSortChange,
+  onRestoreHistory,
+  onDismissClear,
   onPinToggle,
   onFilterHost,
   onExcludePath,
   onLocateInStream,
   onReplay,
+  onQuickRepeat,
+  onRepeatBatch,
   onSetCompareAnchor,
   onCompareWithAnchor,
   onCopyAction,
@@ -88,16 +148,30 @@ export function RequestTable({
   range?: TimeRange;
   hostFilter?: string | null;
   excludePatterns?: string[];
+  methodFilter?: string | null;
+  statusFilter?: RequestStatusFilter | null;
+  searchBody?: boolean;
+  sortBy?: RequestSortField | null;
+  sortDir?: SortDirection;
+  afterSeq?: number | null;
+  clearMarkSeq?: number | null;
+  clearEvictedCount?: number;
   selectedId?: string;
   compareAnchor?: EntryRow | null;
   onSelect: (entry: EntryRow) => void;
   onCount: (count: number) => void;
+  onMeta?: (meta: RequestTableMeta) => void;
   onHosts?: (hosts: string[]) => void;
+  onSortChange?: (field: RequestSortField | null, dir: SortDirection) => void;
+  onRestoreHistory?: () => void;
+  onDismissClear?: () => void;
   onPinToggle?: (entry: EntryRow) => void;
   onFilterHost?: (host: string) => void;
   onExcludePath?: (pattern: string) => void;
   onLocateInStream?: (entry: EntryRow) => void;
   onReplay?: (entry: EntryRow) => void;
+  onQuickRepeat?: (entry: EntryRow) => void;
+  onRepeatBatch?: (entry: EntryRow) => void;
   onSetCompareAnchor?: (entry: EntryRow) => void;
   onCompareWithAnchor?: (entry: EntryRow) => void;
   onCopyAction?: (entry: EntryRow, kind: RequestCopyKind) => void;
@@ -119,11 +193,70 @@ export function RequestTable({
   const revision = useRef(0);
   const navRevision = useRef(0);
   const [failure, setFailure] = useState(false);
+  const [sortStatus, setSortStatus] = useState("");
+  const [tableLayout, setTableLayout] = useState<RequestTableLayoutPrefs>(() =>
+    readRequestTableLayout(),
+  );
+  const [colMenuPos, setColMenuPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [menu, setMenu] = useState<{
     x: number;
     y: number;
     entry: EntryRow;
   } | null>(null);
+
+  const updateLayout = (
+    updater: (prev: RequestTableLayoutPrefs) => RequestTableLayoutPrefs,
+  ) => {
+    setTableLayout((prev) => {
+      const next = updater(prev);
+      writeRequestTableLayout(next);
+      return next;
+    });
+  };
+
+  function startColumnResize(
+    colId: string,
+    event: React.PointerEvent<HTMLSpanElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth =
+      tableLayout.widths[colId] ?? DEFAULT_REQUEST_COLUMN_WIDTHS[colId] ?? 72;
+    const onMove = (moveEvent: PointerEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const nextWidth = Math.max(
+        44,
+        Math.min(240, Math.round(startWidth + delta)),
+      );
+      updateLayout((prev) => ({
+        ...prev,
+        widths: { ...prev.widths, [colId]: nextWidth },
+      }));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  useEffect(() => {
+    if (!colMenuPos) return;
+    const close = () => setColMenuPos(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setColMenuPos(null);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [colMenuPos]);
 
   const virtualizer = useVirtualizer({
     count: page.total,
@@ -140,7 +273,20 @@ export function RequestTable({
     setLoading(true);
     scroll.current?.scrollTo({ top: 0 });
     ++navRevision.current;
-  }, [sessionId, search, filter, rangeKey, hostFilter, excludeKey]);
+  }, [
+    sessionId,
+    search,
+    filter,
+    rangeKey,
+    hostFilter,
+    excludeKey,
+    methodFilter,
+    statusFilter,
+    searchBody,
+    sortBy,
+    sortDir,
+    afterSeq,
+  ]);
 
   useEffect(() => {
     setOffset(Math.max(0, Math.floor(start / 100) * 100 - 100));
@@ -169,7 +315,15 @@ export function RequestTable({
     setFailure(false);
     const parsedRange = JSON.parse(rangeKey) as TimeRange;
     const parsedExcludes = JSON.parse(excludeKey) as string[];
-    const hasExtra = !!(hostFilter || parsedExcludes.length > 0);
+    const hasExtra = !!(
+      hostFilter ||
+      parsedExcludes.length > 0 ||
+      methodFilter ||
+      statusFilter ||
+      searchBody ||
+      sortBy ||
+      afterSeq != null
+    );
     const promise = hasExtra
       ? api.query(
           sessionId,
@@ -181,6 +335,12 @@ export function RequestTable({
           parsedRange,
           hostFilter,
           parsedExcludes,
+          sortBy,
+          sortDir,
+          afterSeq,
+          methodFilter,
+          statusFilter,
+          searchBody,
         )
       : api.query(sessionId, search, filter, offset, request, 300, parsedRange);
 
@@ -194,6 +354,14 @@ export function RequestTable({
           return;
         setPage(result);
         onCount(result.total);
+        onMeta?.({
+          latestSeq: result.latestSeq ?? 0,
+          hiddenCount: result.hiddenCount ?? 0,
+          totalBytes: result.totalBytes ?? 0,
+          maxBytes: result.maxBytes ?? null,
+          spilledCount: result.spilledCount ?? 0,
+          spilledBytes: result.spilledBytes ?? 0,
+        });
         if (result.hosts) onHosts?.(result.hosts);
         setLoading(false);
       })
@@ -217,14 +385,32 @@ export function RequestTable({
     rangeKey,
     hostFilter,
     excludeKey,
+    methodFilter,
+    statusFilter,
+    searchBody,
+    sortBy,
+    sortDir,
+    afterSeq,
     onCount,
+    onMeta,
     onHosts,
     onError,
   ]);
 
-  const columns = useMemo<ColumnDef<EntryRow>[]>(
-    () => [
+  const maxPageDuration = useMemo(() => {
+    let max = 200;
+    for (const row of page.rows) {
+      if (row.durationMs !== null && row.durationMs > max) {
+        max = row.durationMs;
+      }
+    }
+    return max;
+  }, [page.rows]);
+
+  const columns = useMemo<ColumnDef<EntryRow>[]>(() => {
+    const all: ColumnDef<EntryRow>[] = [
       {
+        id: "method",
         accessorKey: "method",
         header: t("method"),
         cell: (info) => {
@@ -256,6 +442,7 @@ export function RequestTable({
         },
       },
       {
+        id: "status",
         accessorKey: "status",
         header: t("status"),
         cell: (info) => {
@@ -270,6 +457,7 @@ export function RequestTable({
         },
       },
       {
+        id: "url",
         accessorKey: "url",
         header: t("url"),
         cell: (info) => {
@@ -285,41 +473,144 @@ export function RequestTable({
           );
         },
       },
-      {
-        accessorKey: "durationMs",
-        header: t("duration"),
-        cell: (info) => {
-          const ms = info.row.original.durationMs;
-          if (ms === null) return <span className="num-cell muted">—</span>;
-          const slow = ms >= 2500 ? "is-very-slow" : ms >= 800 ? "is-slow" : "";
-          return (
-            <span className={`num-cell ${slow}`}>{`${ms.toFixed(0)} ms`}</span>
-          );
-        },
-      },
-      {
-        accessorKey: "responseBytes",
-        header: t("size"),
-        cell: (info) => (
-          <span className="num-cell muted">
-            {formatBytes(info.row.original.responseBytes)}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "startedAt",
-        header: t("time"),
-        cell: (info) => (
-          <span className="num-cell muted" title={info.row.original.startedAt}>
-            {new Date(info.row.original.startedAt).toLocaleTimeString(
-              i18n.language,
-              { hour12: false },
-            )}
-          </span>
-        ),
-      },
-    ],
-    [t, i18n.language, onPinToggle, compareAnchor?.id],
+      ...(tableLayout.visible.durationMs
+        ? ([
+            {
+              id: "durationMs",
+              accessorKey: "durationMs",
+              header: t("duration"),
+              cell: (info) => {
+                const ms = info.row.original.durationMs;
+                if (ms === null)
+                  return <span className="num-cell muted">—</span>;
+                const slow =
+                  ms >= 2500 ? "is-very-slow" : ms >= 800 ? "is-slow" : "";
+                return (
+                  <span
+                    className={`num-cell ${slow}`}
+                  >{`${ms.toFixed(0)} ms`}</span>
+                );
+              },
+            },
+          ] as ColumnDef<EntryRow>[])
+        : []),
+      ...(tableLayout.visible.waterfall
+        ? ([
+            {
+              id: "waterfall",
+              header: t("waterfall"),
+              cell: (info) => {
+                const row = info.row.original;
+                const ms = row.durationMs;
+                if (ms === null) {
+                  return (
+                    <span className="wf-mini-track">
+                      <span
+                        className="wf-mini-bar is-pending"
+                        style={{ width: "16%" }}
+                      />
+                    </span>
+                  );
+                }
+                const pct = Math.max(
+                  5,
+                  Math.min(100, (ms / maxPageDuration) * 100),
+                );
+                const tone =
+                  row.state === "failed" ||
+                  (row.status !== null && row.status >= 500)
+                    ? "is-error"
+                    : ms >= 2500
+                      ? "is-very-slow"
+                      : ms >= 800
+                        ? "is-slow"
+                        : "is-fast";
+                return (
+                  <span className="wf-mini-track" title={`${ms.toFixed(1)} ms`}>
+                    <span
+                      className={`wf-mini-bar ${tone}`}
+                      style={{ width: `${pct.toFixed(1)}%` }}
+                    />
+                  </span>
+                );
+              },
+            },
+          ] as ColumnDef<EntryRow>[])
+        : []),
+      ...(tableLayout.visible.responseBytes
+        ? ([
+            {
+              id: "responseBytes",
+              accessorKey: "responseBytes",
+              header: t("size"),
+              cell: (info) => (
+                <span className="num-cell muted">
+                  {formatBytes(info.row.original.responseBytes)}
+                </span>
+              ),
+            },
+          ] as ColumnDef<EntryRow>[])
+        : []),
+      ...(tableLayout.visible.startedAt
+        ? ([
+            {
+              id: "startedAt",
+              accessorKey: "startedAt",
+              header: t("time"),
+              cell: (info) => (
+                <span
+                  className="num-cell muted"
+                  title={info.row.original.startedAt}
+                >
+                  {new Date(info.row.original.startedAt).toLocaleTimeString(
+                    i18n.language,
+                    { hour12: false },
+                  )}
+                </span>
+              ),
+            },
+          ] as ColumnDef<EntryRow>[])
+        : []),
+      ...(tableLayout.visible.source
+        ? ([
+            {
+              id: "source",
+              accessorKey: "source",
+              header: t("source"),
+              cell: (info) => (
+                <span
+                  className="muted source-cell"
+                  title={info.row.original.source}
+                >
+                  {info.row.original.source}
+                </span>
+              ),
+            },
+          ] as ColumnDef<EntryRow>[])
+        : []),
+    ];
+    return all;
+  }, [
+    t,
+    i18n.language,
+    onPinToggle,
+    compareAnchor?.id,
+    tableLayout.visible,
+    maxPageDuration,
+  ]);
+
+  const gridTemplateColumns = useMemo(
+    () =>
+      columns
+        .map((col) => {
+          const id = col.id ?? "";
+          if (id === "url") return "minmax(120px, 1fr)";
+          const w =
+            tableLayout.widths[id] ?? DEFAULT_REQUEST_COLUMN_WIDTHS[id] ?? 70;
+          return `${w}px`;
+        })
+        .join(" "),
+    [columns, tableLayout.widths],
   );
 
   const table = useReactTable({
@@ -344,7 +635,15 @@ export function RequestTable({
     try {
       const parsedRange = JSON.parse(rangeKey) as TimeRange;
       const parsedExcludes = JSON.parse(excludeKey) as string[];
-      const hasExtra = !!(hostFilter || parsedExcludes.length > 0);
+      const hasExtra = !!(
+        hostFilter ||
+        parsedExcludes.length > 0 ||
+        methodFilter ||
+        statusFilter ||
+        searchBody ||
+        sortBy ||
+        afterSeq != null
+      );
       const result = hasExtra
         ? await api.query(
             sessionId,
@@ -356,12 +655,32 @@ export function RequestTable({
             parsedRange,
             hostFilter,
             parsedExcludes,
+            sortBy,
+            sortDir,
+            afterSeq,
+            methodFilter,
+            statusFilter,
+            searchBody,
           )
         : await api.query(sessionId, search, filter, next, 0, 1, parsedRange);
       if (request === navRevision.current && result.rows[0])
         onSelect(result.rows[0]);
     } catch (error) {
       onError(String(error));
+    }
+  }
+
+  function handleToggleSort(field: RequestSortField, label: string) {
+    if (!onSortChange) return;
+    if (sortBy !== field) {
+      onSortChange(field, "desc");
+      setSortStatus(t("sortAnnounceDesc", { column: label }));
+    } else if (sortDir === "desc") {
+      onSortChange(field, "asc");
+      setSortStatus(t("sortAnnounceAsc", { column: label }));
+    } else {
+      onSortChange(null, "desc");
+      setSortStatus(t("sortAnnounceReset"));
     }
   }
 
@@ -400,12 +719,103 @@ export function RequestTable({
         }
       }}
     >
-      <div className="table-header table-grid" role="row">
-        {table.getHeaderGroups()[0].headers.map((header) => (
-          <div key={header.id} role="columnheader">
-            {flexRender(header.column.columnDef.header, header.getContext())}
-          </div>
-        ))}
+      <div className="sr-only" role="status" aria-live="polite">
+        {sortStatus}
+      </div>
+      <div className="table-header-wrap">
+        <div
+          className="table-header table-grid"
+          style={{ gridTemplateColumns }}
+          role="row"
+        >
+          {table.getHeaderGroups()[0].headers.map((header) => {
+            const sortField = SORTABLE_COLUMN_MAP[header.id];
+            const label = String(header.column.columnDef.header);
+            const isSorted = !!sortField && sortBy === sortField;
+            const ariaSort = isSorted
+              ? sortDir === "asc"
+                ? "ascending"
+                : "descending"
+              : undefined;
+            const resizable = header.id !== "url";
+            return (
+              <div
+                key={header.id}
+                role="columnheader"
+                aria-sort={ariaSort}
+                className={`table-col-head${sortField && onSortChange ? " is-sortable-header" : ""}`}
+              >
+                {sortField && onSortChange ? (
+                  <button
+                    type="button"
+                    className={`sort-header-btn${isSorted ? " is-sorted" : ""}`}
+                    title={t("sortColumnHint", { column: label })}
+                    onClick={() => handleToggleSort(sortField, label)}
+                  >
+                    <span>{label}</span>
+                    <span className="sort-icon" aria-hidden="true">
+                      {isSorted ? (
+                        sortDir === "asc" ? (
+                          <ArrowUp size={11} />
+                        ) : (
+                          <ArrowDown size={11} />
+                        )
+                      ) : (
+                        <ArrowUpDown size={10} />
+                      )}
+                    </span>
+                  </button>
+                ) : (
+                  <span className="col-head-label">
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+                  </span>
+                )}
+                {resizable && (
+                  <span
+                    className="col-resize-handle"
+                    title={t("resizeColumnHint")}
+                    aria-hidden="true"
+                    onPointerDown={(event) =>
+                      startColumnResize(header.id, event)
+                    }
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      const fallback =
+                        DEFAULT_REQUEST_COLUMN_WIDTHS[header.id] ?? 72;
+                      updateLayout((prev) => ({
+                        ...prev,
+                        widths: { ...prev.widths, [header.id]: fallback },
+                      }));
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="col-config-btn"
+          title={t("tableColumns")}
+          aria-label={t("tableColumns")}
+          onClick={(event) => {
+            event.stopPropagation();
+            const rect = event.currentTarget.getBoundingClientRect();
+            setColMenuPos((prev) =>
+              prev
+                ? null
+                : {
+                    x: Math.max(8, rect.right - 180),
+                    y: Math.min(window.innerHeight - 230, rect.bottom + 4),
+                  },
+            );
+          }}
+        >
+          <Columns3 size={12} />
+        </button>
       </div>
       <div className="table-scroll" ref={scroll} aria-busy={loading}>
         {failure ? (
@@ -417,33 +827,80 @@ export function RequestTable({
           </div>
         ) : page.total === 0 ? (
           <div className="table-empty">
-            <SearchX />
+            {afterSeq != null && !loading ? <Eraser /> : <SearchX />}
             <h2>
               {t(
                 loading
                   ? "loading"
-                  : search ||
-                      filter !== "all" ||
-                      hostFilter ||
-                      (excludePatterns?.length ?? 0) > 0
-                    ? "noMatches"
-                    : "emptySession",
+                  : afterSeq != null &&
+                      !search &&
+                      filter === "all" &&
+                      !hostFilter &&
+                      !methodFilter &&
+                      !statusFilter &&
+                      (excludePatterns?.length ?? 0) === 0
+                    ? "networkClearedEmpty"
+                    : search ||
+                        filter !== "all" ||
+                        hostFilter ||
+                        methodFilter ||
+                        statusFilter ||
+                        (excludePatterns?.length ?? 0) > 0
+                      ? "noMatches"
+                      : "emptySession",
               )}
             </h2>
             {!loading && (
               <p>
-                {t(
-                  search ||
-                    filter !== "all" ||
-                    hostFilter ||
-                    (excludePatterns?.length ?? 0) > 0
-                    ? "noMatchesHint"
-                    : live
-                      ? "liveEmptyHint"
-                      : "emptySessionHint",
-                )}
+                {afterSeq != null &&
+                !search &&
+                filter === "all" &&
+                !hostFilter &&
+                !methodFilter &&
+                !statusFilter &&
+                (excludePatterns?.length ?? 0) === 0
+                  ? clearEvictedCount > 0 && (page.hiddenCount ?? 0) > 0
+                    ? t("networkClearedWithEvictedHint", {
+                        retained: page.hiddenCount ?? 0,
+                        evicted: clearEvictedCount,
+                      })
+                    : clearEvictedCount > 0 && (page.hiddenCount ?? 0) === 0
+                      ? t("networkClearedAllEvictedHint", {
+                          evicted: clearEvictedCount,
+                        })
+                      : t("networkClearedHint")
+                  : t(
+                      search ||
+                        filter !== "all" ||
+                        hostFilter ||
+                        methodFilter ||
+                        statusFilter ||
+                        (excludePatterns?.length ?? 0) > 0
+                        ? "noMatchesHint"
+                        : live
+                          ? "liveEmptyHint"
+                          : "emptySessionHint",
+                    )}
               </p>
             )}
+            {!loading &&
+              afterSeq != null &&
+              (page.hiddenCount ?? 0) > 0 &&
+              onRestoreHistory && (
+                <Button size="sm" onClick={onRestoreHistory}>
+                  <RotateCcw size={12} />
+                  {t("networkShowHistory", { count: page.hiddenCount ?? 0 })}
+                </Button>
+              )}
+            {!loading &&
+              afterSeq != null &&
+              (page.hiddenCount ?? 0) === 0 &&
+              clearEvictedCount > 0 &&
+              onDismissClear && (
+                <Button size="sm" variant="ghost" onClick={onDismissClear}>
+                  {t("networkClearDismiss")}
+                </Button>
+              )}
           </div>
         ) : (
           <div
@@ -452,14 +909,23 @@ export function RequestTable({
           >
             {items.map((item) => {
               const row = table.getRowModel().rows[item.index - page.offset];
+              const isBeforeClear =
+                afterSeq == null &&
+                clearMarkSeq != null &&
+                row != null &&
+                row.original.seq != null &&
+                row.original.seq <= clearMarkSeq;
               return row ? (
                 <div
                   key={row.id}
                   role="row"
                   aria-rowindex={item.index + 2}
                   aria-selected={row.id === selectedId}
-                  className={`table-row table-grid ${row.id === selectedId ? "selected" : ""}${row.original.pinned ? " is-pinned-row" : ""}`}
-                  style={{ transform: `translateY(${item.start}px)` }}
+                  className={`table-row table-grid ${row.id === selectedId ? "selected" : ""}${row.original.pinned ? " is-pinned-row" : ""}${isBeforeClear ? " is-before-clear" : ""}`}
+                  style={{
+                    transform: `translateY(${item.start}px)`,
+                    gridTemplateColumns,
+                  }}
                   onClick={() => {
                     ++navRevision.current;
                     onSelect(row.original);
@@ -508,6 +974,18 @@ export function RequestTable({
             style={{ left: menu.x, top: menu.y }}
             onMouseDown={(e) => e.stopPropagation()}
           >
+            {onQuickRepeat && (
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickRepeat(menu.entry);
+                  setMenu(null);
+                }}
+              >
+                <Zap size={13} />
+                {t("repeatOnceInMenu")}
+              </button>
+            )}
             {onReplay && (
               <button
                 type="button"
@@ -518,6 +996,18 @@ export function RequestTable({
               >
                 <Play size={13} />
                 {t("replayInMenu")}
+              </button>
+            )}
+            {onRepeatBatch && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRepeatBatch(menu.entry);
+                  setMenu(null);
+                }}
+              >
+                <Repeat size={13} />
+                {t("repeatAdvancedInMenu")}
               </button>
             )}
             {onPinToggle && (
@@ -645,6 +1135,48 @@ export function RequestTable({
                   )}
               </>
             )}
+          </div>,
+          document.body,
+        )}
+
+      {colMenuPos &&
+        createPortal(
+          <div
+            className="col-config-menu"
+            style={{ left: colMenuPos.x, top: colMenuPos.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="col-config-title">{t("tableColumns")}</div>
+            {OPTIONAL_COLUMN_LABELS.map((col) => (
+              <label key={col.id} className="col-config-item">
+                <input
+                  type="checkbox"
+                  checked={tableLayout.visible[col.id]}
+                  onChange={(e) =>
+                    updateLayout((prev) => ({
+                      ...prev,
+                      visible: { ...prev.visible, [col.id]: e.target.checked },
+                    }))
+                  }
+                />
+                <span>{t(col.labelKey)}</span>
+              </label>
+            ))}
+            <div className="req-menu-sep" />
+            <button
+              type="button"
+              className="col-config-reset"
+              onClick={() => {
+                updateLayout(() => ({
+                  widths: { ...DEFAULT_REQUEST_COLUMN_WIDTHS },
+                  visible: { ...DEFAULT_OPTIONAL_COLUMNS },
+                }));
+                setColMenuPos(null);
+              }}
+            >
+              <RotateCcw size={11} />
+              {t("resetTableColumns")}
+            </button>
           </div>,
           document.body,
         )}

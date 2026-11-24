@@ -32,7 +32,7 @@ export function LegalDocument({ text }: { text: string }) {
           </Button>
         </div>
       )}
-      <pre className="legal-text" tabIndex={0}>
+      <pre className="legal-text" data-select-scope="legal-text" tabIndex={0}>
         {pages[current]}
       </pre>
     </div>

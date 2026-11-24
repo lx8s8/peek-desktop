@@ -75,3 +75,82 @@ export function resolveDeviceDisplay(
   }
   return { title: alias || reportedName, subtitle: null, alias };
 }
+
+export type OptionalRequestColumn =
+  "durationMs" | "waterfall" | "responseBytes" | "startedAt" | "source";
+
+export interface RequestTableLayoutPrefs {
+  widths: Record<string, number>;
+  visible: Record<OptionalRequestColumn, boolean>;
+}
+
+export const DEFAULT_REQUEST_COLUMN_WIDTHS: Record<string, number> = {
+  method: 72,
+  status: 52,
+  durationMs: 68,
+  waterfall: 76,
+  responseBytes: 68,
+  startedAt: 72,
+  source: 76,
+};
+
+export const DEFAULT_OPTIONAL_COLUMNS: Record<OptionalRequestColumn, boolean> =
+  {
+    durationMs: true,
+    waterfall: true,
+    responseBytes: true,
+    startedAt: true,
+    source: false,
+  };
+
+const TABLE_LAYOUT_KEY = "requestTableLayout";
+
+/** 读取持久化保存的网络请求列表列宽与可选列显隐配置。 */
+export function readRequestTableLayout(): RequestTableLayoutPrefs {
+  try {
+    const raw = readPreference(TABLE_LAYOUT_KEY, "");
+    if (!raw) {
+      return {
+        widths: { ...DEFAULT_REQUEST_COLUMN_WIDTHS },
+        visible: { ...DEFAULT_OPTIONAL_COLUMNS },
+      };
+    }
+    const parsed = JSON.parse(raw) as Partial<RequestTableLayoutPrefs>;
+    const widths: Record<string, number> = { ...DEFAULT_REQUEST_COLUMN_WIDTHS };
+    if (parsed.widths && typeof parsed.widths === "object") {
+      for (const [k, v] of Object.entries(parsed.widths)) {
+        if (
+          typeof v === "number" &&
+          Number.isFinite(v) &&
+          v >= 40 &&
+          v <= 260
+        ) {
+          widths[k] = Math.round(v);
+        }
+      }
+    }
+    const visible: Record<OptionalRequestColumn, boolean> = {
+      ...DEFAULT_OPTIONAL_COLUMNS,
+    };
+    if (parsed.visible && typeof parsed.visible === "object") {
+      for (const key of Object.keys(
+        DEFAULT_OPTIONAL_COLUMNS,
+      ) as OptionalRequestColumn[]) {
+        if (typeof parsed.visible[key] === "boolean") {
+          visible[key] = parsed.visible[key];
+        }
+      }
+    }
+    return { widths, visible };
+  } catch {
+    return {
+      widths: { ...DEFAULT_REQUEST_COLUMN_WIDTHS },
+      visible: { ...DEFAULT_OPTIONAL_COLUMNS },
+    };
+  }
+}
+
+/** 持久化保存网络列表列宽与显隐偏好。 */
+export function writeRequestTableLayout(prefs: RequestTableLayoutPrefs) {
+  writePreference(TABLE_LAYOUT_KEY, JSON.stringify(prefs));
+}

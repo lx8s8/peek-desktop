@@ -12,15 +12,19 @@ import {
   ChevronRight,
   Circle,
   FileCode2,
+  FileSearch,
   FileStack,
   FolderOpen,
   Globe2,
+  HardDrive,
   Monitor,
   Ellipsis,
+  Eraser,
   Moon,
   Pencil,
   Puzzle,
   Radio,
+  RotateCcw,
   Save,
   Search,
   Sun,
@@ -60,12 +64,22 @@ import {
 import {
   RequestTable,
   type RequestCopyKind,
+  type RequestTableMeta,
 } from "./features/console/RequestTable";
 import { RequestDiffDialog } from "./features/diff/RequestDiffDialog";
 import { PluginManagerDialog } from "./features/plugins/PluginManagerDialog";
 import { DetailPane } from "./features/detail/DetailPane";
-import { ReplayDialog } from "./features/detail/ReplayDialog";
+import {
+  extractReplayBody,
+  parseRequestHeaders,
+  ReplayDialog,
+} from "./features/detail/ReplayDialog";
 import { writeClipboard } from "./lib/clipboard";
+import {
+  installSelectScopeTracker,
+  isTextInputElement,
+  performScopedSelectAll,
+} from "./lib/selection";
 import { api, desktop } from "./lib/ipc/client";
 import type {
   EntryRow,
@@ -73,6 +87,10 @@ import type {
   ImportProgress,
   ParsedPluginPreview,
   PluginListSnapshot,
+  ReplayResponse,
+  RequestSortField,
+  RequestStatusFilter,
+  SortDirection,
   TimeRange,
   TimelineRow,
 } from "./lib/ipc/types";
@@ -97,12 +115,30 @@ const emptyDiagnosticPane: DiagnosticPaneState = {
   selected: null,
   selection: [],
 };
+const FILTER_METHODS = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "OPTIONS",
+  "HEAD",
+] as const;
+
 interface ViewState {
   search: string;
+  searchBody: boolean;
   filter: Filter;
+  methodFilter: string | null;
+  statusFilter: RequestStatusFilter | null;
   hostFilter: string | null;
   excludePatterns: string[];
   hosts: string[];
+  sortBy: RequestSortField | null;
+  sortDir: SortDirection;
+  clearMarkSeq: number | null;
+  clearActive: boolean;
+  clearInitialHidden: number;
   compareAnchor: EntryRow | null;
   selected: EntryRow | null;
   tab: "network" | "logs" | "exceptions" | "timeline" | "stream";
@@ -118,10 +154,18 @@ interface ViewState {
 }
 const emptyView: ViewState = {
   search: "",
+  searchBody: false,
   filter: "all",
+  methodFilter: null,
+  statusFilter: null,
   hostFilter: null,
   excludePatterns: [],
   hosts: [],
+  sortBy: null,
+  sortDir: "desc",
+  clearMarkSeq: null,
+  clearActive: false,
+  clearInitialHidden: 0,
   compareAnchor: null,
   selected: null,
   tab: "network",
@@ -177,10 +221,15 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const saveRef = useRef(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<{
+    text: string;
+    error: boolean;
+    action?: { label: string; onClick: () => void };
+  } | null>(null);
   const [count, setCount] = useState(0);
+  const [networkMeta, setNetworkMeta] = useState<
+    (RequestTableMeta & { sessionId: string }) | null
+  >(null);
   const [pinTick, setPinTick] = useState(0);
   const [diffPair, setDiffPair] = useState<{
     sessionId: string;
@@ -191,6 +240,8 @@ export default function App() {
     sessionId: string;
     entry: EntryRow;
     metadata?: string;
+    initialBatchMode?: boolean;
+    initialResponse?: ReplayResponse | null;
   } | null>(null);
   const [deviceAliases, setDeviceAliases] = useState<Record<string, string>>(
     () => readDeviceAliases(),
@@ -275,6 +326,9 @@ export default function App() {
         [active.id]: {
           ...(views[active.id] ?? emptyView),
           selected: null,
+          clearMarkSeq: null,
+          clearActive: false,
+          clearInitialHidden: 0,
           timelineSelected: null,
           timelineEntry: null,
           streamSelected: null,
@@ -339,14 +393,23 @@ export default function App() {
     try {
       const entry = await api.entryInfo(sessionId, entryId);
       if (request !== navigation.current) return;
-      setViews((previous) => ({
-        ...previous,
-        [sessionId]: {
-          ...(previous[sessionId] ?? emptyView),
-          tab: "network",
-          selected: entry,
-        },
-      }));
+      setViews((previous) => {
+        const cur = previous[sessionId] ?? emptyView;
+        const hiddenByClear =
+          cur.clearActive &&
+          cur.clearMarkSeq !== null &&
+          entry.seq != null &&
+          entry.seq <= cur.clearMarkSeq;
+        return {
+          ...previous,
+          [sessionId]: {
+            ...cur,
+            tab: "network",
+            selected: entry,
+            ...(hiddenByClear ? { clearActive: false } : {}),
+          },
+        };
+      });
       setIndependent(null);
       setActiveId(sessionId);
     } catch (error) {
@@ -559,6 +622,59 @@ export default function App() {
     }
   };
 
+  /** 右键「原样重发一次」：后台拉取完整请求头与正文并直接重发，在顶部提示结果且支持一键展开详情弹窗。 */
+  const handleQuickRepeat = async (entry: EntryRow) => {
+    if (!active || !desktop) return;
+    const sessionId = active.id;
+    let shortPath = entry.url;
+    try {
+      shortPath = new URL(entry.url).pathname || "/";
+    } catch {
+      /* 保留原始 URL */
+    }
+    try {
+      const [meta, bodyView] = await Promise.all([
+        api.metadata(sessionId, entry.id).catch(() => ""),
+        api.body(sessionId, entry.id, "request").catch(() => null),
+      ]);
+      const reqHeaders = parseRequestHeaders(meta).filter(
+        ([k]) => k.trim().length > 0,
+      );
+      const extracted = extractReplayBody(bodyView);
+      const res = await api.replay({
+        method: entry.method.toUpperCase(),
+        url: entry.url,
+        headers: reqHeaders,
+        body: extracted.text.length > 0 ? extracted.text : null,
+      });
+      setNotice({
+        text: t("quickRepeatDone", {
+          method: entry.method.toUpperCase(),
+          path: shortPath,
+          status: res.status,
+          ms: Math.round(res.durationMs),
+          size: formatBytes(res.bytes),
+        }),
+        error: res.status >= 500,
+        action: {
+          label: t("quickRepeatInspect"),
+          onClick: () =>
+            setReplayTarget({
+              sessionId,
+              entry,
+              metadata: meta,
+              initialResponse: res,
+            }),
+        },
+      });
+    } catch (error) {
+      setNotice({
+        text: t("quickRepeatFailed", { error: String(error) }),
+        error: true,
+      });
+    }
+  };
+
   const save = useCallback(async () => {
     if (!active || saveRef.current || busyRef.current || !desktop) return;
     saveRef.current = true;
@@ -630,6 +746,9 @@ export default function App() {
       !busy &&
       !saving,
   );
+  useCommand("edit.selectAll", () => {
+    performScopedSelectAll();
+  });
   useCommand(
     "edit.find",
     () => {
@@ -701,16 +820,80 @@ export default function App() {
     ["session.save", "session.archive", "session.close"],
     reportError,
   );
+  useEffect(() => installSelectScopeTracker(), []);
+  // 防止在非输入区按 ⌘/Ctrl+A 触发 WebView 全文档选中（波及工具栏、菜单、侧边栏）
+  useEffect(() => {
+    const guardSelectAll = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "a"
+      ) {
+        if (
+          isTextInputElement(event.target) ||
+          isTextInputElement(document.activeElement)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        performScopedSelectAll(event.target);
+      }
+    };
+    window.addEventListener("keydown", guardSelectAll);
+    return () => window.removeEventListener("keydown", guardSelectAll);
+  }, []);
   useEffect(() => {
     if (nativeReady) return;
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.isComposing) return;
       const id = commandForKey(event);
+      if (id === "edit.selectAll") return;
       if (id && commands.dispatch(id)) event.preventDefault();
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
   }, [nativeReady]);
+  const activeMeta =
+    active && networkMeta?.sessionId === active.id ? networkMeta : null;
+  const effectiveAfterSeq =
+    view.clearActive && view.clearMarkSeq !== null ? view.clearMarkSeq : null;
+  const retainedHiddenCount =
+    effectiveAfterSeq !== null ? (activeMeta?.hiddenCount ?? 0) : 0;
+  const evictedHiddenCount =
+    effectiveAfterSeq !== null
+      ? Math.max(0, view.clearInitialHidden - retainedHiddenCount)
+      : 0;
+  const handleClearNetwork = () => {
+    if (!active || active.entryCount === 0) return;
+    const latestSeq = activeMeta?.latestSeq ?? 0;
+    const mark = Math.max(latestSeq, view.clearMarkSeq ?? 0, active.entryCount);
+    updateView({
+      clearMarkSeq: mark,
+      clearActive: true,
+      clearInitialHidden: active.entryCount,
+      selected: null,
+    });
+  };
+  const liveUsedBytes = activeMeta?.totalBytes ?? active?.rawBytes ?? 0;
+  const liveMaxBytes = activeMeta?.maxBytes ?? null;
+  const liveSpilledCount =
+    activeMeta?.spilledCount ?? active?.spilledCount ?? 0;
+  const liveSpilledBytes =
+    activeMeta?.spilledBytes ?? active?.spilledBytes ?? 0;
+  const liveNearLimit =
+    liveMaxBytes !== null &&
+    liveMaxBytes > 0 &&
+    liveUsedBytes / liveMaxBytes >= 0.75;
+  const hasAdvancedNetworkFilter = !!(
+    view.methodFilter ||
+    view.statusFilter ||
+    view.searchBody ||
+    view.hostFilter ||
+    view.excludePatterns.length > 0
+  );
+
   return (
     <main className="workspace">
       <header className="toolbar">
@@ -829,15 +1012,30 @@ export default function App() {
           className={`notice ${notice.error ? "warning" : ""}`}
           role={notice.error ? "alert" : "status"}
         >
-          <span>{notice.text}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t("dismiss")}
-            onClick={() => setNotice(null)}
-          >
-            <X />
-          </Button>
+          <span className="notice-text">{notice.text}</span>
+          <div className="notice-actions">
+            {notice.action && (
+              <button
+                type="button"
+                className="notice-action-btn"
+                onClick={() => {
+                  const fn = notice.action?.onClick;
+                  setNotice(null);
+                  fn?.();
+                }}
+              >
+                {notice.action.label}
+              </button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("dismiss")}
+              onClick={() => setNotice(null)}
+            >
+              <X />
+            </Button>
+          </div>
         </div>
       )}
       {!desktop && <div className="browser-notice">{t("browser")}</div>}
@@ -1095,7 +1293,24 @@ export default function App() {
         </Panel>
         <Separator className="panel-separator" />
         <Panel id="console" defaultSize="49%" minSize={360}>
-          <section className="console">
+          <section
+            className="console"
+            onKeyDown={(event) => {
+              // 网络视图聚焦时支持 ⌘/Ctrl + L 快捷软清屏（不丢数据，随时可切回）
+              if (
+                currentTab === "network" &&
+                active &&
+                (event.metaKey || event.ctrlKey) &&
+                !event.shiftKey &&
+                !event.altKey &&
+                event.key.toLowerCase() === "l" &&
+                !isTextInputElement(event.target)
+              ) {
+                event.preventDefault();
+                handleClearNetwork();
+              }
+            }}
+          >
             {independentRun || active ? (
               <>
                 <div className="console-bar">
@@ -1246,6 +1461,7 @@ export default function App() {
                         />
                         {view.search && (
                           <button
+                            type="button"
                             aria-label={t("dismiss")}
                             onClick={() =>
                               updateView({ search: "", selected: null })
@@ -1254,27 +1470,229 @@ export default function App() {
                             <X size={13} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className={`search-body-toggle${view.searchBody ? " active" : ""}`}
+                          aria-pressed={view.searchBody}
+                          title={t("searchBodyHint")}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            updateView({
+                              searchBody: !view.searchBody,
+                              selected: null,
+                            });
+                          }}
+                        >
+                          <FileSearch size={12} />
+                          <span>{t("searchBodyToggle")}</span>
+                        </button>
                       </label>
                       <div className="filter-row">
-                        <div className="segmented">
-                          {(
-                            ["all", "errors", "pending", "pinned"] as Filter[]
-                          ).map((filter) => (
+                        <div className="filter-row-left">
+                          <div className="segmented">
+                            {(
+                              ["all", "errors", "pending", "pinned"] as Filter[]
+                            ).map((filter) => (
+                              <button
+                                key={filter}
+                                aria-pressed={view.filter === filter}
+                                className={
+                                  view.filter === filter ? "active" : ""
+                                }
+                                onClick={() =>
+                                  updateView({ filter, selected: null })
+                                }
+                              >
+                                {t(filter)}
+                              </button>
+                            ))}
+                          </div>
+                          <select
+                            className={`filter-select${view.methodFilter ? " is-active" : ""}`}
+                            aria-label={t("method")}
+                            value={view.methodFilter ?? ""}
+                            onChange={(event) =>
+                              updateView({
+                                methodFilter: event.target.value || null,
+                                selected: null,
+                              })
+                            }
+                          >
+                            <option value="">{t("allMethods")}</option>
+                            {FILTER_METHODS.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            className={`filter-select${view.statusFilter ? " is-active" : ""}`}
+                            aria-label={t("status")}
+                            value={view.statusFilter ?? ""}
+                            onChange={(event) =>
+                              updateView({
+                                statusFilter:
+                                  (event.target.value as RequestStatusFilter) ||
+                                  null,
+                                selected: null,
+                              })
+                            }
+                          >
+                            <option value="">{t("allStatusCodes")}</option>
+                            <option value="2xx">2xx</option>
+                            <option value="3xx">3xx</option>
+                            <option value="4xx">4xx</option>
+                            <option value="5xx">5xx</option>
+                            <option value="failed">
+                              {t("statusFailedOnly")}
+                            </option>
+                          </select>
+                          {hasAdvancedNetworkFilter && (
                             <button
-                              key={filter}
-                              aria-pressed={view.filter === filter}
-                              className={view.filter === filter ? "active" : ""}
+                              type="button"
+                              className="filter-reset-btn"
                               onClick={() =>
-                                updateView({ filter, selected: null })
+                                updateView({
+                                  methodFilter: null,
+                                  statusFilter: null,
+                                  searchBody: false,
+                                  hostFilter: null,
+                                  excludePatterns: [],
+                                  selected: null,
+                                })
                               }
                             >
-                              {t(filter)}
+                              {t("resetFilters")}
                             </button>
-                          ))}
+                          )}
                         </div>
-                        <span className="num-cell">
-                          {count.toLocaleString()} {t("matches")}
-                        </span>
+                        <div className="filter-row-end">
+                          {view.clearMarkSeq !== null && view.clearActive ? (
+                            <span className="clear-toggle-group">
+                              {retainedHiddenCount > 0 ? (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="is-cleared-chip"
+                                  onClick={() =>
+                                    updateView({ clearActive: false })
+                                  }
+                                  title={
+                                    evictedHiddenCount > 0
+                                      ? t("networkClearedWithEvictedHint", {
+                                          retained: retainedHiddenCount,
+                                          evicted: evictedHiddenCount,
+                                        })
+                                      : t("networkClearedHint")
+                                  }
+                                >
+                                  <RotateCcw size={12} />
+                                  {t("networkShowHistory", {
+                                    count: retainedHiddenCount,
+                                  })}
+                                  {evictedHiddenCount > 0 && (
+                                    <span className="evicted-pill">
+                                      {t("networkEvictedBadge", {
+                                        count: evictedHiddenCount,
+                                      })}
+                                    </span>
+                                  )}
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="is-cleared-chip is-all-evicted"
+                                  onClick={() =>
+                                    updateView({
+                                      clearMarkSeq: null,
+                                      clearActive: false,
+                                      clearInitialHidden: 0,
+                                    })
+                                  }
+                                  title={t("networkClearedAllEvictedHint", {
+                                    evicted: evictedHiddenCount,
+                                  })}
+                                >
+                                  {t("networkEvictedBadge", {
+                                    count: evictedHiddenCount,
+                                  })}
+                                  <X size={11} />
+                                </Button>
+                              )}
+                              {count > 0 && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={handleClearNetwork}
+                                  title={t("networkClearHint")}
+                                >
+                                  <Eraser size={12} />
+                                  {t("networkClear")}
+                                </Button>
+                              )}
+                            </span>
+                          ) : view.clearMarkSeq !== null &&
+                            !view.clearActive ? (
+                            <span className="clear-toggle-group">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="is-cleared-chip"
+                                onClick={() =>
+                                  updateView({
+                                    clearActive: true,
+                                    selected: null,
+                                  })
+                                }
+                                title={t("networkHideHistory")}
+                              >
+                                <Eraser size={12} />
+                                {t("networkHideHistory")}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="clear-dismiss-btn"
+                                aria-label={t("networkClearDismiss")}
+                                title={t("networkClearDismiss")}
+                                onClick={() =>
+                                  updateView({
+                                    clearMarkSeq: null,
+                                    clearActive: false,
+                                    clearInitialHidden: 0,
+                                  })
+                                }
+                              >
+                                <X size={11} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={active.entryCount === 0}
+                                onClick={handleClearNetwork}
+                                title={t("networkClearHint")}
+                              >
+                                <Eraser size={12} />
+                                {t("networkClear")}
+                              </Button>
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={active.entryCount === 0}
+                              onClick={handleClearNetwork}
+                              title={t("networkClearHint")}
+                            >
+                              <Eraser size={12} />
+                              {t("networkClear")}
+                            </Button>
+                          )}
+                          <span className="num-cell filter-match-count">
+                            {count.toLocaleString()} {t("matches")}
+                          </span>
+                        </div>
                       </div>
                       {(view.hosts.length > 1 ||
                         view.hostFilter ||
@@ -1382,11 +1800,35 @@ export default function App() {
                       filter={view.filter}
                       hostFilter={view.hostFilter}
                       excludePatterns={view.excludePatterns}
+                      methodFilter={view.methodFilter}
+                      statusFilter={view.statusFilter}
+                      searchBody={view.searchBody}
+                      sortBy={view.sortBy}
+                      sortDir={view.sortDir}
+                      afterSeq={effectiveAfterSeq}
+                      clearMarkSeq={view.clearMarkSeq}
+                      clearEvictedCount={evictedHiddenCount}
                       range={view.range}
                       selectedId={view.selected?.id}
                       compareAnchor={view.compareAnchor}
                       onSelect={(entry) => updateView({ selected: entry })}
                       onCount={setCount}
+                      onMeta={(meta) =>
+                        setNetworkMeta({ ...meta, sessionId: active.id })
+                      }
+                      onSortChange={(sortBy, sortDir) =>
+                        updateView({ sortBy, sortDir })
+                      }
+                      onRestoreHistory={() =>
+                        updateView({ clearActive: false })
+                      }
+                      onDismissClear={() =>
+                        updateView({
+                          clearMarkSeq: null,
+                          clearActive: false,
+                          clearInitialHidden: 0,
+                        })
+                      }
                       onHosts={(hosts) => {
                         if (
                           JSON.stringify(hosts) !== JSON.stringify(view.hosts)
@@ -1434,6 +1876,21 @@ export default function App() {
                               setReplayTarget({ sessionId: active.id, entry })
                           : undefined
                       }
+                      onQuickRepeat={
+                        desktop
+                          ? (entry) => void handleQuickRepeat(entry)
+                          : undefined
+                      }
+                      onRepeatBatch={
+                        desktop
+                          ? (entry) =>
+                              setReplayTarget({
+                                sessionId: active.id,
+                                entry,
+                                initialBatchMode: true,
+                              })
+                          : undefined
+                      }
                       onSetCompareAnchor={(entry) =>
                         updateView({ compareAnchor: entry })
                       }
@@ -1453,18 +1910,59 @@ export default function App() {
                     />
                     {active.deviceId && (
                       <div className="diagnostic-stats">
-                        {t(
-                          active.syncing
-                            ? "syncing"
-                            : active.online
-                              ? "connected"
-                              : "disconnected",
-                        )}{" "}
-                        ·{" "}
-                        {t("networkLoss", {
-                          dropped: active.dropped ?? 0,
-                          evicted: active.evicted ?? 0,
-                        })}
+                        <span>
+                          {t(
+                            active.syncing
+                              ? "syncing"
+                              : active.online
+                                ? "connected"
+                                : "disconnected",
+                          )}{" "}
+                          ·{" "}
+                          {t("networkLoss", {
+                            dropped: active.dropped ?? 0,
+                            evicted: active.evicted ?? 0,
+                          })}
+                        </span>
+                        {liveSpilledCount > 0 && (
+                          <span
+                            className="spill-badge"
+                            title={t("networkSpilledHint")}
+                          >
+                            <HardDrive size={11} />
+                            {t("networkSpilledBadge", {
+                              count: liveSpilledCount,
+                              size: formatBytes(liveSpilledBytes),
+                            })}
+                          </span>
+                        )}
+                        {liveMaxBytes !== null && (
+                          <span
+                            className={`capacity-meter${liveNearLimit || evictedHiddenCount > 0 ? " is-near-limit" : ""}`}
+                            title={
+                              liveNearLimit
+                                ? t("networkCapacityNearLimit")
+                                : undefined
+                            }
+                          >
+                            {t("networkCapacityUsage", {
+                              used: formatBytes(liveUsedBytes),
+                              limit: formatBytes(liveMaxBytes),
+                            })}
+                            {(liveNearLimit || evictedHiddenCount > 0) &&
+                              desktop && (
+                                <button
+                                  type="button"
+                                  className="capacity-save-link"
+                                  onClick={() =>
+                                    commands.dispatch("session.save")
+                                  }
+                                >
+                                  {t("saveSessionNow")}
+                                </button>
+                              )}
+                          </span>
+                        )}
                       </div>
                     )}
                   </>
@@ -1566,9 +2064,12 @@ export default function App() {
       </Group>
       {replayTarget && (
         <ReplayDialog
+          key={`${replayTarget.sessionId}:${replayTarget.entry.id}:${replayTarget.initialBatchMode ? "batch" : "single"}`}
           sessionId={replayTarget.sessionId}
           entry={replayTarget.entry}
           metadata={replayTarget.metadata}
+          initialBatchMode={replayTarget.initialBatchMode}
+          initialResponse={replayTarget.initialResponse}
           theme={theme}
           onClose={() => setReplayTarget(null)}
         />
@@ -1652,7 +2153,11 @@ export default function App() {
         <span>
           {t("retained")}{" "}
           {formatBytes(
-            sessions.reduce((sum, session) => sum + session.rawBytes, 0),
+            sessions.reduce(
+              (sum, session) =>
+                sum + session.rawBytes + (session.spilledBytes ?? 0),
+              0,
+            ),
           )}
         </span>
         <span className="shortcut-hint">{t("shortcuts")}</span>

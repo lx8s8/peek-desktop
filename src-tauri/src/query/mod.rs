@@ -625,24 +625,46 @@ impl Remote {
         host_filter: Option<&str>,
         exclude_patterns: &[String],
     ) -> Result<crate::session::QueryPage> {
-        Ok(self
-            .store
-            .lock()
-            .map_err(|_| "internalError")?
-            .sessions
-            .get(id)
-            .ok_or("sessionNotFound")?
-            .current
-            .query_range_filtered(
-                search,
-                filter,
-                offset,
-                limit,
-                revision,
-                range,
+        self.query_range_with_options(
+            id,
+            search,
+            filter,
+            offset,
+            limit,
+            revision,
+            range,
+            crate::session::QueryOptions {
                 host_filter,
                 exclude_patterns,
-            ))
+                ..Default::default()
+            },
+        )
+    }
+
+    /// 完整实时会话窗口查询：联合查询热内存区与磁盘冷存储，支持软清屏水位线、方法/状态筛选、正文全文检索与多列排序。
+    #[allow(clippy::too_many_arguments)]
+    pub fn query_range_with_options(
+        &self,
+        id: &str,
+        search: &str,
+        filter: &str,
+        offset: usize,
+        limit: usize,
+        revision: u32,
+        range: &ParsedRange,
+        mut options: crate::session::QueryOptions<'_>,
+    ) -> Result<crate::session::QueryPage> {
+        options.max_bytes = Some(crate::remote::store::MAX_LIVE_BYTES);
+        let mut store = self.store.lock().map_err(|_| "internalError")?;
+        let session = store.sessions.get_mut(id).ok_or("sessionNotFound")?;
+        let spill = if session.spill.is_empty() {
+            None
+        } else {
+            Some(&mut session.spill)
+        };
+        Ok(session.current.query_with_spill(
+            spill, search, filter, offset, limit, revision, range, options,
+        ))
     }
 }
 
