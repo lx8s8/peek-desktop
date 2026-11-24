@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   act,
   fireEvent,
@@ -6,7 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { RequestTable } from "./RequestTable";
+import { RequestTable, type RequestTableMeta } from "./RequestTable";
 import { api } from "../../lib/ipc/client";
 import type { QueryPage } from "../../lib/ipc/types";
 import type { EntryRow } from "../../lib/ipc/types";
@@ -386,4 +387,50 @@ it("exposes quick repeat and batch repeat actions in row context menu", async ()
   fireEvent.click(screen.getByRole("button", { name: "批量重复重发…" }));
   expect(onRepeatBatch).toHaveBeenCalledWith(entry);
   vi.restoreAllMocks();
+});
+
+it("does not loop or flicker loading when parent passes inline onMeta/onHosts callbacks after clear", async () => {
+  vi.mocked(api.query)
+    .mockReset()
+    .mockImplementation(async (_id, _search, _filter, offset, revision) => ({
+      total: 0,
+      offset,
+      revision,
+      rows: [],
+      hosts: ["api.example.test"],
+      latestSeq: 40,
+      hiddenCount: 40,
+      totalBytes: 4096,
+      maxBytes: 8 * 1024 * 1024,
+    }));
+
+  function ParentHarness() {
+    const [, setMeta] = useState<RequestTableMeta | null>(null);
+    const [, setHosts] = useState<string[]>([]);
+    const [, setTotal] = useState(0);
+    return (
+      <RequestTable
+        sessionId="live-clear"
+        live
+        search=""
+        filter="all"
+        afterSeq={40}
+        clearMarkSeq={40}
+        onCount={(n) => setTotal(n)}
+        onMeta={(meta) => setMeta({ ...meta })}
+        onHosts={(hosts) => setHosts([...hosts])}
+        onError={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+  }
+
+  render(<ParentHarness />);
+  await screen.findByText("已清屏，等待新请求");
+  // 等待多轮微任务确认不会因父组件重渲染新建回调而循环重查
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 40));
+  });
+  expect(api.query).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("已清屏，等待新请求")).toBeTruthy();
 });

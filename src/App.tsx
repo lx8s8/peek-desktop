@@ -1814,7 +1814,18 @@ export default function App() {
                       onSelect={(entry) => updateView({ selected: entry })}
                       onCount={setCount}
                       onMeta={(meta) =>
-                        setNetworkMeta({ ...meta, sessionId: active.id })
+                        setNetworkMeta((prev) =>
+                          prev &&
+                          prev.sessionId === active.id &&
+                          prev.latestSeq === meta.latestSeq &&
+                          prev.hiddenCount === meta.hiddenCount &&
+                          prev.totalBytes === meta.totalBytes &&
+                          prev.maxBytes === meta.maxBytes &&
+                          prev.spilledCount === meta.spilledCount &&
+                          prev.spilledBytes === meta.spilledBytes
+                            ? prev
+                            : { ...meta, sessionId: active.id },
+                        )
                       }
                       onSortChange={(sortBy, sortDir) =>
                         updateView({ sortBy, sortDir })

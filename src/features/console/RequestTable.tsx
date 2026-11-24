@@ -192,6 +192,10 @@ export function RequestTable({
   const [retry, setRetry] = useState(0);
   const revision = useRef(0);
   const navRevision = useRef(0);
+  const loadedSessionRef = useRef<string | null>(null);
+  const lastRetryRef = useRef(0);
+  const callbacksRef = useRef({ onCount, onMeta, onHosts, onError });
+  callbacksRef.current = { onCount, onMeta, onHosts, onError };
   const [failure, setFailure] = useState(false);
   const [sortStatus, setSortStatus] = useState("");
   const [tableLayout, setTableLayout] = useState<RequestTableLayoutPrefs>(() =>
@@ -269,8 +273,10 @@ export function RequestTable({
 
   useEffect(() => {
     setOffset(0);
-    setPage({ total: 0, offset: 0, rows: [], revision: 0 });
-    setLoading(true);
+    if (loadedSessionRef.current !== sessionId) {
+      setPage({ total: 0, offset: 0, rows: [], revision: 0 });
+      setLoading(true);
+    }
     scroll.current?.scrollTo({ top: 0 });
     ++navRevision.current;
   }, [
@@ -311,7 +317,12 @@ export function RequestTable({
   useEffect(() => {
     const request = ++revision.current;
     let active = true;
-    setLoading(true);
+    const isRetry = retry !== lastRetryRef.current;
+    lastRetryRef.current = retry;
+    // 仅在首次加载该会话或显式重试时展示「加载中」，同会话内清屏与实时推送静默刷新避免画面闪烁
+    if (loadedSessionRef.current !== sessionId || isRetry) {
+      setLoading(true);
+    }
     setFailure(false);
     const parsedRange = JSON.parse(rangeKey) as TimeRange;
     const parsedExcludes = JSON.parse(excludeKey) as string[];
@@ -352,9 +363,10 @@ export function RequestTable({
           result.revision !== request
         )
           return;
+        loadedSessionRef.current = sessionId;
         setPage(result);
-        onCount(result.total);
-        onMeta?.({
+        callbacksRef.current.onCount(result.total);
+        callbacksRef.current.onMeta?.({
           latestSeq: result.latestSeq ?? 0,
           hiddenCount: result.hiddenCount ?? 0,
           totalBytes: result.totalBytes ?? 0,
@@ -362,14 +374,14 @@ export function RequestTable({
           spilledCount: result.spilledCount ?? 0,
           spilledBytes: result.spilledBytes ?? 0,
         });
-        if (result.hosts) onHosts?.(result.hosts);
+        if (result.hosts) callbacksRef.current.onHosts?.(result.hosts);
         setLoading(false);
       })
       .catch((error) => {
         if (active) {
           setLoading(false);
           setFailure(true);
-          onError(String(error));
+          callbacksRef.current.onError(String(error));
         }
       });
     return () => {
@@ -391,10 +403,6 @@ export function RequestTable({
     sortBy,
     sortDir,
     afterSeq,
-    onCount,
-    onMeta,
-    onHosts,
-    onError,
   ]);
 
   const maxPageDuration = useMemo(() => {
