@@ -1082,6 +1082,29 @@ pub fn save_before_exit(app: &tauri::AppHandle) -> bool {
     });
     true
 }
+
+/// 安装更新并重启前先落盘当前工作区并停止监听，同时阻止退出钩子拦截重启流程。
+pub async fn prepare_for_update_restart(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let state = app.state::<AppState>();
+    state.shutdown.store(true, Ordering::SeqCst);
+    let recovery = state.recovery.clone();
+    let library = state.library.clone();
+    let remote = state.remote.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        persist_workspace(&recovery, &library, &remote, false)
+    })
+    .await;
+    let _ = state.remote.stop().await;
+}
+
+/// 当更新安装失败且应用未退出时，恢复正常退出前的自动保存流程。
+pub fn revert_update_restart(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    app.state::<AppState>()
+        .shutdown
+        .store(false, Ordering::SeqCst);
+}
 #[tauri::command]
 pub async fn recovery_status(
     state: State<'_, AppState>,
@@ -1176,9 +1199,22 @@ pub async fn open_project_link(app: tauri::AppHandle, link: String) -> Result<()
 
 #[tauri::command]
 pub async fn check_updates(
+    app: tauri::AppHandle,
     checker: State<'_, crate::updates::Checker>,
 ) -> Result<crate::updates::UpdateInfo> {
-    checker.check().await
+    checker.check(&app).await
+}
+#[tauri::command]
+pub async fn install_update(
+    app: tauri::AppHandle,
+    checker: State<'_, crate::updates::Checker>,
+    progress: Channel<crate::updates::UpdateProgress>,
+) -> Result<()> {
+    checker.install(&app, progress).await
+}
+#[tauri::command]
+pub fn cancel_update(checker: State<'_, crate::updates::Checker>) -> Result<bool> {
+    checker.cancel()
 }
 #[tauri::command]
 pub async fn open_release_link(app: tauri::AppHandle, url: String) -> Result<()> {

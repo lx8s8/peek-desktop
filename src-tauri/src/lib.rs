@@ -26,6 +26,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(commands::AppState::default())
         .manage(updates::Checker::default())
         .manage(file_open::OpenFiles::default())
@@ -43,6 +44,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::check_updates,
+            commands::install_update,
+            commands::cancel_update,
             commands::open_release_link,
             commands::app_info,
             commands::legal_text,

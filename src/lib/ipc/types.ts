@@ -333,7 +333,14 @@ export interface UpdateInfo {
   latestVersion: string | null;
   releaseUrl: string | null;
   downloadUrl: string | null;
+  canInstall: boolean;
   notes: string;
+}
+
+export interface UpdateProgress {
+  phase: "download" | "install";
+  downloaded: number;
+  total: number | null;
 }
 
 export type PluginKind = "local" | "http" | "cli";

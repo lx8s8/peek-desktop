@@ -1540,6 +1540,32 @@ button.timeline-grid.selected {
     11px/1.7 ui-monospace,
     monospace;
 }
+.update-progress {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.update-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.update-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.update-progress-bar progress {
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  accent-color: var(--accent);
+}
 
 .about-dialog.about-info {
   height: auto;

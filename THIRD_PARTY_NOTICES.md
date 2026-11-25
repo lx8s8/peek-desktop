@@ -175,6 +175,7 @@
 | rust:cookie@0.18.2 | MIT OR Apache-2.0 | Sergio Benitez <sb@sergio.bz>, Alex Crichton <alex@alexcrichton.com> | [源码 / 包](https://crates.io/crates/cookie/0.18.2) | [许可](#license-c859d211879e327d) · [许可](#license-47c8d25246e6cb7b) |
 | rust:core-foundation-sys@0.8.7 | MIT OR Apache-2.0 | The Servo Project Developers | [源码 / 包](https://crates.io/crates/core-foundation-sys/0.8.7) | [许可](#license-954f335b8baf5e1a) · [许可](#license-3bfacc197ff245b6) |
 | rust:core-foundation@0.10.1 | MIT OR Apache-2.0 | The Servo Project Developers | [源码 / 包](https://crates.io/crates/core-foundation/0.10.1) | [许可](#license-954f335b8baf5e1a) · [许可](#license-3bfacc197ff245b6) |
+| rust:core-foundation@0.9.4 | MIT OR Apache-2.0 | The Servo Project Developers | [源码 / 包](https://crates.io/crates/core-foundation/0.9.4) | [许可](#license-954f335b8baf5e1a) · [许可](#license-3bfacc197ff245b6) |
 | rust:core-graphics-types@0.2.0 | MIT OR Apache-2.0 | The Servo Project Developers | [源码 / 包](https://crates.io/crates/core-graphics-types/0.2.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-3bfacc197ff245b6) |
 | rust:core-graphics@0.25.0 | MIT OR Apache-2.0 | The Servo Project Developers | [源码 / 包](https://crates.io/crates/core-graphics/0.25.0) | [许可](#license-537db907352420ce) · [许可](#license-954f335b8baf5e1a) · [许可](#license-3bfacc197ff245b6) |
 | rust:cpufeatures@0.2.17 | MIT OR Apache-2.0 | RustCrypto Developers | [源码 / 包](https://crates.io/crates/cpufeatures/0.2.17) | [许可](#license-e8541ea93f027a6c) · [许可](#license-6334e52844d698f5) |
@@ -215,6 +216,7 @@
 | rust:fastrand@2.5.0 | Apache-2.0 OR MIT | Stjepan Glavina <stjepang@gmail.com> | [源码 / 包](https://crates.io/crates/fastrand/2.5.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-30fefc3a7d6a0041) |
 | rust:fax@0.2.7 | MIT | Sebastian K <s3bk@protonmail.com> | [源码 / 包](https://crates.io/crates/fax/0.2.7) | [许可](#license-153e780a03976428) |
 | rust:fdeflate@0.3.7 | MIT OR Apache-2.0 | The image-rs Developers | [源码 / 包](https://crates.io/crates/fdeflate/0.3.7) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-77949ead506e84e3) |
+| rust:filetime@0.2.30 | MIT/Apache-2.0 | Alex Crichton <alex@alexcrichton.com> | [源码 / 包](https://crates.io/crates/filetime/0.2.30) | [许可](#license-954f335b8baf5e1a) · [许可](#license-84e1bbfebd74e419) |
 | rust:find-msvc-tools@0.1.15 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/find-msvc-tools/0.1.15) | [许可](#license-954f335b8baf5e1a) · [许可](#license-84e1bbfebd74e419) |
 | rust:flate2@1.1.11 | MIT OR Apache-2.0 | Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org> | [源码 / 包](https://crates.io/crates/flate2/1.1.11) | [许可](#license-954f335b8baf5e1a) · [许可](#license-1b7402ea003f3186) |
 | rust:flume@0.12.0 | Apache-2.0/MIT | Joshua Barretto <joshua.s.barretto@gmail.com> | [源码 / 包](https://crates.io/crates/flume/0.12.0) | [许可](#license-283ea6cc2997a1a7) · [许可](#license-30fefc3a7d6a0041) |
@@ -232,6 +234,7 @@
 | rust:futures-task@0.3.34 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/futures-task/0.3.34) | [许可](#license-27480f391bd92f66) · [许可](#license-b420d8add23b5cf7) |
 | rust:futures-util@0.3.34 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/futures-util/0.3.34) | [许可](#license-27480f391bd92f66) · [许可](#license-b420d8add23b5cf7) |
 | rust:generic-array@0.14.7 | MIT | Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com> | [源码 / 包](https://crates.io/crates/generic-array/0.14.7) | [许可](#license-ad4fcfaf8d5b12b9) |
+| rust:getrandom@0.2.17 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.2.17) | [许可](#license-e7330bf53074b4a9) · [许可](#license-478d530cbce79fc1) |
 | rust:getrandom@0.3.4 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.3.4) | [许可](#license-e7330bf53074b4a9) · [许可](#license-73af2019a565c0e6) |
 | rust:getrandom@0.4.3 | MIT OR Apache-2.0 | The Rand Project Developers | [源码 / 包](https://crates.io/crates/getrandom/0.4.3) | [许可](#license-e7330bf53074b4a9) · [许可](#license-94b1870d380ccf53) |
 | rust:gif@0.14.2 | MIT OR Apache-2.0 | The image-rs Developers | [源码 / 包](https://crates.io/crates/gif/0.14.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-1b6f7ab81ae25979) |
@@ -247,6 +250,7 @@
 | rust:http@1.5.0 | MIT OR Apache-2.0 | Alex Crichton <alex@alexcrichton.com>, Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/http/1.5.0) | [许可](#license-881c9fe2d29b216a) · [许可](#license-f47894ff9c86dc7e) |
 | rust:httparse@1.10.1 | MIT OR Apache-2.0 | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/httparse/1.10.1) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8502803cebb30a72) |
 | rust:hybrid-array@0.4.15 | MIT OR Apache-2.0 | RustCrypto Developers | [源码 / 包](https://crates.io/crates/hybrid-array/0.4.15) | [许可](#license-e8541ea93f027a6c) · [许可](#license-a1aa15c3898d79b7) |
+| rust:hyper-rustls@0.27.10 | Apache-2.0 OR ISC OR MIT |  | [源码 / 包](https://crates.io/crates/hyper-rustls/0.27.10) | [许可](#license-954f335b8baf5e1a) · [许可](#license-af6da3f3f6b4929e) · [许可](#license-a3320aa8d192a02c) |
 | rust:hyper-tls@0.6.0 | MIT/Apache-2.0 | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/hyper-tls/0.6.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-ef31af832fed9fa9) |
 | rust:hyper-util@0.1.21 | MIT | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/hyper-util/0.1.21) | [许可](#license-e7d622e4783e8c97) |
 | rust:hyper@1.12.0 | MIT | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/hyper/1.12.0) | [许可](#license-05f344491a7d18e1) |
@@ -287,6 +291,7 @@
 | rust:mdns-sd@0.21.7 | Apache-2.0 OR MIT | Han Xu <keepsimple@gmail.com> | [源码 / 包](https://crates.io/crates/mdns-sd/0.21.7) | [许可](#license-32d66962ac23c54e) · [许可](#license-2a365b16336609d0) |
 | rust:memchr@2.8.3 | Unlicense OR MIT | Andrew Gallant <jamslam@gmail.com>, bluss | [源码 / 包](https://crates.io/crates/memchr/2.8.3) | [许可](#license-65314a6c96683f76) · [许可](#license-154c1af2b38e25e5) |
 | rust:mime@0.3.18 | MIT OR Apache-2.0 | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/mime/0.3.18) | [许可](#license-954f335b8baf5e1a) · [许可](#license-a302dc760d97dc62) |
+| rust:minisign-verify@0.3.0 | MIT | Frank Denis <github@pureftpd.org> | [源码 / 包](https://crates.io/crates/minisign-verify/0.3.0) | [许可](#license-58f66933c7bba2f4) |
 | rust:miniz_oxide@0.8.9 | MIT OR Zlib OR Apache-2.0 | Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com | [源码 / 包](https://crates.io/crates/miniz_oxide/0.8.9) | [许可](#license-7427abc630365f63) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-ac9859ce4e9a80a4) · [许可](#license-eac3911cc3d41ffb) |
 | rust:miniz_oxide@0.9.1 | MIT OR Zlib OR Apache-2.0 | Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com | [源码 / 包](https://crates.io/crates/miniz_oxide/0.9.1) | [许可](#license-7427abc630365f63) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-ac9859ce4e9a80a4) · [许可](#license-eac3911cc3d41ffb) |
 | rust:mio@1.2.4 | MIT | Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs> | [源码 / 包](https://crates.io/crates/mio/1.2.4) | [许可](#license-c804065b0956d00a) |
@@ -304,12 +309,14 @@
 | rust:objc2-exception-helper@0.1.1 | Zlib OR Apache-2.0 OR MIT | Mads Marquart <mads@marquart.dk> | [源码 / 包](https://crates.io/crates/objc2-exception-helper/0.1.1) | [许可](#license-1aa0a34224480ff9) |
 | rust:objc2-foundation@0.3.2 | MIT |  | [源码 / 包](https://crates.io/crates/objc2-foundation/0.3.2) | [许可](#license-1aa0a34224480ff9) |
 | rust:objc2-io-surface@0.3.2 | Zlib OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/objc2-io-surface/0.3.2) | [许可](#license-1aa0a34224480ff9) |
+| rust:objc2-osa-kit@0.3.2 | Zlib OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/objc2-osa-kit/0.3.2) | 包内许可声明 |
 | rust:objc2-quartz-core@0.3.2 | Zlib OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/objc2-quartz-core/0.3.2) | [许可](#license-1aa0a34224480ff9) |
 | rust:objc2-web-kit@0.3.2 | Zlib OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/objc2-web-kit/0.3.2) | [许可](#license-1aa0a34224480ff9) |
 | rust:objc2@0.6.5 | MIT | Mads Marquart <mads@marquart.dk> | [源码 / 包](https://crates.io/crates/objc2/0.6.5) | [许可](#license-1aa0a34224480ff9) |
 | rust:once_cell@1.21.4 | MIT OR Apache-2.0 | Aleksey Kladov <aleksey.kladov@gmail.com> | [源码 / 包](https://crates.io/crates/once_cell/1.21.4) | [许可](#license-954f335b8baf5e1a) · [许可](#license-30fefc3a7d6a0041) |
 | rust:open@5.4.5 | MIT | Sebastian Thiel <byronimo@gmail.com> | [源码 / 包](https://crates.io/crates/open/5.4.5) | [许可](#license-c3ca23514163a6fe) |
 | rust:option-ext@0.2.0 | MPL-2.0 | Simon Ochsenreither <simon@ochsenreither.de> | [源码 / 包](https://crates.io/crates/option-ext/0.2.0) | [许可](#license-86cf9656479f1edb) |
+| rust:osakit@0.3.1 | MIT OR Apache-2.0 | Marat Dulin <mdevils@gmail.com> | [源码 / 包](https://crates.io/crates/osakit/0.3.1) | [许可](#license-85ad950cce8752f7) · [许可](#license-6ca34f7d0a421357) |
 | rust:parking_lot_core@0.9.12 | MIT OR Apache-2.0 | Amanieu d'Antras <amanieu@gmail.com> | [源码 / 包](https://crates.io/crates/parking_lot_core/0.9.12) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8d1f81ea4e87111d) |
 | rust:parking_lot@0.12.5 | MIT OR Apache-2.0 | Amanieu d'Antras <amanieu@gmail.com> | [源码 / 包](https://crates.io/crates/parking_lot/0.12.5) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8d1f81ea4e87111d) |
 | rust:percent-encoding@2.3.2 | MIT OR Apache-2.0 | The rust-url developers | [源码 / 包](https://crates.io/crates/percent-encoding/2.3.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-7a8093fb4a93f23e) |
@@ -343,10 +350,14 @@
 | rust:regex@1.13.1 | MIT OR Apache-2.0 | The Rust Project Developers, Andrew Gallant <jamslam@gmail.com> | [源码 / 包](https://crates.io/crates/regex/1.13.1) | [许可](#license-954f335b8baf5e1a) · [许可](#license-14435fbcd271e278) |
 | rust:reqwest@0.13.5 | MIT OR Apache-2.0 | Sean McArthur <sean@seanmonstar.com> | [源码 / 包](https://crates.io/crates/reqwest/0.13.5) | [许可](#license-5c3866f31ed28362) · [许可](#license-bde59a7e336fcb58) |
 | rust:rfd@0.17.2 | MIT | Poly <marynczak.bartlomiej@gmail.com> | [源码 / 包](https://crates.io/crates/rfd/0.17.2) | [许可](#license-1a6dd9555214dc74) |
+| rust:ring@0.17.14 | Apache-2.0 AND ISC |  | [源码 / 包](https://crates.io/crates/ring/0.17.14) | [许可](#license-edb9c6dbff4676b9) · [许可](#license-473867fcf89f7595) · [许可](#license-07414b6c33f30acf) |
 | rust:rustc_version@0.4.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/rustc_version/0.4.1) | [许可](#license-954f335b8baf5e1a) · [许可](#license-8d1f81ea4e87111d) |
 | rust:rustc-hash@2.1.3 | Apache-2.0 OR MIT | The Rust Project Developers | [源码 / 包](https://crates.io/crates/rustc-hash/2.1.3) | [许可](#license-85ad950cce8752f7) · [许可](#license-30fefc3a7d6a0041) |
 | rust:rustix@1.1.6 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Dan Gohman <dev@sunfishcode.online>, Jakub Konka <kubkon@jakubkonka.com> | [源码 / 包](https://crates.io/crates/rustix/1.1.6) | [许可](#license-fde2a68c47d27938) · [许可](#license-954f335b8baf5e1a) · [许可](#license-2f213ec6b1355dc8) · [许可](#license-30fefc3a7d6a0041) |
 | rust:rustls-pki-types@1.15.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/rustls-pki-types/1.15.1) | [许可](#license-430e912c26cec30c) · [许可](#license-c5e7f780f961f850) |
+| rust:rustls-platform-verifier@0.7.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/rustls-platform-verifier/0.7.1) | [许可](#license-283ea6cc2997a1a7) · [许可](#license-6205904d553962d4) |
+| rust:rustls-webpki@0.103.17 | ISC |  | [源码 / 包](https://crates.io/crates/rustls-webpki/0.103.17) | [许可](#license-3ac27594ed56fd07) |
+| rust:rustls@0.23.46 | Apache-2.0 OR ISC OR MIT |  | [源码 / 包](https://crates.io/crates/rustls/0.23.46) | [许可](#license-954f335b8baf5e1a) · [许可](#license-af6da3f3f6b4929e) · [许可](#license-a3320aa8d192a02c) |
 | rust:rustversion@1.0.23 | MIT OR Apache-2.0 | David Tolnay <dtolnay@gmail.com> | [源码 / 包](https://crates.io/crates/rustversion/1.0.23) | [许可](#license-85ad950cce8752f7) · [许可](#license-30fefc3a7d6a0041) |
 | rust:same-file@1.0.6 | Unlicense/MIT | Andrew Gallant <jamslam@gmail.com> | [源码 / 包](https://crates.io/crates/same-file/1.0.6) | [许可](#license-65314a6c96683f76) · [许可](#license-739620ea44ad8f99) |
 | rust:schannel@0.1.30 | MIT | Steven Fackler <sfackler@gmail.com>, Steffen Butzer <steffen.butzer@outlook.com> | [源码 / 包](https://crates.io/crates/schannel/0.1.30) | [许可](#license-1ecbb241444ad7fe) |
@@ -395,7 +406,10 @@
 | rust:syn@3.0.10 | MIT OR Apache-2.0 | David Tolnay <dtolnay@gmail.com> | [源码 / 包](https://crates.io/crates/syn/3.0.10) | [许可](#license-85ad950cce8752f7) · [许可](#license-30fefc3a7d6a0041) |
 | rust:sync_wrapper@1.0.2 | Apache-2.0 | Actyx AG <developer@actyx.io> | [源码 / 包](https://crates.io/crates/sync_wrapper/1.0.2) | [许可](#license-4bf96504d6e83ce5) |
 | rust:synstructure@0.14.0 | MIT | Nika Layzell <nika@thelayzells.com> | [源码 / 包](https://crates.io/crates/synstructure/0.14.0) | [许可](#license-3a036676ec8c0dba) |
+| rust:system-configuration-sys@0.6.0 | MIT OR Apache-2.0 | Mullvad VPN | [源码 / 包](https://crates.io/crates/system-configuration-sys/0.6.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-eefdbe714980ed70) |
+| rust:system-configuration@0.7.0 | MIT OR Apache-2.0 | Mullvad VPN | [源码 / 包](https://crates.io/crates/system-configuration/0.7.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-eefdbe714980ed70) |
 | rust:tao@0.37.2 | Apache-2.0 | Tauri Programme within The Commons Conservancy, The winit contributors | [源码 / 包](https://crates.io/crates/tao/0.37.2) | [许可](#license-6dc0e068dcf3a5bc) · [许可](#license-28694f36acab4f50) |
+| rust:tar@0.4.46 | MIT OR Apache-2.0 | Alex Crichton <alex@alexcrichton.com> | [源码 / 包](https://crates.io/crates/tar/0.4.46) | [许可](#license-954f335b8baf5e1a) · [许可](#license-e6e853531994cb47) |
 | rust:tauri-build@2.7.4 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-build/2.7.4) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-codegen@2.7.4 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-codegen/2.7.4) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-macros@2.7.4 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-macros/2.7.4) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
@@ -404,6 +418,7 @@
 | rust:tauri-plugin-fs@2.7.1 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-fs/2.7.1) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin-opener@2.7.3 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-opener/2.7.3) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin-single-instance@2.5.5 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-single-instance/2.5.5) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-b7f455413bfe5f9d) |
+| rust:tauri-plugin-updater@2.14.1 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin-updater/2.14.1) | [许可](#license-eb8a6c84630461b3) · [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-plugin@2.7.2 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-plugin/2.7.2) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) · [许可](#license-7c667b0cf9860e6a) |
 | rust:tauri-runtime-wry@2.12.3 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-runtime-wry/2.12.3) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
 | rust:tauri-runtime@2.12.2 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/tauri-runtime/2.12.2) | [许可](#license-4bf96504d6e83ce5) · [许可](#license-89ff9689dcf9dd53) |
@@ -422,6 +437,7 @@
 | rust:tinyvec@1.13.3 | Zlib OR Apache-2.0 OR MIT | Lokathor <zefria@gmail.com> | [源码 / 包](https://crates.io/crates/tinyvec/1.13.3) | [许可](#license-283ea6cc2997a1a7) · [许可](#license-bccaa8b6c09f94e8) · [许可](#license-943f36fd309fb5ea) |
 | rust:tokio-macros@2.7.2 | MIT | Tokio Contributors <team@tokio.rs> | [源码 / 包](https://crates.io/crates/tokio-macros/2.7.2) | [许可](#license-c0fdcda1a4ffc5fd) |
 | rust:tokio-native-tls@0.3.1 | MIT | Tokio Contributors <team@tokio.rs> | [源码 / 包](https://crates.io/crates/tokio-native-tls/0.3.1) | [许可](#license-c1e08ee9a7288bf6) |
+| rust:tokio-rustls@0.26.6 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/tokio-rustls/0.26.6) | [许可](#license-acddfb05f07ab004) · [许可](#license-1b0258c48739a24e) |
 | rust:tokio-tungstenite@0.30.0 | MIT | Daniel Abramov <dabramov@snapview.de>, Alexey Galakhov <agalakhov@snapview.de> | [源码 / 包](https://crates.io/crates/tokio-tungstenite/0.30.0) | [许可](#license-5c07409e74572128) |
 | rust:tokio-util@0.7.20 | MIT | Tokio Contributors <team@tokio.rs> | [源码 / 包](https://crates.io/crates/tokio-util/0.7.20) | [许可](#license-3e1bef82aa0dfee4) |
 | rust:tokio@1.54.1 | MIT | Tokio Contributors <team@tokio.rs> | [源码 / 包](https://crates.io/crates/tokio/1.54.1) | [许可](#license-3e1bef82aa0dfee4) |
@@ -444,6 +460,7 @@
 | rust:typenum@1.20.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/typenum/1.20.1) | [许可](#license-db11fec9946737df) · [许可](#license-65dc2a869ff7fe71) · [许可](#license-87ebb37988efc328) |
 | rust:unicode-ident@1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 | David Tolnay <dtolnay@gmail.com> | [源码 / 包](https://crates.io/crates/unicode-ident/1.0.27) | [许可](#license-85ad950cce8752f7) · [许可](#license-30fefc3a7d6a0041) · [许可](#license-361d7912957842f2) |
 | rust:unicode-segmentation@1.13.3 | MIT OR Apache-2.0 | kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com> | [源码 / 包](https://crates.io/crates/unicode-segmentation/1.13.3) | [许可](#license-20cec30ad7780437) · [许可](#license-954f335b8baf5e1a) · [许可](#license-033a9383ff21d1e4) |
+| rust:untrusted@0.9.0 | ISC | Brian Smith <brian@briansmith.org> | [源码 / 包](https://crates.io/crates/untrusted/0.9.0) | [许可](#license-a1fff344297822d3) |
 | rust:url@2.5.8 | MIT OR Apache-2.0 | The rust-url developers | [源码 / 包](https://crates.io/crates/url/2.5.8) | [许可](#license-954f335b8baf5e1a) · [许可](#license-7a8093fb4a93f23e) |
 | rust:urlpattern@0.6.0 | MIT | the Deno authors, crowlKats <crowlkats@toaxl.com> | [源码 / 包](https://crates.io/crates/urlpattern/0.6.0) | [许可](#license-f2459c4b106b4bee) |
 | rust:utf_types@1.0.0 | Apache-2.0 OR MIT | Henri Sivonen <hsivonen@hsivonen.fi> | [源码 / 包](https://crates.io/crates/utf_types/1.0.0) | [许可](#license-48fb3f740d1502ea) · [许可](#license-283ea6cc2997a1a7) · [许可](#license-7dc2f64024477c92) |
@@ -470,6 +487,7 @@
 | rust:windows-interface@0.59.3 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-interface/0.59.3) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
 | rust:windows-link@0.2.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-link/0.2.1) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
 | rust:windows-numerics@0.3.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-numerics/0.3.1) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
+| rust:windows-registry@0.6.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-registry/0.6.1) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
 | rust:windows-result@0.4.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-result/0.4.1) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
 | rust:windows-strings@0.5.1 | MIT OR Apache-2.0 |  | [源码 / 包](https://crates.io/crates/windows-strings/0.5.1) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
 | rust:windows-sys@0.60.2 | MIT OR Apache-2.0 | Microsoft | [源码 / 包](https://crates.io/crates/windows-sys/0.60.2) | [许可](#license-783829b43aacb86c) · [许可](#license-ff82c90f84945c60) |
@@ -482,6 +500,7 @@
 | rust:winreg@0.56.0 | MIT | Igor Shaula <gentoo90@gmail.com> | [源码 / 包](https://crates.io/crates/winreg/0.56.0) | [许可](#license-d9ba37d9bbdf711b) |
 | rust:writeable@0.6.4 | Unicode-3.0 | The ICU4X Project Developers | [源码 / 包](https://crates.io/crates/writeable/0.6.4) | [许可](#license-cde87abe221f413f) |
 | rust:wry@0.57.2 | Apache-2.0 OR MIT | Tauri Programme within The Commons Conservancy | [源码 / 包](https://crates.io/crates/wry/0.57.2) | [许可](#license-954f335b8baf5e1a) · [许可](#license-86eb6a41ef640b92) · [许可](#license-26235c41e314fb0d) |
+| rust:xattr@1.7.0 | MIT OR Apache-2.0 | Steven Allen <steven@stebalien.com> | [源码 / 包](https://crates.io/crates/xattr/1.7.0) | [许可](#license-954f335b8baf5e1a) · [许可](#license-7bdd5c5e8ad0c973) |
 | rust:yoke-derive@0.8.4 | Unicode-3.0 | Manish Goregaokar <manishsmail@gmail.com> | [源码 / 包](https://crates.io/crates/yoke-derive/0.8.4) | [许可](#license-cde87abe221f413f) |
 | rust:yoke@0.8.4 | Unicode-3.0 | Manish Goregaokar <manishsmail@gmail.com> | [源码 / 包](https://crates.io/crates/yoke/0.8.4) | [许可](#license-cde87abe221f413f) |
 | rust:zerocopy-derive@0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT |  | [源码 / 包](https://crates.io/crates/zerocopy-derive/0.8.63) | [许可](#license-98ed0ad9db8a7295) · [许可](#license-47248d1ec833e077) · [许可](#license-a03d4daa4f46496a) |
@@ -11163,7 +11182,7 @@ SOFTWARE.
 
 ## license-e7330bf53074b4a9
 
-来源：https://crates.io/crates/getrandom/0.3.4
+来源：https://crates.io/crates/getrandom/0.2.17
 
 ```text
 Apache License
@@ -11367,6 +11386,39 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+```
+
+## license-478d530cbce79fc1
+
+来源：https://crates.io/crates/getrandom/0.2.17
+
+```text
+Copyright (c) 2018-2024 The rust-random Project Developers
+Copyright (c) 2014 The Rust Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```
 
 ## license-73af2019a565c0e6
@@ -11916,6 +11968,60 @@ THE SOFTWARE.
 
 ```text
 Copyright (c) 2022-2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## license-af6da3f3f6b4929e
+
+来源：https://crates.io/crates/hyper-rustls/0.27.10
+
+```text
+ISC License (ISC)
+Copyright (c) 2016, Joseph Birr-Pixton <jpixton@gmail.com>
+
+Permission to use, copy, modify, and/or distribute this software for
+any purpose with or without fee is hereby granted, provided that the
+above copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+```
+
+## license-a3320aa8d192a02c
+
+来源：https://crates.io/crates/hyper-rustls/0.27.10
+
+```text
+Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -13817,6 +13923,72 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
+## license-58f66933c7bba2f4
+
+来源：https://crates.io/crates/minisign-verify/0.3.0
+
+```text
+Copyright (c) 2019-2025 Frank Denis
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+--
+
+Code in the src/crypto folder is derived from the rust-crypto project:
+https://github.com/DaGenix/rust-crypto
+
+Original ISC license follows:
+
+Copyright (c) 2006-2009 Graydon Hoare
+Copyright (c) 2009-2013 Mozilla Foundation
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
 ## license-7427abc630365f63
 
 来源：https://crates.io/crates/miniz_oxide/0.8.9
@@ -14744,6 +14916,38 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
   This Source Code Form is "Incompatible With Secondary Licenses", as
   defined by the Mozilla Public License, v. 2.0.
+```
+
+## license-6ca34f7d0a421357
+
+来源：https://crates.io/crates/osakit/0.3.1
+
+```text
+Copyright (c) 2024 Marat Dulin
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```
 
 ## license-ec5d7c32366268f1
@@ -16174,6 +16378,320 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## license-edb9c6dbff4676b9
+
+来源：https://crates.io/crates/ring/0.17.14
+
+```text
+*ring* uses an "ISC" license, like BoringSSL used to use, for new code
+files. See LICENSE-other-bits for the text of that license.
+
+See LICENSE-BoringSSL for code that was sourced from BoringSSL under the
+Apache 2.0 license. Some code that was sourced from BoringSSL under the ISC
+license. In each case, the license info is at the top of the file.
+
+See src/polyfill/once_cell/LICENSE-APACHE and src/polyfill/once_cell/LICENSE-MIT
+for the license to code that was sourced from the once_cell project.
+```
+
+## license-473867fcf89f7595
+
+来源：https://crates.io/crates/ring/0.17.14
+
+```text
+Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+
+Licenses for support code
+-------------------------
+
+Parts of the TLS test suite are under the Go license. This code is not included
+in BoringSSL (i.e. libcrypto and libssl) when compiled, however, so
+distributing code linked against BoringSSL does not trigger this license:
+
+Copyright (c) 2009 The Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+BoringSSL uses the Chromium test infrastructure to run a continuous build,
+trybots etc. The scripts which manage this, and the script for generating build
+metadata, are under the Chromium license. Distributing code linked against
+BoringSSL does not trigger this license.
+
+Copyright 2015 The Chromium Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## license-07414b6c33f30acf
+
+来源：https://crates.io/crates/ring/0.17.14
+
+```text
+Copyright 2015-2025 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
 ## license-fde2a68c47d27938
 
 来源：https://crates.io/crates/rustix/1.1.6
@@ -16673,6 +17191,60 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+```
+
+## license-6205904d553962d4
+
+来源：https://crates.io/crates/rustls-platform-verifier/0.7.1
+
+```text
+MIT License
+
+Copyright (c) 2022 1Password
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## license-3ac27594ed56fd07
+
+来源：https://crates.io/crates/rustls-webpki/0.103.17
+
+```text
+Except as otherwise noted, this project is licensed under the following
+(ISC-style) terms:
+
+Copyright 2015 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+The files under third-party/chromium are licensed as described in
+third-party/chromium/LICENSE.
 ```
 
 ## license-739620ea44ad8f99
@@ -18023,6 +18595,38 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## license-eefdbe714980ed70
+
+来源：https://crates.io/crates/system-configuration-sys/0.6.0
+
+```text
+Copyright (c) 2024 Mullvad VPN AB
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
 ## license-28694f36acab4f50
 
 来源：https://crates.io/crates/tao/0.37.2
@@ -18046,6 +18650,38 @@ PackageDownloadLocation: git://github.com/tauri-apps/tao
 PackageDownloadLocation: git+https://github.com/tauri-apps/tao.git
 PackageDownloadLocation: git+ssh://github.com/tauri-apps/tao.git
 Creator: Person: Daniel Thompson-Yvetot
+```
+
+## license-e6e853531994cb47
+
+来源：https://crates.io/crates/tar/0.4.46
+
+```text
+Copyright (c) The tar-rs Project Contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```
 
 ## license-eb8a6c84630461b3
@@ -18291,6 +18927,246 @@ SOFTWARE.
 
 ```text
 Copyright (c) 2019 Tokio Contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## license-acddfb05f07ab004
+
+来源：https://crates.io/crates/tokio-rustls/0.26.6
+
+```text
+Apache License
+                        Version 2.0, January 2004
+                     http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+   "License" shall mean the terms and conditions for use, reproduction,
+   and distribution as defined by Sections 1 through 9 of this document.
+
+   "Licensor" shall mean the copyright owner or entity authorized by
+   the copyright owner that is granting the License.
+
+   "Legal Entity" shall mean the union of the acting entity and all
+   other entities that control, are controlled by, or are under common
+   control with that entity. For the purposes of this definition,
+   "control" means (i) the power, direct or indirect, to cause the
+   direction or management of such entity, whether by contract or
+   otherwise, or (ii) ownership of fifty percent (50%) or more of the
+   outstanding shares, or (iii) beneficial ownership of such entity.
+
+   "You" (or "Your") shall mean an individual or Legal Entity
+   exercising permissions granted by this License.
+
+   "Source" form shall mean the preferred form for making modifications,
+   including but not limited to software source code, documentation
+   source, and configuration files.
+
+   "Object" form shall mean any form resulting from mechanical
+   transformation or translation of a Source form, including but
+   not limited to compiled object code, generated documentation,
+   and conversions to other media types.
+
+   "Work" shall mean the work of authorship, whether in Source or
+   Object form, made available under the License, as indicated by a
+   copyright notice that is included in or attached to the work
+   (an example is provided in the Appendix below).
+
+   "Derivative Works" shall mean any work, whether in Source or Object
+   form, that is based on (or derived from) the Work and for which the
+   editorial revisions, annotations, elaborations, or other modifications
+   represent, as a whole, an original work of authorship. For the purposes
+   of this License, Derivative Works shall not include works that remain
+   separable from, or merely link (or bind by name) to the interfaces of,
+   the Work and Derivative Works thereof.
+
+   "Contribution" shall mean any work of authorship, including
+   the original version of the Work and any modifications or additions
+   to that Work or Derivative Works thereof, that is intentionally
+   submitted to Licensor for inclusion in the Work by the copyright owner
+   or by an individual or Legal Entity authorized to submit on behalf of
+   the copyright owner. For the purposes of this definition, "submitted"
+   means any form of electronic, verbal, or written communication sent
+   to the Licensor or its representatives, including but not limited to
+   communication on electronic mailing lists, source code control systems,
+   and issue tracking systems that are managed by, or on behalf of, the
+   Licensor for the purpose of discussing and improving the Work, but
+   excluding communication that is conspicuously marked or otherwise
+   designated in writing by the copyright owner as "Not a Contribution."
+
+   "Contributor" shall mean Licensor and any individual or Legal Entity
+   on behalf of whom a Contribution has been received by Licensor and
+   subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of
+   this License, each Contributor hereby grants to You a perpetual,
+   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   copyright license to reproduce, prepare Derivative Works of,
+   publicly display, publicly perform, sublicense, and distribute the
+   Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of
+   this License, each Contributor hereby grants to You a perpetual,
+   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   (except as stated in this section) patent license to make, have made,
+   use, offer to sell, sell, import, and otherwise transfer the Work,
+   where such license applies only to those patent claims licensable
+   by such Contributor that are necessarily infringed by their
+   Contribution(s) alone or by combination of their Contribution(s)
+   with the Work to which such Contribution(s) was submitted. If You
+   institute patent litigation against any entity (including a
+   cross-claim or counterclaim in a lawsuit) alleging that the Work
+   or a Contribution incorporated within the Work constitutes direct
+   or contributory patent infringement, then any patent licenses
+   granted to You under this License for that Work shall terminate
+   as of the date such litigation is filed.
+
+4. Redistribution. You may reproduce and distribute copies of the
+   Work or Derivative Works thereof in any medium, with or without
+   modifications, and in Source or Object form, provided that You
+   meet the following conditions:
+
+   (a) You must give any other recipients of the Work or
+       Derivative Works a copy of this License; and
+
+   (b) You must cause any modified files to carry prominent notices
+       stating that You changed the files; and
+
+   (c) You must retain, in the Source form of any Derivative Works
+       that You distribute, all copyright, patent, trademark, and
+       attribution notices from the Source form of the Work,
+       excluding those notices that do not pertain to any part of
+       the Derivative Works; and
+
+   (d) If the Work includes a "NOTICE" text file as part of its
+       distribution, then any Derivative Works that You distribute must
+       include a readable copy of the attribution notices contained
+       within such NOTICE file, excluding those notices that do not
+       pertain to any part of the Derivative Works, in at least one
+       of the following places: within a NOTICE text file distributed
+       as part of the Derivative Works; within the Source form or
+       documentation, if provided along with the Derivative Works; or,
+       within a display generated by the Derivative Works, if and
+       wherever such third-party notices normally appear. The contents
+       of the NOTICE file are for informational purposes only and
+       do not modify the License. You may add Your own attribution
+       notices within Derivative Works that You distribute, alongside
+       or as an addendum to the NOTICE text from the Work, provided
+       that such additional attribution notices cannot be construed
+       as modifying the License.
+
+   You may add Your own copyright statement to Your modifications and
+   may provide additional or different license terms and conditions
+   for use, reproduction, or distribution of Your modifications, or
+   for any such Derivative Works as a whole, provided Your use,
+   reproduction, and distribution of the Work otherwise complies with
+   the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise,
+   any Contribution intentionally submitted for inclusion in the Work
+   by You to the Licensor shall be under the terms and conditions of
+   this License, without any additional terms or conditions.
+   Notwithstanding the above, nothing herein shall supersede or modify
+   the terms of any separate license agreement you may have executed
+   with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade
+   names, trademarks, service marks, or product names of the Licensor,
+   except as required for reasonable and customary use in describing the
+   origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or
+   agreed to in writing, Licensor provides the Work (and each
+   Contributor provides its Contributions) on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+   implied, including, without limitation, any warranties or conditions
+   of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+   PARTICULAR PURPOSE. You are solely responsible for determining the
+   appropriateness of using or redistributing the Work and assume any
+   risks associated with Your exercise of permissions under this License.
+
+8. Limitation of Liability. In no event and under no legal theory,
+   whether in tort (including negligence), contract, or otherwise,
+   unless required by applicable law (such as deliberate and grossly
+   negligent acts) or agreed to in writing, shall any Contributor be
+   liable to You for damages, including any direct, indirect, special,
+   incidental, or consequential damages of any character arising as a
+   result of this License or out of the use or inability to use the
+   Work (including but not limited to damages for loss of goodwill,
+   work stoppage, computer failure or malfunction, or any and all
+   other commercial damages or losses), even if such Contributor
+   has been advised of the possibility of such damages.
+
+9. Accepting Warranty or Additional Liability. While redistributing
+   the Work or Derivative Works thereof, You may choose to offer,
+   and charge a fee for, acceptance of support, warranty, indemnity,
+   or other liability obligations and/or rights consistent with this
+   License. However, in accepting such obligations, You may act only
+   on Your own behalf and on Your sole responsibility, not on behalf
+   of any other Contributor, and only if You agree to indemnify,
+   defend, and hold each Contributor harmless for any liability
+   incurred by, or claims asserted against, such Contributor by reason
+   of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+
+APPENDIX: How to apply the Apache License to your work.
+
+   To apply the Apache License to your work, attach the following
+   boilerplate notice, with the fields enclosed by brackets "[]"
+   replaced with your own identifying information. (Don't include
+   the brackets!)  The text should be enclosed in the appropriate
+   comment syntax for the file format. We also recommend that a
+   file or class name and description of purpose be included on the
+   same "printed page" as the copyright notice for easier
+   identification within third-party archives.
+
+Copyright 2017 quininer kel
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+## license-1b0258c48739a24e
+
+来源：https://crates.io/crates/tokio-rustls/0.26.6
+
+```text
+Copyright (c) 2017 quininer kel
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -18818,6 +19694,26 @@ license <LICENSE-MIT or http://opensource.org/licenses/MIT>,
 at your option. All files in the project carrying such
 notice may not be copied, modified, or distributed except
 according to those terms.
+```
+
+## license-a1fff344297822d3
+
+来源：https://crates.io/crates/untrusted/0.9.0
+
+```text
+// Copyright 2015-2016 Brian Smith.
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+// OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ## license-f2459c4b106b4bee

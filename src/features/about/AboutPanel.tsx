@@ -15,6 +15,7 @@ export function AboutPanel() {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [checkRequest, setCheckRequest] = useState(0);
+  const [updating, setUpdating] = useState(false);
   const [view, setView] = useState("info");
   const [legal, setLegal] = useState("");
   const [error, setError] = useState("");
@@ -86,7 +87,7 @@ export function AboutPanel() {
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        setOpen(false);
+        if (!updating) setOpen(false);
       }
       if (event.key === "Tab") {
         const nodes = dialog.current?.querySelectorAll<HTMLElement>(
@@ -110,7 +111,7 @@ export function AboutPanel() {
       window.removeEventListener("keydown", keydown, true);
       trigger.current?.focus();
     };
-  }, [open]);
+  }, [open, updating]);
   async function link(value: ProjectLink) {
     try {
       await api.openProjectLink(value);
@@ -135,7 +136,8 @@ export function AboutPanel() {
           <div
             className="dialog-backdrop"
             onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setOpen(false);
+              if (event.target === event.currentTarget && !updating)
+                setOpen(false);
             }}
           >
             <section
@@ -151,6 +153,7 @@ export function AboutPanel() {
                   variant="ghost"
                   size="icon"
                   aria-label={t("dismiss")}
+                  disabled={updating}
                   autoFocus
                   onClick={() => setOpen(false)}
                 >
@@ -165,6 +168,7 @@ export function AboutPanel() {
                 {(["info", "license", "notices"] as const).map((value) => (
                   <button
                     key={value}
+                    disabled={updating}
                     className={view === value ? "active" : ""}
                     onClick={() => setView(value)}
                   >
@@ -196,6 +200,7 @@ export function AboutPanel() {
                   <UpdateCheck
                     request={checkRequest}
                     onCheck={() => setCheckRequest((value) => value + 1)}
+                    onBusyChange={setUpdating}
                   />
                   <dl className="about-facts">
                     <div>

@@ -15,6 +15,7 @@
     "release:check": "node scripts/check-release.mjs",
     "release:test": "node --test scripts/*.test.mjs",
     "package:local": "node scripts/package-desktop.mjs unsigned",
+    "updater:key": "node scripts/create-updater-key.mjs",
     "notices:generate": "node scripts/generate-notices.mjs"
   },
   "dependencies": {

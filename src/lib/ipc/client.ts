@@ -2,6 +2,7 @@ import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   UpdateInfo,
+  UpdateProgress,
   AppInfo,
   ProjectLink,
   Imported,
@@ -54,6 +55,14 @@ export const emptyRemote: RemoteSnapshot = {
 };
 export const api = {
   checkUpdates: () => invoke<UpdateInfo>("check_updates"),
+  installUpdate: (onProgress: (progress: UpdateProgress) => void) => {
+    const progress = new Channel<UpdateProgress>();
+    progress.onmessage = onProgress;
+    return invoke<void>("install_update", { progress }).finally(() => {
+      progress.onmessage = () => {};
+    });
+  },
+  cancelUpdate: () => invoke<boolean>("cancel_update"),
   openReleaseLink: (url: string) => invoke<void>("open_release_link", { url }),
   appInfo: () => invoke<AppInfo>("app_info"),
   legalText: (document: "license" | "notices") =>
