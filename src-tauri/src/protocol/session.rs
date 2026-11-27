@@ -74,6 +74,10 @@ pub struct EntryRow {
     pub state: &'static str,
     pub pinned: bool,
     pub response_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graphql_operation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub biz_error: Option<String>,
 }
 
 /// Validate known fields, but retain the original line separately for lossless export.
@@ -157,7 +161,108 @@ pub fn parse_entry(value: &Value) -> Result<EntryRow> {
         },
         pinned: value["pinned"].as_bool().unwrap_or(false),
         response_bytes: body_size(&response["body"]),
+        graphql_operation: extract_graphql_operation(url, &request["body"]),
+        biz_error: None,
     })
+}
+
+/// 从 GraphQL 请求正文中提取 operationName（优先读取 operationName 字段，否则解析 query/mutation 头部名称）。
+pub fn extract_graphql_operation(url: &str, request_body: &Value) -> Option<String> {
+    if request_body["kind"].as_str() != Some("text") {
+        return None;
+    }
+    let text = request_body["text"].as_str()?.trim();
+    if text.len() > 256 * 1024 || !text.starts_with('{') {
+        return None;
+    }
+    let parsed: Value = serde_json::from_str(text).ok()?;
+    let obj = parsed.as_object()?;
+    let url_hint = url.to_ascii_lowercase().contains("graphql");
+    let query_text = obj.get("query").and_then(Value::as_str);
+    if !url_hint && query_text.is_none() {
+        return None;
+    }
+    if let Some(name) = obj
+        .get("operationName")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && name.len() <= 80)
+    {
+        return Some(name.to_owned());
+    }
+    let query = query_text?;
+    for keyword in ["query", "mutation", "subscription"] {
+        if let Some(rest) = strip_gql_keyword(query, keyword) {
+            let ident: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .take(80)
+                .collect();
+            if !ident.is_empty() {
+                return Some(ident);
+            }
+        }
+    }
+    None
+}
+
+fn strip_gql_keyword<'a>(source: &'a str, keyword: &str) -> Option<&'a str> {
+    let trimmed = source.trim_start();
+    let rest = trimmed.strip_prefix(keyword)?;
+    let first = rest.chars().next()?;
+    if !first.is_whitespace() {
+        return None;
+    }
+    Some(rest.trim_start())
+}
+
+/// 从文本型 JSON 响应中提取轻量标量字段摘要（最多 16 项），用于动态业务错误码判定且避免重复解析大报文。
+pub fn extract_response_json_fields(response_body: &Value) -> Vec<(String, String)> {
+    if response_body["kind"].as_str() != Some("text") {
+        return Vec::new();
+    }
+    let Some(text) = response_body["text"].as_str().map(str::trim) else {
+        return Vec::new();
+    };
+    if text.len() > 512 * 1024 || !text.starts_with('{') {
+        return Vec::new();
+    }
+    let Ok(Value::Object(map)) = serde_json::from_str::<Value>(text) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (key, value) in &map {
+        if out.len() >= 16 {
+            break;
+        }
+        if let Some(scalar) = json_scalar_preview(value) {
+            out.push((key.clone(), scalar));
+        } else if let Value::Object(nested) = value
+            && matches!(
+                key.to_ascii_lowercase().as_str(),
+                "meta" | "status" | "error" | "header" | "head" | "result"
+            )
+        {
+            for (sub_key, sub_val) in nested {
+                if out.len() >= 16 {
+                    break;
+                }
+                if let Some(scalar) = json_scalar_preview(sub_val) {
+                    out.push((format!("{key}.{sub_key}"), scalar));
+                }
+            }
+        }
+    }
+    out
+}
+
+fn json_scalar_preview(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.chars().take(96).collect()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(if *b { "true".into() } else { "false".into() }),
+        _ => None,
+    }
 }
 
 pub fn validate_headers(value: &Value) -> Result<()> {

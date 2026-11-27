@@ -59,6 +59,51 @@ export interface EntryRow {
   state: "pending" | "completed" | "failed";
   pinned: boolean;
   responseBytes: number | null;
+  graphqlOperation?: string;
+  bizError?: string;
+}
+
+export interface BizErrorRule {
+  enabled: boolean;
+  codeField: string;
+  okValues: string[];
+  successField?: string | null;
+  messageField?: string | null;
+}
+
+export interface EndpointStatRow {
+  key: string;
+  method: string;
+  host: string;
+  normalizedPath: string;
+  graphqlOperation: string | null;
+  count: number;
+  errorCount: number;
+  bizErrorCount: number;
+  pendingCount: number;
+  slowCount: number;
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  maxMs: number;
+  totalBytes: number;
+  sampleEntryId: string;
+  sampleUrl: string;
+}
+
+export interface EndpointStatsReport {
+  totalRequests: number;
+  totalErrors: number;
+  totalBizErrors: number;
+  totalSlow: number;
+  totalBytes: number;
+  endpoints: EndpointStatRow[];
+}
+
+export interface PrefetchBodiesReport {
+  totalCandidates: number;
+  fetched: number;
+  failed: number;
 }
 
 export type RequestSortField = "time" | "duration" | "size";
@@ -282,7 +327,8 @@ export interface RemoteSnapshot {
 }
 
 export type Filter = "all" | "errors" | "pending" | "pinned";
-export type RequestStatusFilter = "2xx" | "3xx" | "4xx" | "5xx" | "failed";
+export type RequestStatusFilter =
+  "2xx" | "3xx" | "4xx" | "5xx" | "failed" | "bizError";
 export interface QueryPage {
   total: number;
   offset: number;

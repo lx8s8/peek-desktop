@@ -16,6 +16,7 @@ vi.mock("../../lib/ipc/client", () => ({
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   vi.mocked(api.localAddresses).mockResolvedValue(["192.168.1.8", "10.1.1.9"]);
 });
 afterEach(() => vi.useRealTimers());
@@ -183,4 +184,47 @@ it("shows current computer addresses before listening, refreshes and copies the 
   fireEvent.click(screen.getByRole("button", { name: "刷新地址" }));
   await screen.findByText("192.168.1.19:9841");
   expect(screen.queryByText("192.168.1.8:9841")).toBeNull();
+});
+
+it("persists listener preferences and optional auto-start flag across mounts", () => {
+  const { unmount } = render(
+    <ConnectionPanel
+      remote={emptyRemote}
+      onChange={async () => {}}
+      onError={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "设备连接" }));
+  fireEvent.change(screen.getByLabelText("监听范围"), {
+    target: { value: "127.0.0.1" },
+  });
+  fireEvent.change(screen.getByLabelText("端口"), {
+    target: { value: "9855" },
+  });
+  const autoStartBox = screen.getByLabelText(
+    /启动应用时自动开始监听/,
+  ) as HTMLInputElement;
+  expect(autoStartBox.checked).toBe(false);
+  fireEvent.click(autoStartBox);
+  expect(autoStartBox.checked).toBe(true);
+  unmount();
+
+  render(
+    <ConnectionPanel
+      remote={emptyRemote}
+      onChange={async () => {}}
+      onError={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "设备连接" }));
+  expect((screen.getByLabelText("监听范围") as HTMLSelectElement).value).toBe(
+    "127.0.0.1",
+  );
+  expect((screen.getByLabelText("端口") as HTMLInputElement).value).toBe(
+    "9855",
+  );
+  expect(
+    (screen.getByLabelText(/启动应用时自动开始监听/) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
 });

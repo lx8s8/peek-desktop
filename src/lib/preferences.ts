@@ -1,3 +1,5 @@
+import type { BizErrorRule, Filter, RequestStatusFilter } from "./ipc/types";
+
 export function readPreference(key: string, fallback: string): string {
   try {
     return localStorage.getItem(`peek.${key}`) ?? fallback;
@@ -153,4 +155,209 @@ export function readRequestTableLayout(): RequestTableLayoutPrefs {
 /** 持久化保存网络列表列宽与显隐偏好。 */
 export function writeRequestTableLayout(prefs: RequestTableLayoutPrefs) {
   writePreference(TABLE_LAYOUT_KEY, JSON.stringify(prefs));
+}
+
+export interface ListenerPrefs {
+  host: "127.0.0.1" | "0.0.0.0";
+  port: string;
+  advertise: boolean;
+  diagnostics: boolean;
+  autoStart: boolean;
+}
+
+export const DEFAULT_LISTENER_PREFS: ListenerPrefs = {
+  host: "0.0.0.0",
+  port: "9741",
+  advertise: true,
+  diagnostics: true,
+  autoStart: false,
+};
+
+const LISTENER_PREFS_KEY = "listenerPrefs";
+
+/** 读取桌面端持久化保存的监听地址、端口与自动启动配置。 */
+export function readListenerPrefs(): ListenerPrefs {
+  try {
+    const raw = readPreference(LISTENER_PREFS_KEY, "");
+    if (!raw) return { ...DEFAULT_LISTENER_PREFS };
+    const parsed = JSON.parse(raw) as Partial<ListenerPrefs>;
+    const host = parsed.host === "127.0.0.1" ? "127.0.0.1" : "0.0.0.0";
+    const portStr =
+      typeof parsed.port === "string" &&
+      /^\d+$/.test(parsed.port) &&
+      Number(parsed.port) >= 1 &&
+      Number(parsed.port) <= 65535
+        ? parsed.port
+        : DEFAULT_LISTENER_PREFS.port;
+    return {
+      host,
+      port: portStr,
+      advertise:
+        typeof parsed.advertise === "boolean"
+          ? parsed.advertise
+          : DEFAULT_LISTENER_PREFS.advertise,
+      diagnostics:
+        typeof parsed.diagnostics === "boolean"
+          ? parsed.diagnostics
+          : DEFAULT_LISTENER_PREFS.diagnostics,
+      autoStart:
+        typeof parsed.autoStart === "boolean"
+          ? parsed.autoStart
+          : DEFAULT_LISTENER_PREFS.autoStart,
+    };
+  } catch {
+    return { ...DEFAULT_LISTENER_PREFS };
+  }
+}
+
+/** 持久化保存监听配置。 */
+export function writeListenerPrefs(prefs: ListenerPrefs) {
+  writePreference(LISTENER_PREFS_KEY, JSON.stringify(prefs));
+}
+
+export interface GlobalNoiseConfig {
+  enabled: boolean;
+  globalExcludes: string[];
+  deviceExcludes: Record<string, string[]>;
+}
+
+const NOISE_RULES_KEY = "globalNoiseRules";
+
+function cleanPatterns(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed || trimmed.length > 200) continue;
+    const key = trimmed.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(trimmed);
+    }
+  }
+  return out.slice(0, 60);
+}
+
+/** 读取持久化的全局与按设备降噪屏蔽规则。 */
+export function readGlobalNoiseConfig(): GlobalNoiseConfig {
+  try {
+    const raw = readPreference(NOISE_RULES_KEY, "");
+    if (!raw) {
+      return { enabled: true, globalExcludes: [], deviceExcludes: {} };
+    }
+    const parsed = JSON.parse(raw) as Partial<GlobalNoiseConfig>;
+    const deviceExcludes: Record<string, string[]> = {};
+    if (parsed.deviceExcludes && typeof parsed.deviceExcludes === "object") {
+      for (const [deviceId, list] of Object.entries(parsed.deviceExcludes)) {
+        const cleaned = cleanPatterns(list);
+        if (cleaned.length > 0) {
+          deviceExcludes[deviceId] = cleaned;
+        }
+      }
+    }
+    return {
+      enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
+      globalExcludes: cleanPatterns(parsed.globalExcludes),
+      deviceExcludes,
+    };
+  } catch {
+    return { enabled: true, globalExcludes: [], deviceExcludes: {} };
+  }
+}
+
+/** 持久化保存全局与按设备降噪屏蔽规则。 */
+export function writeGlobalNoiseConfig(config: GlobalNoiseConfig) {
+  writePreference(NOISE_RULES_KEY, JSON.stringify(config));
+}
+
+export interface NetworkFilterPreset {
+  id: string;
+  name: string;
+  filter: Filter;
+  methodFilter: string | null;
+  statusFilter: RequestStatusFilter | null;
+  minDurationMs: number | null;
+  search: string;
+  searchBody: boolean;
+  hostFilter: string | null;
+}
+
+const FILTER_PRESETS_KEY = "networkFilterPresets";
+
+/** 读取用户自定义的快捷筛选预设列表。 */
+export function readFilterPresets(): NetworkFilterPreset[] {
+  try {
+    const raw = readPreference(FILTER_PRESETS_KEY, "");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is NetworkFilterPreset =>
+          !!item &&
+          typeof item === "object" &&
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          item.name.trim().length > 0,
+      )
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+/** 持久化保存用户自定义的快捷筛选预设列表。 */
+export function writeFilterPresets(presets: NetworkFilterPreset[]) {
+  writePreference(FILTER_PRESETS_KEY, JSON.stringify(presets.slice(0, 20)));
+}
+
+export const DEFAULT_BIZ_ERROR_RULE: BizErrorRule = {
+  enabled: false,
+  codeField: "code,errCode,errno",
+  okValues: ["0", "200", "OK"],
+  successField: "success",
+  messageField: "msg,message,error",
+};
+
+const BIZ_ERROR_RULE_KEY = "bizErrorRule";
+
+/** 读取 HTTP 200 业务错误码识别规则。 */
+export function readBizErrorRule(): BizErrorRule {
+  try {
+    const raw = readPreference(BIZ_ERROR_RULE_KEY, "");
+    if (!raw) return { ...DEFAULT_BIZ_ERROR_RULE };
+    const parsed = JSON.parse(raw) as Partial<BizErrorRule>;
+    return {
+      enabled:
+        typeof parsed.enabled === "boolean"
+          ? parsed.enabled
+          : DEFAULT_BIZ_ERROR_RULE.enabled,
+      codeField:
+        typeof parsed.codeField === "string" && parsed.codeField.trim()
+          ? parsed.codeField.trim()
+          : DEFAULT_BIZ_ERROR_RULE.codeField,
+      okValues: Array.isArray(parsed.okValues)
+        ? parsed.okValues
+            .filter((v): v is string => typeof v === "string" && !!v.trim())
+            .map((v) => v.trim())
+        : [...DEFAULT_BIZ_ERROR_RULE.okValues],
+      successField:
+        typeof parsed.successField === "string"
+          ? parsed.successField.trim() || null
+          : DEFAULT_BIZ_ERROR_RULE.successField,
+      messageField:
+        typeof parsed.messageField === "string"
+          ? parsed.messageField.trim() || null
+          : DEFAULT_BIZ_ERROR_RULE.messageField,
+    };
+  } catch {
+    return { ...DEFAULT_BIZ_ERROR_RULE };
+  }
+}
+
+/** 持久化保存 HTTP 200 业务错误码识别规则。 */
+export function writeBizErrorRule(rule: BizErrorRule) {
+  writePreference(BIZ_ERROR_RULE_KEY, JSON.stringify(rule));
 }

@@ -16,6 +16,7 @@ vi.mock("../../lib/ipc/client", () => ({
     restoreRecovery: vi.fn(),
     startNewRecovery: vi.fn(),
     exportScope: vi.fn(),
+    prefetchBodies: vi.fn(),
     copyCurl: vi.fn(),
     writeClipboard: vi.fn(),
   },
@@ -120,4 +121,39 @@ it("protects pending recovery until explicitly restored and surfaces backup fall
       }) as HTMLButtonElement
     ).disabled,
   ).toBe(true);
+});
+
+it("surfaces spill merge notice and prefetches remote bodies for online live sessions", async () => {
+  vi.mocked(api.prefetchBodies).mockResolvedValue({
+    totalCandidates: 5,
+    fetched: 4,
+    failed: 1,
+  });
+  const notice = vi.fn();
+  const error = vi.fn();
+  render(
+    <FileTools
+      scope={{ kind: "network", id: "live-session-1" }}
+      networkId="live-session-1"
+      liveOnline
+      spilledCount={18}
+      hasLogs={false}
+      onError={error}
+      onNotice={notice}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "导出与恢复" }));
+  expect(
+    screen.getByText(
+      /包含 18 条磁盘冷存历史，保存 \.peek 或完整归档时将自动合并导出/,
+    ),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "补拉未加载正文…" }));
+  await waitFor(() =>
+    expect(api.prefetchBodies).toHaveBeenCalledWith("live-session-1"),
+  );
+  await waitFor(() =>
+    expect(notice).toHaveBeenCalledWith("已补拉 4/5 条远端正文（失败 1）"),
+  );
+  expect(error).not.toHaveBeenCalled();
 });

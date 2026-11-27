@@ -4,6 +4,9 @@ import type {
   UpdateInfo,
   UpdateProgress,
   AppInfo,
+  BizErrorRule,
+  EndpointStatsReport,
+  PrefetchBodiesReport,
   ProjectLink,
   Imported,
   RecoveryStatus,
@@ -202,7 +205,26 @@ export const api = {
   cancel: () => invoke<void>("cancel_import"),
   close: (sessionId: string) => invoke<void>("close_session", { sessionId }),
   archive: (scope: Scope) => invoke<boolean>("save_bundle", { scope }),
-  save: (sessionId: string) => invoke<boolean>("save_peek", { sessionId }),
+  save: (sessionId: string, includeSpill = true) =>
+    invoke<boolean>("save_peek", { sessionId, includeSpill }),
+  endpointStats: (
+    sessionId: string,
+    range: TimeRange = {},
+    afterSeq?: number | null,
+    bizErrorRule?: BizErrorRule | null,
+  ) =>
+    invoke<EndpointStatsReport>("query_endpoint_stats", {
+      sessionId,
+      range,
+      ...(afterSeq != null ? { afterSeq } : {}),
+      ...(bizErrorRule?.enabled ? { bizErrorRule } : {}),
+    }),
+  prefetchBodies: (sessionId: string, maxBytes = 256 * 1024, maxCount = 60) =>
+    invoke<PrefetchBodiesReport>("prefetch_remote_bodies", {
+      sessionId,
+      maxBytes,
+      maxCount,
+    }),
   query: (
     sessionId: string,
     search: string,
@@ -219,6 +241,8 @@ export const api = {
     methodFilter?: string | null,
     statusFilter?: RequestStatusFilter | null,
     searchBody?: boolean,
+    minDurationMs?: number | null,
+    bizErrorRule?: BizErrorRule | null,
   ) =>
     invoke<QueryPage>("query_entries", {
       sessionId,
@@ -235,6 +259,8 @@ export const api = {
       ...(methodFilter ? { methodFilter } : {}),
       ...(statusFilter ? { statusFilter } : {}),
       ...(searchBody ? { searchBody: true } : {}),
+      ...(minDurationMs != null && minDurationMs > 0 ? { minDurationMs } : {}),
+      ...(bizErrorRule?.enabled ? { bizErrorRule } : {}),
     }),
   metadata: (sessionId: string, entryId: string) =>
     invoke<string>("get_entry_metadata", { sessionId, entryId }),

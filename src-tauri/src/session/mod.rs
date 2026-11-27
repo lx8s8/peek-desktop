@@ -1,7 +1,9 @@
 pub mod spill;
 
-use crate::protocol::session::{EntryRow, Header, Result, parse_entry, parse_timestamp_micros};
-use serde::Serialize;
+use crate::protocol::session::{
+    EntryRow, Header, Result, extract_response_json_fields, parse_entry, parse_timestamp_micros,
+};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     cmp::Ordering,
@@ -25,6 +27,7 @@ pub struct StoredEntry {
     pub raw: Arc<str>,
     pub(crate) search: String,
     pub(crate) started_at_micros: i64,
+    pub(crate) response_fields: Vec<(String, String)>,
 }
 
 impl StoredEntry {
@@ -37,12 +40,14 @@ impl StoredEntry {
             .map(|b| format!("{b:02x}"))
             .collect();
         let started_at_micros = parse_timestamp_micros(&row.started_at);
+        let response_fields = extract_response_json_fields(&value["response"]["body"]);
         let search = format!(
-            "{} {} {} {}",
+            "{} {} {} {} {}",
             row.method,
             row.url,
             row.source,
-            row.status.map(|s| s.to_string()).unwrap_or_default()
+            row.status.map(|s| s.to_string()).unwrap_or_default(),
+            row.graphql_operation.as_deref().unwrap_or("")
         )
         .to_lowercase();
         Ok(Self {
@@ -50,8 +55,161 @@ impl StoredEntry {
             raw: raw.into(),
             search,
             started_at_micros,
+            response_fields,
         })
     }
+}
+
+/// HTTP 200 响应的自定义业务错误码识别规则（支持多候选字段名与点号嵌套路径）。
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BizErrorRule {
+    pub enabled: bool,
+    pub code_field: String,
+    pub ok_values: Vec<String>,
+    pub success_field: Option<String>,
+    pub message_field: Option<String>,
+}
+
+impl BizErrorRule {
+    /// 仅对 HTTP 2xx 的 JSON 响应评估业务异常，命中时返回简洁摘要（如 `50001 · token expired`）。
+    pub fn evaluate(&self, status: Option<i64>, fields: &[(String, String)]) -> Option<String> {
+        if !self.enabled || fields.is_empty() || !status.is_some_and(|s| (200..300).contains(&s)) {
+            return None;
+        }
+        let lookup_any = |spec: &str| -> Option<&str> {
+            for candidate in spec.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                if let Some((_, val)) = fields
+                    .iter()
+                    .find(|(key, _)| key.eq_ignore_ascii_case(candidate))
+                {
+                    return Some(val.as_str());
+                }
+            }
+            None
+        };
+
+        let mut error_tag: Option<String> = None;
+
+        if let Some(success_spec) = self.success_field.as_deref()
+            && let Some(val) = lookup_any(success_spec)
+            && matches!(val.trim().to_ascii_lowercase().as_str(), "false" | "0")
+        {
+            error_tag = Some("false".to_owned());
+        }
+
+        if let Some(val) = lookup_any(&self.code_field) {
+            let trimmed = val.trim();
+            let is_ok = self
+                .ok_values
+                .iter()
+                .map(|v| v.trim())
+                .filter(|v| !v.is_empty())
+                .any(|ok| ok.eq_ignore_ascii_case(trimmed));
+            if !is_ok && !trimmed.is_empty() {
+                error_tag = Some(trimmed.to_owned());
+            }
+        }
+
+        let tag = error_tag?;
+        let msg = self
+            .message_field
+            .as_deref()
+            .and_then(lookup_any)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        Some(match msg {
+            Some(text) => {
+                let clipped: String = text.chars().take(48).collect();
+                format!("{tag} · {clipped}")
+            }
+            None => tag,
+        })
+    }
+}
+
+/// 接口聚合统计单行结果。
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointStatRow {
+    pub key: String,
+    pub method: String,
+    pub host: String,
+    pub normalized_path: String,
+    pub graphql_operation: Option<String>,
+    pub count: usize,
+    pub error_count: usize,
+    pub biz_error_count: usize,
+    pub pending_count: usize,
+    pub slow_count: usize,
+    pub avg_ms: f64,
+    pub p50_ms: f64,
+    pub p95_ms: f64,
+    pub max_ms: f64,
+    pub total_bytes: u64,
+    pub sample_entry_id: String,
+    pub sample_url: String,
+}
+
+/// 当前会话的接口聚合统计总览报告。
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointStatsReport {
+    pub total_requests: usize,
+    pub total_errors: usize,
+    pub total_biz_errors: usize,
+    pub total_slow: usize,
+    pub total_bytes: u64,
+    pub endpoints: Vec<EndpointStatRow>,
+}
+
+/// 将 URL 中的数字 ID、UUID 与长十六进制段归一化为 `:id`，用于聚合同一接口的多次调用。
+pub fn normalize_endpoint_path(url: &str, graphql_op: Option<&str>) -> (String, String) {
+    let Ok(parsed) = url::Url::parse(url) else {
+        return (String::new(), url.to_owned());
+    };
+    let host = parsed.host_str().unwrap_or("").to_lowercase();
+    let mut segments = Vec::new();
+    for seg in parsed.path().split('/').filter(|s| !s.is_empty()) {
+        if is_dynamic_path_segment(seg) {
+            segments.push(":id");
+        } else {
+            segments.push(seg);
+        }
+    }
+    let mut path = format!("/{}", segments.join("/"));
+    if let Some(op) = graphql_op.filter(|s| !s.is_empty()) {
+        path.push_str(&format!(" [{op}]"));
+    }
+    (host, path)
+}
+
+fn is_dynamic_path_segment(seg: &str) -> bool {
+    if seg.is_empty() {
+        return false;
+    }
+    // 纯数字 ID
+    if seg.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    // 标准 UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    if seg.len() == 36
+        && seg.as_bytes()[8] == b'-'
+        && seg.as_bytes()[13] == b'-'
+        && seg.as_bytes()[18] == b'-'
+        && seg.as_bytes()[23] == b'-'
+        && seg
+            .chars()
+            .enumerate()
+            .all(|(i, c)| matches!(i, 8 | 13 | 18 | 23) || c.is_ascii_hexdigit())
+    {
+        return true;
+    }
+    // 长十六进制或 ObjectId (如 24/32/40/64 位 hex)
+    if seg.len() >= 16 && seg.chars().all(|c| c.is_ascii_hexdigit()) {
+        return true;
+    }
+    false
 }
 
 /// 零分配 ASCII 大小写不敏感子串匹配（非 ASCII 字符回退为完整 Unicode 小写匹配）。
@@ -72,7 +230,7 @@ pub fn contains_ignore_case(haystack: &str, needle_lower: &str) -> bool {
     haystack.to_lowercase().contains(needle_lower)
 }
 
-/// 网络请求列表窗口查询附加参数（支持域名、方法、状态码段、降噪、跨请求正文搜索、多列排序与软清屏水位线）。
+/// 网络请求列表窗口查询附加参数（支持域名、方法、状态码段、业务错误规则、慢请求阈值、降噪、跨请求正文搜索、多列排序与软清屏水位线）。
 #[derive(Clone, Copy, Debug, Default)]
 pub struct QueryOptions<'a> {
     pub host_filter: Option<&'a str>,
@@ -84,6 +242,8 @@ pub struct QueryOptions<'a> {
     pub sort_dir: Option<&'a str>,
     pub after_seq: Option<u64>,
     pub max_bytes: Option<usize>,
+    pub min_duration_ms: Option<f64>,
+    pub biz_error_rule: Option<&'a BizErrorRule>,
 }
 
 #[derive(Clone)]
@@ -375,17 +535,31 @@ impl Session {
         host_list.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
         let hosts: Vec<String> = host_list.into_iter().take(12).map(|(h, _)| h).collect();
 
-        let matches_meta = |row: &EntryRow| -> bool {
+        let biz_rule = options.biz_error_rule.filter(|r| r.enabled);
+        let min_duration_ms = options
+            .min_duration_ms
+            .filter(|v| v.is_finite() && *v > 0.0);
+
+        let matches_meta = |row: &EntryRow, biz_err: Option<&str>| -> bool {
             if after_seq.is_some_and(|mark| row.seq <= mark) {
                 return false;
             }
             let accepted = match filter {
-                "errors" => row.state == "failed" || row.status.is_some_and(|s| s >= 400),
+                "errors" => {
+                    row.state == "failed"
+                        || row.status.is_some_and(|s| s >= 400)
+                        || biz_err.is_some()
+                }
                 "pending" => row.state == "pending",
                 "pinned" => row.pinned,
                 _ => true,
             };
             if !accepted || !range.includes(&row.started_at) {
+                return false;
+            }
+            if let Some(min_ms) = min_duration_ms
+                && !row.duration_ms.is_some_and(|d| d >= min_ms)
+            {
                 return false;
             }
             if let Some(target_method) = &method_upper
@@ -400,6 +574,7 @@ impl Session {
                     "4xx" => row.status.is_some_and(|s| (400..500).contains(&s)),
                     "5xx" => row.status.is_some_and(|s| s >= 500),
                     "failed" => row.state == "failed",
+                    "bizerror" => biz_err.is_some(),
                     _ => true,
                 };
                 if !status_ok {
@@ -438,12 +613,19 @@ impl Session {
             duration_ms: Option<f64>,
             response_bytes: Option<u64>,
             seq: u64,
+            biz_error: Option<String>,
         }
         // 统一候选引用索引：区分来自冷区（false）还是热区（true）
         let mut matched_refs: Vec<MatchedRef> = Vec::new();
         if let Some(cold) = spill.as_deref_mut() {
             for idx in 0..cold.entries.len() {
-                let meta_ok = matches_meta(&cold.entries[idx].row);
+                let biz_error = biz_rule.and_then(|rule| {
+                    rule.evaluate(
+                        cold.entries[idx].row.status,
+                        &cold.entries[idx].response_fields,
+                    )
+                });
+                let meta_ok = matches_meta(&cold.entries[idx].row, biz_error.as_deref());
                 if !meta_ok {
                     continue;
                 }
@@ -467,12 +649,15 @@ impl Session {
                         duration_ms: e.row.duration_ms,
                         response_bytes: e.row.response_bytes,
                         seq: e.row.seq,
+                        biz_error,
                     });
                 }
             }
         }
         for (idx, entry) in self.entries.iter().enumerate() {
-            if !matches_meta(&entry.row) {
+            let biz_error =
+                biz_rule.and_then(|rule| rule.evaluate(entry.row.status, &entry.response_fields));
+            if !matches_meta(&entry.row, biz_error.as_deref()) {
                 continue;
             }
             let text_ok = if search_lower.is_empty() || entry.search.contains(&search_lower) {
@@ -490,6 +675,7 @@ impl Session {
                     duration_ms: entry.row.duration_ms,
                     response_bytes: entry.row.response_bytes,
                     seq: entry.row.seq,
+                    biz_error,
                 });
             }
         }
@@ -535,11 +721,13 @@ impl Session {
             .skip(offset)
             .take(limit.min(500))
             .map(|item| {
-                if item.is_hot {
+                let mut row = if item.is_hot {
                     self.entries[item.idx].row.clone()
                 } else {
                     cold_ref.unwrap().entries[item.idx].row.clone()
-                }
+                };
+                row.biz_error = item.biz_error;
+                row
             })
             .collect();
 
@@ -559,6 +747,173 @@ impl Session {
             max_bytes: options.max_bytes,
             spilled_count,
             spilled_bytes,
+        }
+    }
+
+    /// 汇总当前会话（含磁盘冷存储）的接口聚合统计：识别高频重复请求、慢接口与报错热点。
+    pub fn endpoint_stats(
+        &self,
+        spill: Option<&spill::SpillStore>,
+        range: &crate::query::ParsedRange,
+        after_seq: Option<u64>,
+        biz_rule: Option<&BizErrorRule>,
+    ) -> EndpointStatsReport {
+        struct Acc {
+            method: String,
+            host: String,
+            normalized_path: String,
+            graphql_operation: Option<String>,
+            count: usize,
+            error_count: usize,
+            biz_error_count: usize,
+            pending_count: usize,
+            slow_count: usize,
+            durations: Vec<f64>,
+            total_bytes: u64,
+            sample_entry_id: String,
+            sample_url: String,
+            sample_priority: (u8, i64),
+        }
+
+        let active_rule = biz_rule.filter(|r| r.enabled);
+        let mut total_requests = 0usize;
+        let mut total_errors = 0usize;
+        let mut total_biz_errors = 0usize;
+        let mut total_slow = 0usize;
+        let mut total_bytes = 0u64;
+        let mut groups: HashMap<String, Acc> = HashMap::new();
+
+        let mut ingest = |row: &EntryRow, fields: &[(String, String)]| {
+            if after_seq.is_some_and(|mark| row.seq <= mark) || !range.includes(&row.started_at) {
+                return;
+            }
+            total_requests += 1;
+            let biz_err = active_rule.and_then(|rule| rule.evaluate(row.status, fields));
+            let is_http_err = row.state == "failed" || row.status.is_some_and(|s| s >= 400);
+            let is_err = is_http_err || biz_err.is_some();
+            let is_slow = row.duration_ms.is_some_and(|d| d >= 800.0);
+            let bytes = row.response_bytes.unwrap_or(0);
+
+            if is_err {
+                total_errors += 1;
+            }
+            if biz_err.is_some() {
+                total_biz_errors += 1;
+            }
+            if is_slow {
+                total_slow += 1;
+            }
+            total_bytes = total_bytes.saturating_add(bytes);
+
+            let method = row.method.to_ascii_uppercase();
+            let (host, normalized_path) =
+                normalize_endpoint_path(&row.url, row.graphql_operation.as_deref());
+            let key = format!("{method} {host}{normalized_path}");
+            let priority = (
+                if is_err { 2 } else { 1 },
+                row.duration_ms.map(|d| (d * 100.0) as i64).unwrap_or(0),
+            );
+
+            let acc = groups.entry(key).or_insert_with(|| Acc {
+                method: method.clone(),
+                host: host.clone(),
+                normalized_path: normalized_path.clone(),
+                graphql_operation: row.graphql_operation.clone(),
+                count: 0,
+                error_count: 0,
+                biz_error_count: 0,
+                pending_count: 0,
+                slow_count: 0,
+                durations: Vec::new(),
+                total_bytes: 0,
+                sample_entry_id: row.id.clone(),
+                sample_url: row.url.clone(),
+                sample_priority: priority,
+            });
+            acc.count += 1;
+            if is_err {
+                acc.error_count += 1;
+            }
+            if biz_err.is_some() {
+                acc.biz_error_count += 1;
+            }
+            if row.state == "pending" {
+                acc.pending_count += 1;
+            }
+            if is_slow {
+                acc.slow_count += 1;
+            }
+            if let Some(ms) = row.duration_ms {
+                acc.durations.push(ms);
+            }
+            acc.total_bytes = acc.total_bytes.saturating_add(bytes);
+            if priority >= acc.sample_priority {
+                acc.sample_priority = priority;
+                acc.sample_entry_id = row.id.clone();
+                acc.sample_url = row.url.clone();
+            }
+        };
+
+        if let Some(cold) = spill {
+            for entry in &cold.entries {
+                ingest(&entry.row, &entry.response_fields);
+            }
+        }
+        for entry in &self.entries {
+            ingest(&entry.row, &entry.response_fields);
+        }
+
+        let mut endpoints: Vec<EndpointStatRow> = groups
+            .into_iter()
+            .map(|(key, mut acc)| {
+                acc.durations.sort_by(|a, b| a.total_cmp(b));
+                let len = acc.durations.len();
+                let (avg_ms, p50_ms, p95_ms, max_ms) = if len == 0 {
+                    (0.0, 0.0, 0.0, 0.0)
+                } else {
+                    let sum: f64 = acc.durations.iter().sum();
+                    let p50 = acc.durations[len / 2];
+                    let p95 = acc.durations[((len - 1) * 95) / 100];
+                    let max = acc.durations[len - 1];
+                    (sum / len as f64, p50, p95, max)
+                };
+                EndpointStatRow {
+                    key,
+                    method: acc.method,
+                    host: acc.host,
+                    normalized_path: acc.normalized_path,
+                    graphql_operation: acc.graphql_operation,
+                    count: acc.count,
+                    error_count: acc.error_count,
+                    biz_error_count: acc.biz_error_count,
+                    pending_count: acc.pending_count,
+                    slow_count: acc.slow_count,
+                    avg_ms,
+                    p50_ms,
+                    p95_ms,
+                    max_ms,
+                    total_bytes: acc.total_bytes,
+                    sample_entry_id: acc.sample_entry_id,
+                    sample_url: acc.sample_url,
+                }
+            })
+            .collect();
+
+        endpoints.sort_by(|a, b| {
+            b.count
+                .cmp(&a.count)
+                .then_with(|| b.p95_ms.total_cmp(&a.p95_ms))
+                .then_with(|| a.key.cmp(&b.key))
+        });
+        endpoints.truncate(200);
+
+        EndpointStatsReport {
+            total_requests,
+            total_errors,
+            total_biz_errors,
+            total_slow,
+            total_bytes,
+            endpoints,
         }
     }
 }
@@ -651,12 +1006,14 @@ pub fn read_session(
         match parse_entry(&value) {
             Ok(mut row) => {
                 let started_at_micros = parse_timestamp_micros(&row.started_at);
+                let response_fields = extract_response_json_fields(&value["response"]["body"]);
                 let search = format!(
-                    "{} {} {} {}",
+                    "{} {} {} {} {}",
                     row.method,
                     row.url,
                     row.source,
-                    row.status.map(|s| s.to_string()).unwrap_or_default()
+                    row.status.map(|s| s.to_string()).unwrap_or_default(),
+                    row.graphql_operation.as_deref().unwrap_or("")
                 )
                 .to_lowercase();
                 let existing = session.index.get(&row.id).copied();
@@ -674,6 +1031,7 @@ pub fn read_session(
                     raw: line.into(),
                     search,
                     started_at_micros,
+                    response_fields,
                 };
                 session.raw_bytes += line.len();
                 if let Some(index) = existing {
@@ -1105,7 +1463,13 @@ mod tests {
         // 模拟热内存溢出到磁盘冷存储：冷区记录可完整回溯、全文搜索、固定并读回原文
         let mut spill = spill::SpillStore::default();
         for item in session.evict_prefix_extract(1) {
-            assert!(spill.push(item.row, item.search, item.started_at_micros, &item.raw));
+            assert!(spill.push(
+                item.row,
+                item.search,
+                item.started_at_micros,
+                item.response_fields,
+                &item.raw
+            ));
         }
         assert!(session.entry("order-create").is_none());
         assert_eq!(spill.len(), 1);
@@ -1135,5 +1499,125 @@ mod tests {
         assert!(recalled.rows[0].pinned);
         assert_eq!(recalled.spilled_count, 1);
         assert!(recalled.spilled_bytes > 0);
+    }
+
+    #[test]
+    fn graphql_extraction_biz_error_rule_and_endpoint_stats_work() {
+        let (header, raw_header) = sample_header();
+        let mut session = Session::empty(header, raw_header);
+
+        // 1. 普通 HTTP 200 但业务码报错的订单接口（两个不同数字 ID 应归一化聚合为 /orders/:id）
+        let biz_fail = json!({
+            "id": "ord-1",
+            "source": "dio",
+            "startedAt": "2026-11-27T01:00:00.000Z",
+            "completedAt": "2026-11-27T01:00:01.200Z",
+            "request": {"method": "GET", "url": "https://api.example.test/v1/orders/10001"},
+            "response": {
+                "status": 200,
+                "body": {"kind": "text", "text": "{\"code\":50001,\"msg\":\"token expired\"}"}
+            }
+        });
+        let biz_ok = json!({
+            "id": "ord-2",
+            "source": "dio",
+            "startedAt": "2026-11-27T01:00:02.000Z",
+            "completedAt": "2026-11-27T01:00:02.150Z",
+            "request": {"method": "GET", "url": "https://api.example.test/v1/orders/20002"},
+            "response": {
+                "status": 200,
+                "body": {"kind": "text", "text": "{\"code\":0,\"msg\":\"ok\"}"}
+            }
+        });
+        // 2. GraphQL 请求自动提取 operationName
+        let gql = json!({
+            "id": "gql-1",
+            "source": "dio",
+            "startedAt": "2026-11-27T01:00:03.000Z",
+            "completedAt": "2026-11-27T01:00:03.080Z",
+            "request": {
+                "method": "POST",
+                "url": "https://api.example.test/graphql",
+                "body": {"kind": "text", "text": "{\"operationName\":\"GetUserProfile\",\"query\":\"query GetUserProfile { me { id } }\"}"}
+            },
+            "response": {
+                "status": 200,
+                "body": {"kind": "text", "text": "{\"data\":{\"me\":{\"id\":\"1\"}}}"}
+            }
+        });
+        session.upsert(StoredEntry::parse(&biz_fail.to_string()).unwrap());
+        session.upsert(StoredEntry::parse(&biz_ok.to_string()).unwrap());
+        session.upsert(StoredEntry::parse(&gql.to_string()).unwrap());
+
+        assert_eq!(
+            session
+                .entry("gql-1")
+                .unwrap()
+                .row
+                .graphql_operation
+                .as_deref(),
+            Some("GetUserProfile")
+        );
+
+        let rule = BizErrorRule {
+            enabled: true,
+            code_field: "code,errCode".into(),
+            ok_values: vec!["0".into(), "200".into()],
+            success_field: Some("success".into()),
+            message_field: Some("msg,message".into()),
+        };
+
+        // 业务错误筛选应仅命中 ord-1 且返回清晰摘要
+        let biz_errors = session.query_with_options(
+            "",
+            "all",
+            0,
+            50,
+            1,
+            &ParsedRange::default(),
+            QueryOptions {
+                status_filter: Some("bizError"),
+                biz_error_rule: Some(&rule),
+                ..Default::default()
+            },
+        );
+        assert_eq!(biz_errors.total, 1);
+        assert_eq!(biz_errors.rows[0].id, "ord-1");
+        assert_eq!(
+            biz_errors.rows[0].biz_error.as_deref(),
+            Some("50001 · token expired")
+        );
+
+        // 慢请求阈值筛选（>= 1000ms）应命中 ord-1 (1200ms)
+        let slow_only = session.query_with_options(
+            "",
+            "all",
+            0,
+            50,
+            2,
+            &ParsedRange::default(),
+            QueryOptions {
+                min_duration_ms: Some(1000.0),
+                ..Default::default()
+            },
+        );
+        assert_eq!(slow_only.total, 1);
+        assert_eq!(slow_only.rows[0].id, "ord-1");
+
+        // 接口聚合统计：两个数字 ID 订单接口合并为 /v1/orders/:id，GraphQL 携带 [GetUserProfile]
+        let stats = session.endpoint_stats(None, &ParsedRange::default(), None, Some(&rule));
+        assert_eq!(stats.total_requests, 3);
+        assert_eq!(stats.total_errors, 1);
+        assert_eq!(stats.total_biz_errors, 1);
+        assert_eq!(stats.total_slow, 1);
+        assert_eq!(stats.endpoints.len(), 2);
+        assert_eq!(stats.endpoints[0].normalized_path, "/v1/orders/:id");
+        assert_eq!(stats.endpoints[0].count, 2);
+        assert_eq!(stats.endpoints[0].biz_error_count, 1);
+        assert_eq!(stats.endpoints[0].sample_entry_id, "ord-1");
+        assert_eq!(
+            stats.endpoints[1].normalized_path,
+            "/graphql [GetUserProfile]"
+        );
     }
 }

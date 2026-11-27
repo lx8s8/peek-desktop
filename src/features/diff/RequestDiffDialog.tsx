@@ -103,18 +103,28 @@ function DiffTable({
   );
 }
 
-/** 双请求并排 Diff 对比弹窗（支持 Query / Headers / Request Body / Response JSON 字段级差异）。 */
+/** 双请求并排 Diff 对比弹窗（支持同会话或跨会话 / 跨设备的 Query / Headers / Request Body / Response JSON 字段级差异）。 */
 export function RequestDiffDialog({
   sessionId,
+  leftSessionId,
+  rightSessionId,
+  leftLabel,
+  rightLabel,
   left,
   right,
   onClose,
 }: {
-  sessionId: string;
+  sessionId?: string;
+  leftSessionId?: string;
+  rightSessionId?: string;
+  leftLabel?: string;
+  rightLabel?: string;
   left: EntryRow;
   right: EntryRow;
   onClose: () => void;
 }) {
+  const effectiveLeftSession = leftSessionId ?? sessionId ?? "";
+  const effectiveRightSession = rightSessionId ?? sessionId ?? "";
   const { t } = useTranslation();
   const [tab, setTab] = useState<"response" | "request" | "headers" | "query">(
     "response",
@@ -129,8 +139,8 @@ export function RequestDiffDialog({
     let active = true;
     setLoading(true);
     void Promise.all([
-      loadEntrySide(sessionId, left),
-      loadEntrySide(sessionId, right),
+      loadEntrySide(effectiveLeftSession, left),
+      loadEntrySide(effectiveRightSession, right),
     ]).then(([l, r]) => {
       if (!active) return;
       setLeftData(l);
@@ -140,7 +150,7 @@ export function RequestDiffDialog({
     return () => {
       active = false;
     };
-  }, [sessionId, left, right]);
+  }, [effectiveLeftSession, effectiveRightSession, left, right]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -239,6 +249,11 @@ export function RequestDiffDialog({
         <div className="diff-summary-cards">
           <div className="diff-side-card">
             <span className="diff-badge">A</span>
+            {leftLabel && (
+              <span className="diff-source-tag" title={leftLabel}>
+                {leftLabel}
+              </span>
+            )}
             <span
               className={`method-pill method method-${left.method.toLowerCase()}`}
             >
@@ -257,6 +272,11 @@ export function RequestDiffDialog({
           </div>
           <div className="diff-side-card">
             <span className="diff-badge">B</span>
+            {rightLabel && (
+              <span className="diff-source-tag" title={rightLabel}>
+                {rightLabel}
+              </span>
+            )}
             <span
               className={`method-pill method method-${right.method.toLowerCase()}`}
             >

@@ -5,28 +5,34 @@ import {
 } from "./lib/commands/dispatcher";
 import { useCommand } from "./lib/commands/react";
 import { useNativeMenu, useContextMenu } from "./lib/commands/native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Activity,
   Archive,
+  BarChart3,
   ChevronRight,
   Circle,
-  FileCode2,
+  Command,
   FileSearch,
-  FileStack,
   FolderOpen,
   Globe2,
   HardDrive,
-  Monitor,
-  Ellipsis,
   Eraser,
   Moon,
-  Pencil,
   Puzzle,
   Radio,
   RotateCcw,
   Save,
   Search,
+  SlidersHorizontal,
   Sun,
   Terminal,
   X,
@@ -39,8 +45,13 @@ import { useFileOpen } from "./features/files/useFileOpen";
 import { useFileDrop } from "./features/files/useFileDrop";
 import { AboutPanel } from "./features/about/AboutPanel";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
-import { DeviceAliasDialog } from "./features/connection/DeviceAliasDialog";
+import { SessionSidebar } from "./features/connection/SessionSidebar";
+import {
+  formatRunStartedAt,
+  groupWorkspaceSessions,
+} from "./features/connection/sessionGroups";
 import { useWorkspace } from "./features/connection/useWorkspace";
+import type { PaletteAction } from "./features/command/CommandPalette";
 import {
   DiagnosticsTable,
   type LogSelection,
@@ -66,14 +77,12 @@ import {
   type RequestCopyKind,
   type RequestTableMeta,
 } from "./features/console/RequestTable";
-import { RequestDiffDialog } from "./features/diff/RequestDiffDialog";
-import { PluginManagerDialog } from "./features/plugins/PluginManagerDialog";
 import { DetailPane } from "./features/detail/DetailPane";
+import { buildRequestBugReport } from "./features/detail/bugReport";
 import {
   extractReplayBody,
   parseRequestHeaders,
-  ReplayDialog,
-} from "./features/detail/ReplayDialog";
+} from "./features/detail/replayHelpers";
 import { writeClipboard } from "./lib/clipboard";
 import {
   installSelectScopeTracker,
@@ -82,6 +91,7 @@ import {
 } from "./lib/selection";
 import { api, desktop } from "./lib/ipc/client";
 import type {
+  BizErrorRule,
   EntryRow,
   Filter,
   ImportProgress,
@@ -90,20 +100,67 @@ import type {
   ReplayResponse,
   RequestSortField,
   RequestStatusFilter,
+  SessionSummary,
   SortDirection,
   TimeRange,
   TimelineRow,
 } from "./lib/ipc/types";
 import {
   formatBytes,
+  readBizErrorRule,
   readDeviceAliases,
+  readFilterPresets,
+  readGlobalNoiseConfig,
+  readListenerPrefs,
   readPreference,
   resolveDeviceDisplay,
+  writeBizErrorRule,
   writeDeviceAlias,
+  writeFilterPresets,
+  writeGlobalNoiseConfig,
   writePreference,
+  type GlobalNoiseConfig,
+  type NetworkFilterPreset,
 } from "./lib/preferences";
 import "./lib/i18n";
 import "./App.css";
+
+// 非首屏重型弹窗按需懒加载，压缩桌面端冷启动首包体积
+const LazyDeviceAliasDialog = lazy(() =>
+  import("./features/connection/DeviceAliasDialog").then((m) => ({
+    default: m.DeviceAliasDialog,
+  })),
+);
+const LazyRequestDiffDialog = lazy(() =>
+  import("./features/diff/RequestDiffDialog").then((m) => ({
+    default: m.RequestDiffDialog,
+  })),
+);
+const LazyPluginManagerDialog = lazy(() =>
+  import("./features/plugins/PluginManagerDialog").then((m) => ({
+    default: m.PluginManagerDialog,
+  })),
+);
+const LazyReplayDialog = lazy(() =>
+  import("./features/detail/ReplayDialog").then((m) => ({
+    default: m.ReplayDialog,
+  })),
+);
+const LazyEndpointStatsDialog = lazy(() =>
+  import("./features/console/EndpointStatsDialog").then((m) => ({
+    default: m.EndpointStatsDialog,
+  })),
+);
+const LazyNetworkRulesDialog = lazy(() =>
+  import("./features/console/NetworkRulesDialog").then((m) => ({
+    default: m.NetworkRulesDialog,
+  })),
+);
+const LazyCommandPalette = lazy(() =>
+  import("./features/command/CommandPalette").then((m) => ({
+    default: m.CommandPalette,
+  })),
+);
 
 interface DiagnosticPaneState {
   view: DiagnosticView;
@@ -131,6 +188,7 @@ interface ViewState {
   filter: Filter;
   methodFilter: string | null;
   statusFilter: RequestStatusFilter | null;
+  minDurationMs: number | null;
   hostFilter: string | null;
   excludePatterns: string[];
   hosts: string[];
@@ -139,7 +197,6 @@ interface ViewState {
   clearMarkSeq: number | null;
   clearActive: boolean;
   clearInitialHidden: number;
-  compareAnchor: EntryRow | null;
   selected: EntryRow | null;
   tab: "network" | "logs" | "exceptions" | "timeline" | "stream";
   timeline: TimelineView;
@@ -158,6 +215,7 @@ const emptyView: ViewState = {
   filter: "all",
   methodFilter: null,
   statusFilter: null,
+  minDurationMs: null,
   hostFilter: null,
   excludePatterns: [],
   hosts: [],
@@ -166,7 +224,6 @@ const emptyView: ViewState = {
   clearMarkSeq: null,
   clearActive: false,
   clearInitialHidden: 0,
-  compareAnchor: null,
   selected: null,
   tab: "network",
   logs: emptyDiagnosticPane,
@@ -231,11 +288,33 @@ export default function App() {
     (RequestTableMeta & { sessionId: string }) | null
   >(null);
   const [pinTick, setPinTick] = useState(0);
-  const [diffPair, setDiffPair] = useState<{
+  // 跨运行 / 跨设备对比基准提升为工作区全局状态
+  const [compareAnchor, setCompareAnchor] = useState<{
     sessionId: string;
+    sessionLabel: string;
+    entry: EntryRow;
+  } | null>(null);
+  const [diffPair, setDiffPair] = useState<{
+    leftSessionId: string;
+    leftLabel: string;
     left: EntryRow;
+    rightSessionId: string;
+    rightLabel: string;
     right: EntryRow;
   } | null>(null);
+  const [bizErrorRule, setBizErrorRule] = useState<BizErrorRule>(() =>
+    readBizErrorRule(),
+  );
+  const [noiseConfig, setNoiseConfig] = useState<GlobalNoiseConfig>(() =>
+    readGlobalNoiseConfig(),
+  );
+  const [filterPresets, setFilterPresets] = useState<NetworkFilterPreset[]>(
+    () => readFilterPresets(),
+  );
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const autoStartAttempted = useRef(false);
   const [replayTarget, setReplayTarget] = useState<{
     sessionId: string;
     entry: EntryRow;
@@ -297,6 +376,25 @@ export default function App() {
       activeFlag = false;
     };
   }, []);
+  // 可选的「启动时自动开始监听」：仅在用户显式勾选后于启动时触发一次，失败仅温和提示
+  useEffect(() => {
+    if (!desktop || autoStartAttempted.current || remote.listening) return;
+    const prefs = readListenerPrefs();
+    if (!prefs.autoStart) return;
+    autoStartAttempted.current = true;
+    void api
+      .start(prefs.host, Number(prefs.port), prefs.advertise)
+      .then(() => refresh())
+      .catch((error) => {
+        if (String(error) !== "listenerAlreadyRunning") {
+          reportError(String(error));
+        }
+      });
+  }, [remote.listening, refresh, reportError]);
+  const workspaceGroups = useMemo(
+    () => groupWorkspaceSessions(sessions, remote.pairing?.devices ?? []),
+    [sessions, remote.pairing?.devices],
+  );
   const active = independent
     ? undefined
     : sessions.find((session) => session.id === activeId);
@@ -306,9 +404,28 @@ export default function App() {
   const runs = remote.diagnosticRuns.filter(
     (run) => run.networkSessionKey === active?.id,
   );
+  const knownSessionIds = useRef<Set<string> | null>(null);
   useEffect(() => {
-    if (!activeId && sessions.length) setActiveId(sessions[0].id);
-  }, [activeId, sessions]);
+    if (!activeId && workspaceGroups.orderedSessions.length) {
+      setActiveId(workspaceGroups.orderedSessions[0].id);
+    }
+  }, [activeId, workspaceGroups.orderedSessions]);
+  // 同一设备重启/热重启产生新的在线运行时，若当前停在该设备的离线运行，自动切到最新在线运行
+  useEffect(() => {
+    const previous = knownSessionIds.current;
+    const currentIds = new Set(sessions.map((session) => session.id));
+    knownSessionIds.current = currentIds;
+    if (!previous || independent || !active?.deviceId || active.online) return;
+    const freshOnlineSameDevice = workspaceGroups.orderedSessions.find(
+      (session) =>
+        session.deviceId === active.deviceId &&
+        session.online &&
+        !previous.has(session.id),
+    );
+    if (freshOnlineSameDevice) {
+      setActiveId(freshOnlineSameDevice.id);
+    }
+  }, [sessions, active, independent, workspaceGroups.orderedSessions]);
   useEffect(() => {
     if (independent && !independentRun) {
       setIndependent(null);
@@ -597,6 +714,65 @@ export default function App() {
     }
   };
 
+  const formatSessionLabel = useCallback(
+    (session: SessionSummary | undefined): string => {
+      if (!session) return "";
+      const reported = session.header.name || session.filename;
+      const display = resolveDeviceDisplay(
+        session.deviceId,
+        reported,
+        deviceAliases,
+      );
+      const base = display.subtitle
+        ? `${display.title} (${display.subtitle})`
+        : display.title;
+      const runCount = session.deviceId
+        ? (workspaceGroups.deviceGroups.find(
+            (group) => group.deviceId === session.deviceId,
+          )?.runs.length ?? 1)
+        : 1;
+      const runTime =
+        session.deviceId && runCount > 1
+          ? formatRunStartedAt(session.header.startedAt, i18n.language)
+          : "";
+      return runTime ? `${base} · ${runTime}` : base;
+    },
+    [deviceAliases, i18n.language, workspaceGroups.deviceGroups],
+  );
+  const activeSessionLabel = useMemo(
+    () => formatSessionLabel(active),
+    [active, formatSessionLabel],
+  );
+  const activeDeviceLabel = useMemo(() => {
+    if (!active?.deviceId) return activeSessionLabel;
+    const reported = active.header.name || active.filename;
+    return resolveDeviceDisplay(active.deviceId, reported, deviceAliases).title;
+  }, [active, activeSessionLabel, deviceAliases]);
+
+  const effectiveExcludes = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const add = (pattern: string) => {
+      const trimmed = pattern.trim();
+      if (!trimmed) return;
+      const key = trimmed.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(trimmed);
+      }
+    };
+    for (const p of view.excludePatterns) add(p);
+    if (noiseConfig.enabled) {
+      for (const p of noiseConfig.globalExcludes) add(p);
+      if (active?.deviceId) {
+        for (const p of noiseConfig.deviceExcludes[active.deviceId] ?? []) {
+          add(p);
+        }
+      }
+    }
+    return out;
+  }, [view.excludePatterns, noiseConfig, active?.deviceId]);
+
   const handleRequestCopy = async (entry: EntryRow, kind: RequestCopyKind) => {
     if (!active) return;
     try {
@@ -614,6 +790,19 @@ export default function App() {
           setNotice({ text: t("emptyBody"), error: false });
           return;
         }
+      } else if (kind === "report") {
+        const [meta, reqBody, resBody] = await Promise.all([
+          api.metadata(active.id, entry.id).catch(() => ""),
+          api.body(active.id, entry.id, "request").catch(() => null),
+          api.body(active.id, entry.id, "response").catch(() => null),
+        ]);
+        text = buildRequestBugReport({
+          entry,
+          deviceLabel: activeSessionLabel,
+          metadata: meta,
+          requestBody: reqBody,
+          responseBody: resBody,
+        });
       }
       await writeClipboard(text);
       setNotice({ text: t("copied"), error: false });
@@ -711,6 +900,7 @@ export default function App() {
   };
   async function close(id: string) {
     try {
+      const target = sessions.find((session) => session.id === id);
       await api.close(id);
       delete generations.current[id];
       await refresh();
@@ -719,10 +909,71 @@ export default function App() {
         delete next[id];
         return next;
       });
-      if (id === activeId)
-        setActiveId(sessions.find((session) => session.id !== id)?.id ?? null);
+      if (id === activeId) {
+        const remaining = workspaceGroups.orderedSessions.filter(
+          (session) => session.id !== id,
+        );
+        const sameDeviceFallback = target?.deviceId
+          ? remaining.find((session) => session.deviceId === target.deviceId)
+          : undefined;
+        setActiveId(sameDeviceFallback?.id ?? remaining[0]?.id ?? null);
+      }
     } catch (error) {
       reportError(String(error));
+    }
+  }
+  async function closeDeviceOfflineRuns(
+    deviceId: string,
+    deviceDisplayName: string,
+  ) {
+    const offlineIds = sessions
+      .filter((session) => session.deviceId === deviceId && !session.online)
+      .map((session) => session.id);
+    if (offlineIds.length === 0) return;
+
+    const closedIds = new Set<string>();
+    let firstError: string | null = null;
+    for (const id of offlineIds) {
+      try {
+        await api.close(id);
+        delete generations.current[id];
+        closedIds.add(id);
+      } catch (error) {
+        if (!firstError) firstError = String(error);
+      }
+    }
+
+    if (closedIds.size > 0) {
+      await refresh();
+      setViews((previous) => {
+        const next = { ...previous };
+        for (const id of closedIds) {
+          delete next[id];
+        }
+        return next;
+      });
+      if (activeId && closedIds.has(activeId)) {
+        const remaining = workspaceGroups.orderedSessions.filter(
+          (session) => !closedIds.has(session.id),
+        );
+        const sameDeviceFallback = remaining.find(
+          (session) => session.deviceId === deviceId,
+        );
+        setActiveId(sameDeviceFallback?.id ?? remaining[0]?.id ?? null);
+      }
+      if (!firstError) {
+        setNotice({
+          text: t("clearedOfflineRunsNotice", {
+            name: deviceDisplayName,
+            count: closedIds.size,
+          }),
+          error: false,
+        });
+      }
+    }
+
+    if (firstError) {
+      reportError(firstError);
     }
   }
   useCommand(
@@ -773,6 +1024,9 @@ export default function App() {
   );
   useCommand("view.timeline", () => updateView({ tab: "timeline" }), !!scopeId);
   useCommand("view.stream", () => updateView({ tab: "stream" }), !!scopeId);
+  useCommand("palette.open", () => setPaletteOpen((value) => !value));
+  useCommand("view.stats", () => setStatsOpen(true), !!active);
+  useCommand("network.rules", () => setRulesOpen(true), !!active);
   useCommand("view.theme", () =>
     setTheme((value) => (value === "dark" ? "light" : "dark")),
   );
@@ -844,12 +1098,29 @@ export default function App() {
     window.addEventListener("keydown", guardSelectAll);
     return () => window.removeEventListener("keydown", guardSelectAll);
   }, []);
+  // ⌘/Ctrl+P 随时呼出快捷命令面板（不依赖原生菜单项注册）
+  useEffect(() => {
+    const onPaletteKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.isComposing) return;
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "p"
+      ) {
+        event.preventDefault();
+        setPaletteOpen((value) => !value);
+      }
+    };
+    window.addEventListener("keydown", onPaletteKey);
+    return () => window.removeEventListener("keydown", onPaletteKey);
+  }, []);
   useEffect(() => {
     if (nativeReady) return;
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.isComposing) return;
       const id = commandForKey(event);
-      if (id === "edit.selectAll") return;
+      if (id === "edit.selectAll" || id === "palette.open") return;
       if (id && commands.dispatch(id)) event.preventDefault();
     };
     window.addEventListener("keydown", keydown);
@@ -889,10 +1160,170 @@ export default function App() {
   const hasAdvancedNetworkFilter = !!(
     view.methodFilter ||
     view.statusFilter ||
+    view.minDurationMs ||
     view.searchBody ||
     view.hostFilter ||
     view.excludePatterns.length > 0
   );
+
+  const activeRuleCount =
+    (bizErrorRule.enabled ? 1 : 0) +
+    (noiseConfig.enabled
+      ? noiseConfig.globalExcludes.length +
+        (active?.deviceId
+          ? (noiseConfig.deviceExcludes[active.deviceId]?.length ?? 0)
+          : 0)
+      : 0);
+
+  const paletteActions = useMemo<PaletteAction[]>(() => {
+    const list: PaletteAction[] = [];
+    for (const session of workspaceGroups.orderedSessions) {
+      const label = formatSessionLabel(session);
+      list.push({
+        id: `session:${session.id}`,
+        group: t("paletteGroupDevices"),
+        title: label,
+        subtitle: session.deviceId
+          ? `${t(session.online ? "connected" : "disconnected")} · ${session.entryCount} ${t("requests")}`
+          : `${session.header.platform} · ${session.entryCount} ${t("requests")}`,
+        keywords: `${session.filename} ${session.deviceId ?? ""} ${session.id}`,
+        run: () => {
+          setIndependent(null);
+          setActiveId(session.id);
+        },
+      });
+    }
+    list.push(
+      {
+        id: "cmd:network",
+        group: t("paletteGroupViews"),
+        title: t("network"),
+        shortcut: "⌘1",
+        disabled: !active,
+        run: () => updateView({ tab: "network" }),
+      },
+      {
+        id: "cmd:logs",
+        group: t("paletteGroupViews"),
+        title: t("logs"),
+        shortcut: "⌘2",
+        disabled: !(active?.deviceId || runs.length || independentRun),
+        run: () => updateView({ tab: "logs" }),
+      },
+      {
+        id: "cmd:exceptions",
+        group: t("paletteGroupViews"),
+        title: t("exceptions"),
+        shortcut: "⌘3",
+        disabled: !(active?.deviceId || runs.length || independentRun),
+        run: () => updateView({ tab: "exceptions" }),
+      },
+      {
+        id: "cmd:timeline",
+        group: t("paletteGroupViews"),
+        title: t("timeline"),
+        shortcut: "⌘4",
+        disabled: !scopeId,
+        run: () => updateView({ tab: "timeline" }),
+      },
+      {
+        id: "cmd:stream",
+        group: t("paletteGroupViews"),
+        title: t("stream"),
+        shortcut: "⌘5",
+        disabled: !scopeId,
+        run: () => updateView({ tab: "stream" }),
+      },
+      {
+        id: "cmd:stats",
+        group: t("paletteGroupViews"),
+        title: t("endpointStatsTitle"),
+        keywords: "stats analytics slow api",
+        disabled: !active,
+        run: () => setStatsOpen(true),
+      },
+      {
+        id: "cmd:rules",
+        group: t("paletteGroupViews"),
+        title: t("networkRulesTitle"),
+        keywords: "biz error noise filter preset",
+        disabled: !active,
+        run: () => setRulesOpen(true),
+      },
+      {
+        id: "cmd:clear",
+        group: t("paletteGroupActions"),
+        title: t("networkClear"),
+        shortcut: "⌘L",
+        disabled: !active || active.entryCount === 0,
+        run: () => handleClearNetwork(),
+      },
+      {
+        id: "cmd:connection",
+        group: t("paletteGroupActions"),
+        title: t("connection"),
+        shortcut: "⌘K",
+        disabled: !desktop,
+        run: () => commands.dispatch("connection.open"),
+      },
+      {
+        id: "cmd:pair",
+        group: t("paletteGroupActions"),
+        title: t("newPairingCode"),
+        disabled: !desktop || !remote.listening,
+        run: () => commands.dispatch("connection.pair"),
+      },
+      {
+        id: "cmd:open",
+        group: t("paletteGroupActions"),
+        title: t("open"),
+        shortcut: "⌘O",
+        disabled: !desktop || busy || saving,
+        run: () => commands.dispatch("session.open"),
+      },
+      {
+        id: "cmd:archive",
+        group: t("paletteGroupActions"),
+        title: t("archiveSession"),
+        disabled: !desktop || !scopeId || busy || saving,
+        run: () => commands.dispatch("session.archive"),
+      },
+      {
+        id: "cmd:plugins",
+        group: t("paletteGroupActions"),
+        title: t("pluginsTitle"),
+        disabled: !desktop,
+        run: () => {
+          setPendingPluginPreview(null);
+          setPluginsOpen(true);
+        },
+      },
+      {
+        id: "cmd:theme",
+        group: t("paletteGroupActions"),
+        title: t("theme"),
+        run: () => commands.dispatch("view.theme"),
+      },
+      {
+        id: "cmd:lang",
+        group: t("paletteGroupActions"),
+        title: t("language"),
+        run: () => commands.dispatch("view.language"),
+      },
+    );
+    return list;
+  }, [
+    workspaceGroups.orderedSessions,
+    formatSessionLabel,
+    t,
+    active,
+    runs.length,
+    independentRun,
+    scopeId,
+    remote.listening,
+    busy,
+    saving,
+  ]);
 
   return (
     <main className="workspace">
@@ -942,6 +1373,8 @@ export default function App() {
           }
           hasLogs={!!(independentRun || runs.length)}
           networkId={active?.id}
+          liveOnline={!!active?.deviceId && !!active?.online}
+          spilledCount={liveSpilledCount}
           entryId={
             currentTab === "network"
               ? view.selected?.id
@@ -968,6 +1401,14 @@ export default function App() {
           {t(remote.listening ? "listening" : "offline")}
         </span>
         <div className="toolbar-end">
+          <Button
+            variant="ghost"
+            onClick={() => setPaletteOpen(true)}
+            title={`${t("commandPaletteTitle")} (⌘/Ctrl+P)`}
+          >
+            <Command size={14} aria-hidden="true" />
+            {t("commandPaletteBtn")}
+          </Button>
           {desktop && (
             <Button
               variant="ghost"
@@ -1052,244 +1493,46 @@ export default function App() {
         }}
       >
         <Panel id="sidebar" defaultSize="17%" minSize={180} maxSize="28%">
-          <nav className="sidebar" aria-label={t("sessions")}>
-            <div className="sidebar-heading">
-              {t("sessions")}
-              <span>{sessions.length}</span>
-            </div>
-            <div className="sidebar-section-title">
-              <Monitor size={13} />
-              {t("devices")}
-            </div>
-            <div className="device-placeholder">
-              {(() => {
-                const onlineDevices = new Set(
-                  remote.sessions
-                    .filter((session) => session.online)
-                    .map((session) => session.deviceId),
-                ).size;
-                return (
-                  <>
-                    <span
-                      className={`live-dot ${onlineDevices > 0 ? "is-online" : ""}`}
-                    />
-                    {onlineDevices || t("noConnectedDevice")}
-                  </>
-                );
-              })()}
-            </div>
-            <div className="sidebar-section-title files-title">
-              <FileStack size={13} />
-              {t("runsAndFiles")}
-              <Button
-                variant="ghost"
-                size="icon"
-                title={t("open")}
-                aria-label={t("open")}
-                disabled={!desktop || busy || saving}
-                onClick={() => commands.dispatch("session.open")}
-              >
-                <FolderOpen />
-              </Button>
-            </div>
-            <div className="session-list">
-              {sessions.length ? (
-                sessions.map((session) => {
-                  const reportedName = session.header.name || session.filename;
-                  const display = resolveDeviceDisplay(
-                    session.deviceId,
-                    reportedName,
-                    deviceAliases,
-                  );
-                  return (
-                    <div
-                      key={session.id}
-                      onContextMenu={(event) => {
-                        setIndependent(null);
-                        setActiveId(session.id);
-                        sessionContextMenu(event);
-                      }}
-                      className={`session-item ${session.id === active?.id ? "active" : ""}`}
-                    >
-                      <button
-                        className="session-select"
-                        onClick={() => {
-                          setIndependent(null);
-                          setActiveId(session.id);
-                        }}
-                        aria-current={
-                          session.id === active?.id ? "true" : undefined
-                        }
-                      >
-                        {session.deviceId ? (
-                          <Monitor size={16} />
-                        ) : (
-                          <FileCode2 size={16} />
-                        )}
-                        <span>
-                          <strong title={display.title}>{display.title}</strong>
-                          {display.subtitle && (
-                            <small
-                              className="session-alias-origin"
-                              title={display.subtitle}
-                            >
-                              {display.subtitle}
-                            </small>
-                          )}
-                          {session.archive && (
-                            <small>
-                              {t(
-                                session.archive.recovered
-                                  ? "recoveredSession"
-                                  : "archivedSession",
-                              )}
-                              {` · ${t("archiveLoss", { dropped: session.archive.dropped, evicted: session.archive.evicted })}`}
-                              {session.archive.syncing
-                                ? ` · ${t("archiveSyncing")}`
-                                : ""}
-                            </small>
-                          )}
-                          <small>
-                            {session.deviceId
-                              ? t(
-                                  session.syncing
-                                    ? "syncing"
-                                    : session.online
-                                      ? "connected"
-                                      : "disconnected",
-                                )
-                              : session.header.platform}{" "}
-                            · {session.entryCount.toLocaleString()}{" "}
-                            {t("requests")}
-                            {session.deviceId && (
-                              <>
-                                {" "}
-                                ·{" "}
-                                {t(
-                                  session.diagnosticsOnline
-                                    ? "diagnosticsLive"
-                                    : session.diagnosticCount
-                                      ? "diagnosticsRetained"
-                                      : "diagnosticsNotConnected",
-                                )}
-                              </>
-                            )}
-                          </small>
-                        </span>
-                      </button>
-                      <div className="session-item-actions">
-                        {session.deviceId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title={t("deviceAliasTitle")}
-                            aria-label={`${t("deviceAliasTitle")} ${display.title}`}
-                            onClick={() =>
-                              setAliasTarget({
-                                deviceId: session.deviceId!,
-                                reportedName,
-                              })
-                            }
-                          >
-                            <Pencil size={12} />
-                          </Button>
-                        )}
-                        {desktop && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-haspopup="menu"
-                            aria-label={`${t("menuActions")} ${display.title}`}
-                            onClick={(event) => {
-                              setIndependent(null);
-                              setActiveId(session.id);
-                              sessionContextMenu(event);
-                            }}
-                          >
-                            <Ellipsis />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`${t("close")} ${session.filename}`}
-                          disabled={session.online || busy || saving}
-                          onClick={() => void close(session.id)}
-                        >
-                          <X />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="no-files">{t("emptyFiles")}</div>
-              )}
-            </div>
-            {remote.diagnosticRuns.some(
-              (run) =>
-                !run.networkSessionKey ||
-                !sessions.some(
-                  (session) => session.id === run.networkSessionKey,
-                ),
-            ) && (
-              <>
-                <div className="sidebar-section-title">
-                  {t("independentRuns")}
-                </div>
-                <div className="session-list">
-                  {remote.diagnosticRuns
-                    .filter(
-                      (run) =>
-                        !run.networkSessionKey ||
-                        !sessions.some(
-                          (session) => session.id === run.networkSessionKey,
-                        ),
-                    )
-                    .map((run) => (
-                      <div
-                        className={`session-item ${independent === run.id ? "active" : ""}`}
-                        key={run.id}
-                        onContextMenu={(event) => {
-                          setIndependent(run.id);
-                          sessionContextMenu(event);
-                        }}
-                      >
-                        <button
-                          className="session-select"
-                          onClick={() => {
-                            setIndependent(run.id);
-                          }}
-                        >
-                          <Activity size={16} />
-                          <span>
-                            <strong>{run.runId}</strong>
-                            <small>
-                              {t(run.online ? "connected" : "disconnected")} ·{" "}
-                              {run.count}
-                            </small>
-                          </span>
-                        </button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`${t("close")} ${run.runId}`}
-                          disabled={run.online || busy || saving}
-                          onClick={() =>
-                            void api
-                              .closeDiagnostic(run.id)
-                              .then(refresh)
-                              .catch((error) => reportError(String(error)))
-                          }
-                        >
-                          <X />
-                        </Button>
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-          </nav>
+          <SessionSidebar
+            sessions={sessions}
+            remote={remote}
+            activeId={activeId}
+            independentId={independent}
+            deviceAliases={deviceAliases}
+            desktop={desktop}
+            busy={busy}
+            saving={saving}
+            onSelectSession={(sessionId) => {
+              setIndependent(null);
+              setActiveId(sessionId);
+            }}
+            onSelectIndependent={(runId) => {
+              setIndependent(runId);
+            }}
+            onOpenFile={() => commands.dispatch("session.open")}
+            onCloseSession={(sessionId) => void close(sessionId)}
+            onCloseDeviceOfflineRuns={(deviceId, displayName) =>
+              void closeDeviceOfflineRuns(deviceId, displayName)
+            }
+            onCloseDiagnostic={(runId) =>
+              void api
+                .closeDiagnostic(runId)
+                .then(refresh)
+                .catch((error) => reportError(String(error)))
+            }
+            onEditDeviceAlias={(deviceId, reportedName) =>
+              setAliasTarget({ deviceId, reportedName })
+            }
+            onSessionContextMenu={(sessionId, event) => {
+              setIndependent(null);
+              setActiveId(sessionId);
+              sessionContextMenu(event);
+            }}
+            onIndependentContextMenu={(runId, event) => {
+              setIndependent(runId);
+              sessionContextMenu(event);
+            }}
+          />
         </Panel>
         <Separator className="panel-separator" />
         <Panel id="console" defaultSize="49%" minSize={360}>
@@ -1344,23 +1587,14 @@ export default function App() {
                     ))}
                   </div>
                   <div className="console-bar-meta">
-                    {active &&
-                      (() => {
-                        const reported = active.header.name || active.filename;
-                        const activeDisplay = resolveDeviceDisplay(
-                          active.deviceId,
-                          reported,
-                          deviceAliases,
-                        );
-                        const label = activeDisplay.subtitle
-                          ? `${activeDisplay.title} (${activeDisplay.subtitle})`
-                          : activeDisplay.title;
-                        return (
-                          <span className="muted filename" title={label}>
-                            {label}
-                          </span>
-                        );
-                      })()}
+                    {active && (
+                      <span
+                        className="muted filename"
+                        title={activeSessionLabel}
+                      >
+                        {activeSessionLabel}
+                      </span>
+                    )}
                     <TimeRangeBar
                       range={view.range}
                       onChange={(range) => updateView({ range })}
@@ -1546,7 +1780,47 @@ export default function App() {
                             <option value="failed">
                               {t("statusFailedOnly")}
                             </option>
+                            <option value="bizError">
+                              {t("statusBizErrorOnly")}
+                            </option>
                           </select>
+                          <button
+                            type="button"
+                            className={`filter-pill-btn${view.minDurationMs ? " is-active" : ""}`}
+                            aria-pressed={!!view.minDurationMs}
+                            title={t("slowFilterHint")}
+                            onClick={() =>
+                              updateView({
+                                minDurationMs: view.minDurationMs ? null : 1000,
+                                selected: null,
+                              })
+                            }
+                          >
+                            {t("slowFilterToggle")}
+                          </button>
+                          <button
+                            type="button"
+                            className={`filter-pill-btn${activeRuleCount > 0 ? " is-active" : ""}`}
+                            title={t("networkRulesTitle")}
+                            onClick={() => setRulesOpen(true)}
+                          >
+                            <SlidersHorizontal size={11} aria-hidden="true" />
+                            <span>{t("networkRulesBtn")}</span>
+                            {activeRuleCount > 0 && (
+                              <span className="filter-pill-badge">
+                                {activeRuleCount}
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="filter-pill-btn"
+                            title={t("endpointStatsTitle")}
+                            onClick={() => setStatsOpen(true)}
+                          >
+                            <BarChart3 size={11} aria-hidden="true" />
+                            <span>{t("endpointStatsBtn")}</span>
+                          </button>
                           {hasAdvancedNetworkFilter && (
                             <button
                               type="button"
@@ -1555,6 +1829,7 @@ export default function App() {
                                 updateView({
                                   methodFilter: null,
                                   statusFilter: null,
+                                  minDurationMs: null,
                                   searchBody: false,
                                   hostFilter: null,
                                   excludePatterns: [],
@@ -1696,8 +1971,9 @@ export default function App() {
                       </div>
                       {(view.hosts.length > 1 ||
                         view.hostFilter ||
-                        view.excludePatterns.length > 0 ||
-                        view.compareAnchor) && (
+                        effectiveExcludes.length > 0 ||
+                        filterPresets.length > 0 ||
+                        compareAnchor) && (
                         <div className="host-chips-row">
                           {view.hosts.length > 1 && (
                             <>
@@ -1748,33 +2024,92 @@ export default function App() {
                                 {view.hostFilter} ×
                               </button>
                             )}
-                          {view.excludePatterns.map((pattern) => (
+                          {filterPresets.slice(0, 4).map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              className="host-chip is-preset"
+                              onClick={() =>
+                                updateView({
+                                  filter: preset.filter,
+                                  methodFilter: preset.methodFilter,
+                                  statusFilter: preset.statusFilter,
+                                  minDurationMs: preset.minDurationMs,
+                                  search: preset.search,
+                                  searchBody: preset.searchBody,
+                                  hostFilter: preset.hostFilter,
+                                  selected: null,
+                                })
+                              }
+                            >
+                              ★ {preset.name}
+                            </button>
+                          ))}
+                          {effectiveExcludes.map((pattern) => (
                             <button
                               key={pattern}
                               type="button"
                               className="host-chip is-exclude"
                               title={t("hiddenPathChip")}
-                              onClick={() =>
+                              onClick={() => {
                                 updateView({
                                   excludePatterns: view.excludePatterns.filter(
                                     (p) => p !== pattern,
                                   ),
-                                })
-                              }
+                                });
+                                if (
+                                  noiseConfig.globalExcludes.includes(
+                                    pattern,
+                                  ) ||
+                                  (active?.deviceId &&
+                                    (
+                                      noiseConfig.deviceExcludes[
+                                        active.deviceId
+                                      ] ?? []
+                                    ).includes(pattern))
+                                ) {
+                                  const next: GlobalNoiseConfig = {
+                                    ...noiseConfig,
+                                    globalExcludes:
+                                      noiseConfig.globalExcludes.filter(
+                                        (p) => p !== pattern,
+                                      ),
+                                    deviceExcludes: {
+                                      ...noiseConfig.deviceExcludes,
+                                    },
+                                  };
+                                  if (active?.deviceId) {
+                                    const filtered = (
+                                      next.deviceExcludes[active.deviceId] ?? []
+                                    ).filter((p) => p !== pattern);
+                                    if (filtered.length > 0)
+                                      next.deviceExcludes[active.deviceId] =
+                                        filtered;
+                                    else
+                                      delete next.deviceExcludes[
+                                        active.deviceId
+                                      ];
+                                  }
+                                  setNoiseConfig(next);
+                                  writeGlobalNoiseConfig(next);
+                                }
+                              }}
                             >
                               -{pattern} ×
                             </button>
                           ))}
-                          {view.compareAnchor && (
+                          {compareAnchor && (
                             <button
                               type="button"
                               className="host-chip is-compare"
-                              onClick={() =>
-                                updateView({ compareAnchor: null })
-                              }
+                              onClick={() => setCompareAnchor(null)}
                             >
                               {t("compareBaselineReady")}:{" "}
-                              {view.compareAnchor.method} ×
+                              {compareAnchor.entry.method}
+                              {compareAnchor.sessionId !== active.id
+                                ? ` (${compareAnchor.sessionLabel})`
+                                : ""}{" "}
+                              ×
                             </button>
                           )}
                         </div>
@@ -1799,10 +2134,12 @@ export default function App() {
                       }
                       filter={view.filter}
                       hostFilter={view.hostFilter}
-                      excludePatterns={view.excludePatterns}
+                      excludePatterns={effectiveExcludes}
                       methodFilter={view.methodFilter}
                       statusFilter={view.statusFilter}
                       searchBody={view.searchBody}
+                      minDurationMs={view.minDurationMs}
+                      bizErrorRule={bizErrorRule}
                       sortBy={view.sortBy}
                       sortDir={view.sortDir}
                       afterSeq={effectiveAfterSeq}
@@ -1810,7 +2147,7 @@ export default function App() {
                       clearEvictedCount={evictedHiddenCount}
                       range={view.range}
                       selectedId={view.selected?.id}
-                      compareAnchor={view.compareAnchor}
+                      compareAnchor={compareAnchor}
                       onSelect={(entry) => updateView({ selected: entry })}
                       onCount={setCount}
                       onMeta={(meta) =>
@@ -1852,9 +2189,24 @@ export default function App() {
                         updateView({ hostFilter: host, selected: null })
                       }
                       onExcludePath={(pattern) => {
-                        if (!view.excludePatterns.includes(pattern)) {
-                          updateView({
-                            excludePatterns: [...view.excludePatterns, pattern],
+                        if (
+                          !noiseConfig.globalExcludes.some(
+                            (p) => p.toLowerCase() === pattern.toLowerCase(),
+                          )
+                        ) {
+                          const next: GlobalNoiseConfig = {
+                            ...noiseConfig,
+                            enabled: true,
+                            globalExcludes: [
+                              ...noiseConfig.globalExcludes,
+                              pattern,
+                            ],
+                          };
+                          setNoiseConfig(next);
+                          writeGlobalNoiseConfig(next);
+                          setNotice({
+                            text: t("noiseRuleAddedNotice", { pattern }),
+                            error: false,
                           });
                         }
                       }}
@@ -1903,13 +2255,20 @@ export default function App() {
                           : undefined
                       }
                       onSetCompareAnchor={(entry) =>
-                        updateView({ compareAnchor: entry })
+                        setCompareAnchor({
+                          sessionId: active.id,
+                          sessionLabel: activeSessionLabel,
+                          entry,
+                        })
                       }
                       onCompareWithAnchor={(entry) => {
-                        if (view.compareAnchor) {
+                        if (compareAnchor) {
                           setDiffPair({
-                            sessionId: active.id,
-                            left: view.compareAnchor,
+                            leftSessionId: compareAnchor.sessionId,
+                            leftLabel: compareAnchor.sessionLabel,
+                            left: compareAnchor.entry,
+                            rightSessionId: active.id,
+                            rightLabel: activeSessionLabel,
                             right: entry,
                           });
                         }
@@ -2031,6 +2390,7 @@ export default function App() {
             !(currentTab === "stream" && !!view.streamSelected?.entryId) ? (
             <DiagnosticDetail
               selected={detailLog}
+              deviceLabel={activeSessionLabel || independentRun?.runId}
               evictionVersion={selectedRun?.evicted}
               networkSessionId={boundNetwork?.id ?? null}
               networkVersion={`${boundNetwork?.generation ?? 0}:${boundNetwork?.evicted ?? 0}`}
@@ -2051,6 +2411,7 @@ export default function App() {
               key={`${activeId}:${active?.generation ?? 0}:${currentTab}`}
               version={active?.version}
               sessionId={active?.id ?? null}
+              deviceLabel={activeSessionLabel}
               entry={
                 currentTab === "timeline"
                   ? view.timelineEntry
@@ -2073,48 +2434,133 @@ export default function App() {
           )}
         </Panel>
       </Group>
-      {replayTarget && (
-        <ReplayDialog
-          key={`${replayTarget.sessionId}:${replayTarget.entry.id}:${replayTarget.initialBatchMode ? "batch" : "single"}`}
-          sessionId={replayTarget.sessionId}
-          entry={replayTarget.entry}
-          metadata={replayTarget.metadata}
-          initialBatchMode={replayTarget.initialBatchMode}
-          initialResponse={replayTarget.initialResponse}
-          theme={theme}
-          onClose={() => setReplayTarget(null)}
-        />
-      )}
-      {aliasTarget && (
-        <DeviceAliasDialog
-          deviceId={aliasTarget.deviceId}
-          reportedName={aliasTarget.reportedName}
-          initialAlias={deviceAliases[aliasTarget.deviceId] ?? ""}
-          onSave={(deviceId, alias) =>
-            setDeviceAliases((prev) => writeDeviceAlias(prev, deviceId, alias))
-          }
-          onClose={() => setAliasTarget(null)}
-        />
-      )}
-      {diffPair && (
-        <RequestDiffDialog
-          sessionId={diffPair.sessionId}
-          left={diffPair.left}
-          right={diffPair.right}
-          onClose={() => setDiffPair(null)}
-        />
-      )}
-      {pluginsOpen && (
-        <PluginManagerDialog
-          snapshot={pluginSnapshot}
-          initialPreview={pendingPluginPreview}
-          onSnapshotChange={setPluginSnapshot}
-          onClose={() => {
-            setPluginsOpen(false);
-            setPendingPluginPreview(null);
-          }}
-        />
-      )}
+      <Suspense fallback={null}>
+        {replayTarget && (
+          <LazyReplayDialog
+            key={`${replayTarget.sessionId}:${replayTarget.entry.id}:${replayTarget.initialBatchMode ? "batch" : "single"}`}
+            sessionId={replayTarget.sessionId}
+            entry={replayTarget.entry}
+            metadata={replayTarget.metadata}
+            initialBatchMode={replayTarget.initialBatchMode}
+            initialResponse={replayTarget.initialResponse}
+            theme={theme}
+            onClose={() => setReplayTarget(null)}
+          />
+        )}
+        {aliasTarget && (
+          <LazyDeviceAliasDialog
+            deviceId={aliasTarget.deviceId}
+            reportedName={aliasTarget.reportedName}
+            initialAlias={deviceAliases[aliasTarget.deviceId] ?? ""}
+            onSave={(deviceId, alias) =>
+              setDeviceAliases((prev) =>
+                writeDeviceAlias(prev, deviceId, alias),
+              )
+            }
+            onClose={() => setAliasTarget(null)}
+          />
+        )}
+        {diffPair && (
+          <LazyRequestDiffDialog
+            leftSessionId={diffPair.leftSessionId}
+            leftLabel={diffPair.leftLabel}
+            left={diffPair.left}
+            rightSessionId={diffPair.rightSessionId}
+            rightLabel={diffPair.rightLabel}
+            right={diffPair.right}
+            onClose={() => setDiffPair(null)}
+          />
+        )}
+        {pluginsOpen && (
+          <LazyPluginManagerDialog
+            snapshot={pluginSnapshot}
+            initialPreview={pendingPluginPreview}
+            onSnapshotChange={setPluginSnapshot}
+            onClose={() => {
+              setPluginsOpen(false);
+              setPendingPluginPreview(null);
+            }}
+          />
+        )}
+        {statsOpen && active && (
+          <LazyEndpointStatsDialog
+            sessionId={active.id}
+            sessionLabel={activeSessionLabel}
+            range={view.range}
+            afterSeq={effectiveAfterSeq}
+            bizErrorRule={bizErrorRule}
+            onFilterEndpoint={(pathKeyword, host) => {
+              updateView({
+                tab: "network",
+                hostFilter: host || null,
+                search: pathKeyword,
+                selected: null,
+              });
+            }}
+            onInspectSample={(entryId) => void openNetwork(active.id, entryId)}
+            onClose={() => setStatsOpen(false)}
+          />
+        )}
+        {rulesOpen && (
+          <LazyNetworkRulesDialog
+            bizErrorRule={bizErrorRule}
+            noiseConfig={noiseConfig}
+            currentDeviceId={active?.deviceId}
+            currentDeviceLabel={activeDeviceLabel}
+            presets={filterPresets}
+            onSaveBizErrorRule={(rule) => {
+              setBizErrorRule(rule);
+              writeBizErrorRule(rule);
+            }}
+            onSaveNoiseConfig={(config) => {
+              setNoiseConfig(config);
+              writeGlobalNoiseConfig(config);
+            }}
+            onApplyPreset={(preset) => {
+              updateView({
+                filter: preset.filter,
+                methodFilter: preset.methodFilter,
+                statusFilter: preset.statusFilter,
+                minDurationMs: preset.minDurationMs,
+                search: preset.search,
+                searchBody: preset.searchBody,
+                hostFilter: preset.hostFilter,
+                selected: null,
+              });
+            }}
+            onSaveCurrentAsPreset={(name) => {
+              const next: NetworkFilterPreset[] = [
+                {
+                  id: `preset-${Date.now()}`,
+                  name,
+                  filter: view.filter,
+                  methodFilter: view.methodFilter,
+                  statusFilter: view.statusFilter,
+                  minDurationMs: view.minDurationMs,
+                  search: view.search,
+                  searchBody: view.searchBody,
+                  hostFilter: view.hostFilter,
+                },
+                ...filterPresets,
+              ].slice(0, 20);
+              setFilterPresets(next);
+              writeFilterPresets(next);
+            }}
+            onDeletePreset={(id) => {
+              const next = filterPresets.filter((item) => item.id !== id);
+              setFilterPresets(next);
+              writeFilterPresets(next);
+            }}
+            onClose={() => setRulesOpen(false)}
+          />
+        )}
+        {paletteOpen && (
+          <LazyCommandPalette
+            actions={paletteActions}
+            onClose={() => setPaletteOpen(false)}
+          />
+        )}
+      </Suspense>
       {draggingFiles && (
         <div className="drop-overlay" role="status">
           <div className="drop-overlay-card">

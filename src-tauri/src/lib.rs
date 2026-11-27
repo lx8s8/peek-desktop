@@ -58,6 +58,8 @@ pub fn run() {
             commands::list_sessions,
             commands::close_session,
             commands::query_entries,
+            commands::query_endpoint_stats,
+            commands::prefetch_remote_bodies,
             commands::toggle_entry_pin,
             commands::get_entry_metadata,
             commands::get_body,

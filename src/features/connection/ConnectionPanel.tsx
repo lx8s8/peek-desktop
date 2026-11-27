@@ -7,7 +7,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api, desktop } from "../../lib/ipc/client";
 import type { RemoteSnapshot } from "../../lib/ipc/types";
-import { resolveDeviceDisplay } from "../../lib/preferences";
+import {
+  readListenerPrefs,
+  resolveDeviceDisplay,
+  writeListenerPrefs,
+} from "../../lib/preferences";
 import { PairingQr } from "./PairingQr";
 
 export function ConnectionPanel({
@@ -27,10 +31,34 @@ export function ConnectionPanel({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const actionBusy = useRef(false);
-  const [host, setHost] = useState("0.0.0.0");
-  const [port, setPort] = useState("9741");
-  const [advertise, setAdvertise] = useState(true);
-  const [diagnostics, setDiagnostics] = useState(true);
+  const initialPrefs = useRef(readListenerPrefs());
+  const [host, setHost] = useState<"127.0.0.1" | "0.0.0.0">(
+    initialPrefs.current.host,
+  );
+  const [port, setPort] = useState(initialPrefs.current.port);
+  const [advertise, setAdvertise] = useState(initialPrefs.current.advertise);
+  const [diagnostics, setDiagnostics] = useState(
+    initialPrefs.current.diagnostics,
+  );
+  const [autoStart, setAutoStart] = useState(initialPrefs.current.autoStart);
+  const persistPrefs = (
+    patch: Partial<{
+      host: "127.0.0.1" | "0.0.0.0";
+      port: string;
+      advertise: boolean;
+      diagnostics: boolean;
+      autoStart: boolean;
+    }>,
+  ) => {
+    const next = {
+      host: patch.host ?? host,
+      port: patch.port ?? port,
+      advertise: patch.advertise ?? advertise,
+      diagnostics: patch.diagnostics ?? diagnostics,
+      autoStart: patch.autoStart ?? autoStart,
+    };
+    writeListenerPrefs(next);
+  };
   const [expires, setExpires] = useState(0);
   const [lanIps, setLanIps] = useState<string[] | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
@@ -214,7 +242,14 @@ export function ConnectionPanel({
                   <select
                     value={remote.listening ? remote.host : host}
                     disabled={remote.listening || busy}
-                    onChange={(e) => setHost(e.target.value)}
+                    onChange={(e) => {
+                      const nextHost =
+                        e.target.value === "127.0.0.1"
+                          ? "127.0.0.1"
+                          : "0.0.0.0";
+                      setHost(nextHost);
+                      persistPrefs({ host: nextHost });
+                    }}
                   >
                     <option value="127.0.0.1">{t("loopback")}</option>
                     <option value="0.0.0.0">{t("lan")}</option>
@@ -228,7 +263,10 @@ export function ConnectionPanel({
                     type="number"
                     min={1}
                     max={65535}
-                    onChange={(e) => setPort(e.target.value)}
+                    onChange={(e) => {
+                      setPort(e.target.value);
+                      persistPrefs({ port: e.target.value });
+                    }}
                   />
                 </label>
               </div>
@@ -237,9 +275,24 @@ export function ConnectionPanel({
                   type="checkbox"
                   checked={advertise}
                   disabled={remote.listening || busy}
-                  onChange={(e) => setAdvertise(e.target.checked)}
+                  onChange={(e) => {
+                    setAdvertise(e.target.checked);
+                    persistPrefs({ advertise: e.target.checked });
+                  }}
                 />
                 {t("advertise")}
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={autoStart}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setAutoStart(e.target.checked);
+                    persistPrefs({ autoStart: e.target.checked });
+                  }}
+                />
+                {t("autoStartListener")}
               </label>
               <Button
                 variant="primary"
@@ -312,7 +365,10 @@ export function ConnectionPanel({
                   <input
                     type="checkbox"
                     checked={diagnostics}
-                    onChange={(e) => setDiagnostics(e.target.checked)}
+                    onChange={(e) => {
+                      setDiagnostics(e.target.checked);
+                      persistPrefs({ diagnostics: e.target.checked });
+                    }}
                   />
                   {t("allowDiagnostics")}
                 </label>

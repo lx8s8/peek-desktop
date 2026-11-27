@@ -252,6 +252,8 @@ pub async fn query_entries(
     sort_by: Option<String>,
     sort_dir: Option<String>,
     after_seq: Option<u64>,
+    min_duration_ms: Option<f64>,
+    biz_error_rule: Option<crate::session::BizErrorRule>,
 ) -> Result<QueryPage> {
     let range = range.unwrap_or_default().parse()?;
     let excludes = exclude_patterns.unwrap_or_default();
@@ -277,6 +279,8 @@ pub async fn query_entries(
                     sort_dir: sort_dir.as_deref(),
                     after_seq,
                     max_bytes: None,
+                    min_duration_ms,
+                    biz_error_rule: biz_error_rule.as_ref(),
                 },
             )
         })
@@ -306,11 +310,68 @@ pub async fn query_entries(
                 sort_dir: sort_dir.as_deref(),
                 after_seq,
                 max_bytes: None,
+                min_duration_ms,
+                biz_error_rule: biz_error_rule.as_ref(),
             },
         ))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// 汇总当前会话的接口聚合统计（调用次数、错误率、P50/P95 耗时、总流量与热点样本）。
+#[tauri::command]
+pub async fn query_endpoint_stats(
+    state: State<'_, AppState>,
+    session_id: String,
+    range: Option<crate::query::TimeRange>,
+    after_seq: Option<u64>,
+    biz_error_rule: Option<crate::session::BizErrorRule>,
+) -> Result<crate::session::EndpointStatsReport> {
+    let range = range.unwrap_or_default().parse()?;
+    if session_id.starts_with("live-") {
+        let remote = state.remote.clone();
+        return tauri::async_runtime::spawn_blocking(move || {
+            remote.endpoint_stats(&session_id, &range, after_seq, biz_error_rule.as_ref())
+        })
+        .await
+        .map_err(|_| "internalError")?;
+    }
+    let session = state
+        .library
+        .lock()
+        .map_err(|_| "internalError")?
+        .get(&session_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(session.endpoint_stats(None, &range, after_seq, biz_error_rule.as_ref()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 导出/归档前批量补拉在线设备尚未加载的小正文（默认上限 256 KiB、单批 60 个）。
+#[tauri::command]
+pub async fn prefetch_remote_bodies(
+    state: State<'_, AppState>,
+    session_id: String,
+    max_bytes: Option<u64>,
+    max_count: Option<usize>,
+) -> Result<crate::remote::server::PrefetchBodiesReport> {
+    if !session_id.starts_with("live-") {
+        return Ok(crate::remote::server::PrefetchBodiesReport {
+            total_candidates: 0,
+            fetched: 0,
+            failed: 0,
+        });
+    }
+    state
+        .remote
+        .prefetch_remote_bodies(
+            session_id,
+            max_bytes.unwrap_or(256 * 1024),
+            max_count.unwrap_or(60),
+        )
+        .await
 }
 
 /// 切换抓包请求的固定（Pinned）状态，支持实时会话与已打开离线会话。
@@ -420,9 +481,12 @@ pub async fn save_peek(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     session_id: String,
+    include_spill: Option<bool>,
 ) -> Result<bool> {
     let session = if session_id.starts_with("live-") {
-        state.remote.export(&session_id)?
+        state
+            .remote
+            .export_with_options(&session_id, include_spill.unwrap_or(true))?
     } else {
         state
             .library

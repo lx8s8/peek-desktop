@@ -4,11 +4,13 @@ import { useTranslation } from "react-i18next";
 import { api, desktop } from "../../lib/ipc/client";
 import { Button } from "../../components/ui/button";
 import { JsonViewer } from "../detail/JsonViewer";
+import { buildDiagnosticBugReport } from "../detail/bugReport";
 import { StackSymbolicator } from "../plugins/StackSymbolicator";
 import type { PluginView } from "../../lib/ipc/types";
 import type { LogSelection } from "./DiagnosticsTable";
 export function DiagnosticDetail({
   selected,
+  deviceLabel,
   theme,
   evictionVersion,
   networkSessionId,
@@ -20,6 +22,7 @@ export function DiagnosticDetail({
   onOpenPlugins,
 }: {
   selected: LogSelection | null;
+  deviceLabel?: string;
   theme: string;
   evictionVersion?: number;
   networkSessionId?: string | null;
@@ -114,6 +117,18 @@ export function DiagnosticDetail({
           <div className="review-actions detail-actions">
             <Button onClick={() => void copy(message)}>
               {t("copyMessage")}
+            </Button>
+            <Button
+              onClick={() =>
+                void copy(
+                  buildDiagnosticBugReport({
+                    event,
+                    deviceLabel,
+                  }),
+                )
+              }
+            >
+              {t("copyBugReport")}
             </Button>
             <Button disabled={!desktop} onClick={() => void save()}>
               {t("exportSelected")}

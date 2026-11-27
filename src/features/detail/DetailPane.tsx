@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ArrowDownLeft,
   Check,
   Code2,
   Copy,
+  FileText,
   MousePointer2,
   Play,
   Sparkles,
@@ -22,9 +23,13 @@ import { Button } from "../../components/ui/button";
 import type { BodyView, EntryRow, SnippetFormat } from "../../lib/ipc/types";
 import { formatBytes } from "../../lib/preferences";
 import { BodyPreview } from "./BodyPreview";
+import { buildRequestBugReport } from "./bugReport";
 import { OverviewSection } from "./OverviewSection";
-import { ReplayDialog } from "./ReplayDialog";
 import { inspectSmartValue } from "./smartDecode";
+
+const LazyReplayDialog = lazy(() =>
+  import("./ReplayDialog").then((m) => ({ default: m.ReplayDialog })),
+);
 
 function KeyValueRow({
   name,
@@ -93,12 +98,14 @@ function KeyValueRow({
 export function DetailPane({
   sessionId,
   entry: selected,
+  deviceLabel,
   version,
   theme,
   onReplay,
 }: {
   sessionId: string | null;
   entry: EntryRow | null;
+  deviceLabel?: string;
   theme: string;
   version?: number;
   onReplay?: (entry: EntryRow, metadata: string) => void;
@@ -273,6 +280,30 @@ export function DetailPane({
     }
   }
 
+  async function handleCopyBugReport() {
+    if (!sessionId || !entry) return;
+    try {
+      const [metaText, reqBody, resBody] = await Promise.all([
+        metadata
+          ? Promise.resolve(metadata)
+          : api.metadata(sessionId, entry.id).catch(() => ""),
+        api.body(sessionId, entry.id, "request").catch(() => null),
+        api.body(sessionId, entry.id, "response").catch(() => null),
+      ]);
+      const report = buildRequestBugReport({
+        entry,
+        deviceLabel,
+        metadata: metaText,
+        requestBody: reqBody,
+        responseBody: resBody,
+      });
+      await writeClipboard(report);
+      setCopiedAction("report");
+    } catch {
+      setError("copyFailed");
+    }
+  }
+
   return (
     <aside className="detail-pane">
       <div className="detail-heading">
@@ -284,6 +315,19 @@ export function DetailPane({
               {entry.method}
             </span>
             <span className={`status-pill ${statusClass}`}>{stateLabel}</span>
+            {entry.graphqlOperation && (
+              <span
+                className="gql-op-pill"
+                title={`GraphQL: ${entry.graphqlOperation}`}
+              >
+                GQL · {entry.graphqlOperation}
+              </span>
+            )}
+            {entry.bizError && (
+              <span className="biz-err-pill" title={entry.bizError}>
+                {t("bizErrorBadge")}: {entry.bizError}
+              </span>
+            )}
           </div>
           <div className="detail-quick-actions">
             <Button
@@ -299,6 +343,21 @@ export function DetailPane({
               )}
               {copiedAction === "url" ? t("copied") : t("copyUrl")}
             </Button>
+            {sessionId && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void handleCopyBugReport()}
+                title={t("copyBugReportHint")}
+              >
+                {copiedAction === "report" ? (
+                  <Check size={12} />
+                ) : (
+                  <FileText size={12} />
+                )}
+                {copiedAction === "report" ? t("copied") : t("copyBugReport")}
+              </Button>
+            )}
             {desktop && sessionId && (
               <>
                 <Button
@@ -476,13 +535,15 @@ export function DetailPane({
       </Tabs>
 
       {replayOpen && sessionId && (
-        <ReplayDialog
-          sessionId={sessionId}
-          entry={entry}
-          metadata={metadata}
-          theme={theme}
-          onClose={() => setReplayOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <LazyReplayDialog
+            sessionId={sessionId}
+            entry={entry}
+            metadata={metadata}
+            theme={theme}
+            onClose={() => setReplayOpen(false)}
+          />
+        </Suspense>
       )}
     </aside>
   );

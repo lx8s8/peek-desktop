@@ -16,6 +16,7 @@ import {
   Copy,
   Eraser,
   EyeOff,
+  FileText,
   Filter as FilterIcon,
   GitCompareArrows,
   Pin,
@@ -31,6 +32,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api } from "../../lib/ipc/client";
 import type {
+  BizErrorRule,
   EntryRow,
   Filter,
   QueryPage,
@@ -100,7 +102,11 @@ function statusTone(state: EntryRow["state"], status: number | null): string {
   return "status-2xx";
 }
 
-export type RequestCopyKind = "url" | "curl" | "dio" | "fetch" | "body";
+export type RequestCopyKind =
+  "url" | "curl" | "dio" | "fetch" | "body" | "report";
+
+export type CompareAnchorRef =
+  EntryRow | { sessionId: string; entry: EntryRow };
 
 export function RequestTable({
   sessionId,
@@ -114,6 +120,8 @@ export function RequestTable({
   methodFilter,
   statusFilter,
   searchBody = false,
+  minDurationMs,
+  bizErrorRule,
   sortBy,
   sortDir = "desc",
   afterSeq,
@@ -151,13 +159,15 @@ export function RequestTable({
   methodFilter?: string | null;
   statusFilter?: RequestStatusFilter | null;
   searchBody?: boolean;
+  minDurationMs?: number | null;
+  bizErrorRule?: BizErrorRule | null;
   sortBy?: RequestSortField | null;
   sortDir?: SortDirection;
   afterSeq?: number | null;
   clearMarkSeq?: number | null;
   clearEvictedCount?: number;
   selectedId?: string;
-  compareAnchor?: EntryRow | null;
+  compareAnchor?: CompareAnchorRef | null;
   onSelect: (entry: EntryRow) => void;
   onCount: (count: number) => void;
   onMeta?: (meta: RequestTableMeta) => void;
@@ -180,6 +190,19 @@ export function RequestTable({
   const { t, i18n } = useTranslation();
   const rangeKey = JSON.stringify(range ?? {});
   const excludeKey = JSON.stringify(excludePatterns ?? []);
+  const bizRuleKey = JSON.stringify(
+    bizErrorRule?.enabled ? bizErrorRule : null,
+  );
+  const anchorSessionId = compareAnchor
+    ? "entry" in compareAnchor
+      ? compareAnchor.sessionId
+      : sessionId
+    : null;
+  const anchorEntryId = compareAnchor
+    ? "entry" in compareAnchor
+      ? compareAnchor.entry.id
+      : compareAnchor.id
+    : null;
   const scroll = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<QueryPage>({
     total: 0,
@@ -289,6 +312,8 @@ export function RequestTable({
     methodFilter,
     statusFilter,
     searchBody,
+    minDurationMs,
+    bizRuleKey,
     sortBy,
     sortDir,
     afterSeq,
@@ -326,12 +351,15 @@ export function RequestTable({
     setFailure(false);
     const parsedRange = JSON.parse(rangeKey) as TimeRange;
     const parsedExcludes = JSON.parse(excludeKey) as string[];
+    const parsedBizRule = JSON.parse(bizRuleKey) as BizErrorRule | null;
     const hasExtra = !!(
       hostFilter ||
       parsedExcludes.length > 0 ||
       methodFilter ||
       statusFilter ||
       searchBody ||
+      (minDurationMs != null && minDurationMs > 0) ||
+      parsedBizRule?.enabled ||
       sortBy ||
       afterSeq != null
     );
@@ -352,6 +380,8 @@ export function RequestTable({
           methodFilter,
           statusFilter,
           searchBody,
+          minDurationMs,
+          parsedBizRule,
         )
       : api.query(sessionId, search, filter, offset, request, 300, parsedRange);
 
@@ -400,6 +430,8 @@ export function RequestTable({
     methodFilter,
     statusFilter,
     searchBody,
+    minDurationMs,
+    bizRuleKey,
     sortBy,
     sortDir,
     afterSeq,
@@ -456,10 +488,18 @@ export function RequestTable({
         cell: (info) => {
           const row = info.row.original;
           return (
-            <span
-              className={`status-pill ${statusTone(row.state, row.status)}`}
-            >
-              {row.status ?? (row.state === "pending" ? "…" : "ERR")}
+            <span className="status-cell-wrap">
+              <span
+                className={`status-pill ${row.bizError ? "status-biz-error" : statusTone(row.state, row.status)}`}
+                title={
+                  row.bizError
+                    ? `${t("bizErrorBadge")}: ${row.bizError}`
+                    : undefined
+                }
+              >
+                {row.status ?? (row.state === "pending" ? "…" : "ERR")}
+                {row.bizError ? "!" : ""}
+              </span>
             </span>
           );
         },
@@ -469,12 +509,27 @@ export function RequestTable({
         accessorKey: "url",
         header: t("url"),
         cell: (info) => {
-          const raw = info.row.original.url;
+          const row = info.row.original;
+          const raw = row.url;
           const { host, path } = splitUrl(raw);
-          const isAnchor = compareAnchor?.id === info.row.original.id;
+          const isAnchor =
+            anchorSessionId === sessionId && anchorEntryId === row.id;
           return (
             <span className="url-cell" title={raw}>
               {isAnchor && <span className="diff-anchor-pill">A</span>}
+              {row.graphqlOperation && (
+                <span
+                  className="gql-op-pill"
+                  title={`GraphQL: ${row.graphqlOperation}`}
+                >
+                  {row.graphqlOperation}
+                </span>
+              )}
+              {row.bizError && (
+                <span className="biz-err-inline" title={row.bizError}>
+                  {row.bizError}
+                </span>
+              )}
               <span className="url-path">{path}</span>
               {host && <span className="url-host">{host}</span>}
             </span>
@@ -602,7 +657,9 @@ export function RequestTable({
     t,
     i18n.language,
     onPinToggle,
-    compareAnchor?.id,
+    sessionId,
+    anchorSessionId,
+    anchorEntryId,
     tableLayout.visible,
     maxPageDuration,
   ]);
@@ -643,12 +700,15 @@ export function RequestTable({
     try {
       const parsedRange = JSON.parse(rangeKey) as TimeRange;
       const parsedExcludes = JSON.parse(excludeKey) as string[];
+      const parsedBizRule = JSON.parse(bizRuleKey) as BizErrorRule | null;
       const hasExtra = !!(
         hostFilter ||
         parsedExcludes.length > 0 ||
         methodFilter ||
         statusFilter ||
         searchBody ||
+        (minDurationMs != null && minDurationMs > 0) ||
+        parsedBizRule?.enabled ||
         sortBy ||
         afterSeq != null
       );
@@ -669,6 +729,8 @@ export function RequestTable({
             methodFilter,
             statusFilter,
             searchBody,
+            minDurationMs,
+            parsedBizRule,
           )
         : await api.query(sessionId, search, filter, next, 0, 1, parsedRange);
       if (request === navRevision.current && result.rows[0])
@@ -1085,6 +1147,16 @@ export function RequestTable({
                   <Copy size={13} />
                   {t("copyResponseBody")}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCopyAction(menu.entry, "report");
+                    setMenu(null);
+                  }}
+                >
+                  <FileText size={13} />
+                  {t("copyBugReport")}
+                </button>
               </>
             )}
             <div className="req-menu-sep" />
@@ -1128,8 +1200,11 @@ export function RequestTable({
                   </button>
                 )}
                 {onCompareWithAnchor &&
-                  compareAnchor &&
-                  compareAnchor.id !== menu.entry.id && (
+                  anchorEntryId &&
+                  !(
+                    anchorSessionId === sessionId &&
+                    anchorEntryId === menu.entry.id
+                  ) && (
                     <button
                       type="button"
                       onClick={() => {

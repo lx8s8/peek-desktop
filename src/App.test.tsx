@@ -121,6 +121,7 @@ vi.mock("./lib/ipc/client", () => ({
   desktop: true,
   api: {
     entryInfo: vi.fn(),
+    close: vi.fn(async () => {}),
     watchFiles: vi.fn(async () => () => {}),
     openPending: vi.fn(async () => null),
     hasPendingFiles: vi.fn(async () => false),
@@ -301,4 +302,56 @@ it("provides an independent console stream tab that links network entries withou
   );
   fireEvent.click(screen.getByRole("button", { name: "控制台" }));
   await screen.findByText("chosen");
+});
+
+it("auto-switches to a newly reconnected online run for the same device and supports clearing offline runs", async () => {
+  const oldOffline: SessionSummary = {
+    ...session("live-old"),
+    deviceId: "dev-same",
+    online: false,
+    filename: "iPhone 16 Pro",
+    header: {
+      formatVersion: 1,
+      peekVersion: "2.1.1",
+      name: "iPhone 16 Pro",
+      platform: "ios",
+      startedAt: "2026-11-27T01:00:00Z",
+    },
+  };
+  const newOnline: SessionSummary = {
+    ...session("live-new"),
+    deviceId: "dev-same",
+    online: true,
+    filename: "iPhone 16 Pro",
+    header: {
+      formatVersion: 1,
+      peekVersion: "2.1.1",
+      name: "iPhone 16 Pro",
+      platform: "ios",
+      startedAt: "2026-11-27T01:10:00Z",
+    },
+  };
+
+  data.sessions = [oldOffline];
+  const { rerender } = render(<App />);
+  await screen.findByRole("button", { name: /^iPhone 16 Pro/ });
+
+  // 同一设备重启后以新 sessionId 重新连上，应自动从旧离线运行切换到新在线运行
+  data.sessions = [oldOffline, newOnline];
+  rerender(<App />);
+
+  await waitFor(() => {
+    const activeRunBtn = document.querySelector(
+      ".device-run-item.active .device-run-select",
+    );
+    expect(activeRunBtn?.textContent).toContain("在线");
+  });
+
+  // 一键清理该设备的离线运行，仅关闭旧离线运行并提示结果
+  fireEvent.click(
+    screen.getByRole("button", { name: "清理 iPhone 16 Pro 的 1 条离线运行" }),
+  );
+  await waitFor(() => expect(api.close).toHaveBeenCalledWith("live-old"));
+  expect(api.close).toHaveBeenCalledTimes(1);
+  await screen.findByText("已清理 iPhone 16 Pro 的 1 条离线运行");
 });

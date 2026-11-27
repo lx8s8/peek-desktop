@@ -188,6 +188,8 @@ it("supports tri-state sorting on duration, size, and time headers with aria-sor
       undefined,
       undefined,
       false,
+      undefined,
+      null,
     ),
   );
 
@@ -315,6 +317,8 @@ it("forwards method, status, and body search filters and toggles optional column
       "POST",
       "5xx",
       true,
+      undefined,
+      null,
     ),
   );
   expect(onMeta).toHaveBeenCalledWith(

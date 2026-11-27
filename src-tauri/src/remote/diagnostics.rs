@@ -174,7 +174,28 @@ impl DiagnosticStore {
         }
         let id = format!("diagnostic-{}", super::store::session_key(&device, &run));
         if !self.runs.contains_key(&id) && self.runs.len() >= 8 {
-            return Err("diagnosticCapacity".into());
+            // 容量满时自动淘汰最早的离线诊断运行（优先同设备，其次事件最少的离线运行），避免热重启几次后被拒
+            let candidate = self
+                .runs
+                .iter()
+                .filter(|(_, existing)| !existing.online)
+                .min_by_key(|(key, existing)| {
+                    (
+                        existing.device_id != device,
+                        existing.network_key.is_some(),
+                        existing.events.len(),
+                        existing.version,
+                        (*key).clone(),
+                    )
+                })
+                .map(|(key, _)| key.clone());
+            if let Some(evicted_id) = candidate {
+                if let Some(removed) = self.runs.remove(&evicted_id) {
+                    removed.cancel.cancel();
+                }
+            } else {
+                return Err("diagnosticCapacity".into());
+            }
         }
         if let Some(existing) = self.runs.get_mut(&id) {
             if existing.network_key != network_key {

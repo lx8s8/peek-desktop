@@ -54,6 +54,13 @@ pub struct ListenerInfo {
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PrefetchBodiesReport {
+    pub total_candidates: usize,
+    pub fetched: usize,
+    pub failed: usize,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RemoteSnapshot {
     #[serde(flatten)]
     pub listener: ListenerInfo,
@@ -195,16 +202,111 @@ impl Remote {
         Ok(pinned)
     }
     pub fn export(&self, id: &str) -> Result<Arc<Session>> {
-        Ok(Arc::new(
-            self.store
-                .lock()
-                .map_err(|_| "internalError")?
+        self.export_with_options(id, true)
+    }
+    /// 导出实时会话，默认自动合并磁盘溢出冷存储历史（严守文件大小与条目数上限）。
+    pub fn export_with_options(&self, id: &str, include_spill: bool) -> Result<Arc<Session>> {
+        let mut store = self.store.lock().map_err(|_| "internalError")?;
+        let session = store.sessions.get_mut(id).ok_or("sessionNotFound")?;
+        Ok(Arc::new(session.snapshot_session(
+            include_spill,
+            crate::session::MAX_FILE_BYTES,
+        )))
+    }
+    /// 计算实时会话（热区 + 冷存）的接口聚合统计。
+    pub fn endpoint_stats(
+        &self,
+        id: &str,
+        range: &crate::query::ParsedRange,
+        after_seq: Option<u64>,
+        biz_rule: Option<&crate::session::BizErrorRule>,
+    ) -> Result<crate::session::EndpointStatsReport> {
+        let store = self.store.lock().map_err(|_| "internalError")?;
+        let session = store.sessions.get(id).ok_or("sessionNotFound")?;
+        let spill = if session.spill.is_empty() {
+            None
+        } else {
+            Some(&session.spill)
+        };
+        Ok(session
+            .current
+            .endpoint_stats(spill, range, after_seq, biz_rule))
+    }
+    /// 归档或导出前批量补拉在线设备未加载的小正文，限流并发写入内存缓存。
+    pub async fn prefetch_remote_bodies(
+        &self,
+        id: String,
+        max_bytes: u64,
+        max_count: usize,
+    ) -> Result<PrefetchBodiesReport> {
+        let limit = max_count.clamp(1, 200);
+        let candidates: Vec<(String, String)> = {
+            let store = self.store.lock().map_err(|_| "internalError")?;
+            let session = store
                 .sessions
-                .get(id)
-                .ok_or("sessionNotFound")?
-                .current
-                .clone(),
-        ))
+                .get(&id)
+                .filter(|s| s.online && s.staging.is_none())
+                .ok_or("deviceOffline")?;
+            let mut list = Vec::new();
+            // 优先补拉最新请求的正文，控制单批数量与体积
+            for entry in session.current.entries.iter().rev() {
+                if list.len() >= limit {
+                    break;
+                }
+                if !entry.raw.contains("\"remote\"") {
+                    continue;
+                }
+                let Ok(value) = serde_json::from_str::<Value>(&entry.raw) else {
+                    continue;
+                };
+                for side in ["response", "request"] {
+                    if list.len() >= limit {
+                        break;
+                    }
+                    let body = &value[side]["body"];
+                    if body["kind"] == "remote" {
+                        let size = body["size"].as_u64().unwrap_or(0);
+                        if size <= max_bytes {
+                            list.push((entry.row.id.clone(), side.to_owned()));
+                        }
+                    }
+                }
+            }
+            list
+        };
+
+        let total_candidates = candidates.len();
+        if total_candidates == 0 {
+            return Ok(PrefetchBodiesReport {
+                total_candidates: 0,
+                fetched: 0,
+                failed: 0,
+            });
+        }
+
+        let results: Vec<Result<BodyView>> = futures_util::stream::iter(candidates)
+            .map(|(entry_id, side)| {
+                let session_id = id.clone();
+                async move { self.body(session_id, entry_id, side).await }
+            })
+            .buffer_unordered(4)
+            .collect()
+            .await;
+
+        let mut fetched = 0usize;
+        let mut failed = 0usize;
+        for outcome in results {
+            if outcome.is_ok() {
+                fetched += 1;
+            } else {
+                failed += 1;
+            }
+        }
+        Ok(PrefetchBodiesReport {
+            total_candidates,
+            fetched,
+            failed,
+        })
     }
     pub fn close(&self, id: &str) -> Result<()> {
         let mut store = self.store.lock().map_err(|_| "internalError")?;
@@ -518,6 +620,7 @@ impl Remote {
         let capacity = {
             let store = self.store.lock().map_err(|_| "internalError")?;
             store.sessions.len() < super::store::MAX_LIVE_SESSIONS
+                || store.has_evictable_offline()
                 || known.is_some_and(|device| {
                     store.sessions.contains_key(&super::store::session_key(
                         &device,
@@ -576,14 +679,31 @@ impl Remote {
             .to_owned();
         let connection_id = Uuid::new_v4().to_string();
         let (sender, mut outgoing) = mpsc::channel(16);
-        let key = self.store.lock().map_err(|_| "internalError")?.begin(
-            &auth.device_id,
-            hello["sessionId"].as_str().unwrap(),
-            &connection_id,
-            hello["session"].clone(),
-            sender,
-            cancel.clone(),
-        )?;
+        let (key, evicted_key) = self
+            .store
+            .lock()
+            .map_err(|_| "internalError")?
+            .begin_with_eviction(
+                &auth.device_id,
+                hello["sessionId"].as_str().unwrap(),
+                &connection_id,
+                hello["session"].clone(),
+                sender,
+                cancel.clone(),
+            )?;
+        // 若因容量上限自动淘汰了旧的离线网络会话，同步清理绑定在该会话上的离线诊断运行
+        if let Some(evicted_id) = evicted_key
+            && let Ok(mut diagnostics) = self.diagnostics.lock()
+        {
+            diagnostics.runs.retain(|_, run| {
+                if !run.online && run.network_key.as_deref() == Some(evicted_id.as_str()) {
+                    run.cancel.cancel();
+                    false
+                } else {
+                    true
+                }
+            });
+        }
         drop(admission);
         let welcome = if !self.authorized(&auth.device_id, false) || cancel.is_cancelled() {
             Err("token".into())

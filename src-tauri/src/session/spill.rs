@@ -22,6 +22,7 @@ pub struct SpillEntry {
     pub row: EntryRow,
     pub search: String,
     pub started_at_micros: i64,
+    pub response_fields: Vec<(String, String)>,
     pub offset: u64,
     pub len: usize,
 }
@@ -69,6 +70,7 @@ impl SpillStore {
         row: EntryRow,
         search: String,
         started_at_micros: i64,
+        response_fields: Vec<(String, String)>,
         raw: &str,
     ) -> bool {
         // 同 ID 若之前已在冷区，先移除旧索引避免重复
@@ -101,6 +103,7 @@ impl SpillStore {
             row,
             search,
             started_at_micros,
+            response_fields,
             offset,
             len: bytes.len(),
         });
@@ -196,5 +199,52 @@ impl SpillStore {
         let mut buf = vec![0u8; len];
         file.read_exact(&mut buf).ok()?;
         String::from_utf8(buf).ok()
+    }
+
+    /// 导出时在字节和条数预算内读回冷区记录（从最新到最早优先保留，最后按 seq 升序输出）。
+    pub fn export_entries(
+        &mut self,
+        max_entries: usize,
+        max_bytes: usize,
+    ) -> Vec<crate::session::StoredEntry> {
+        if self.entries.is_empty() || max_entries == 0 || max_bytes == 0 {
+            return Vec::new();
+        }
+        let mut selected_indices = Vec::new();
+        let mut used_bytes = 0usize;
+        // 优先纳入固定记录，再从最新向最早纳入普通记录，确保最关键的历史不丢失
+        for (idx, entry) in self.entries.iter().enumerate().rev() {
+            if entry.row.pinned
+                && selected_indices.len() < max_entries
+                && used_bytes.saturating_add(entry.len) <= max_bytes
+            {
+                selected_indices.push(idx);
+                used_bytes = used_bytes.saturating_add(entry.len);
+            }
+        }
+        for (idx, entry) in self.entries.iter().enumerate().rev() {
+            if !entry.row.pinned
+                && selected_indices.len() < max_entries
+                && used_bytes.saturating_add(entry.len) <= max_bytes
+            {
+                selected_indices.push(idx);
+                used_bytes = used_bytes.saturating_add(entry.len);
+            }
+        }
+        selected_indices.sort_unstable();
+        let mut out = Vec::with_capacity(selected_indices.len());
+        for idx in selected_indices {
+            let meta = self.entries[idx].clone();
+            if let Some(raw) = self.read_raw_at(meta.offset, meta.len) {
+                out.push(crate::session::StoredEntry {
+                    row: meta.row,
+                    raw: Arc::from(raw),
+                    search: meta.search,
+                    started_at_micros: meta.started_at_micros,
+                    response_fields: meta.response_fields,
+                });
+            }
+        }
+        out
     }
 }

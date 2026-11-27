@@ -1,6 +1,6 @@
 use crate::{
-    protocol::session::{Header, Result},
-    session::{LiveInfo, Session, SessionSummary, StoredEntry, spill::SpillStore},
+    protocol::session::{Header, Result, parse_timestamp_micros},
+    session::{LiveInfo, MAX_ENTRIES, Session, SessionSummary, StoredEntry, spill::SpillStore},
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
@@ -71,6 +71,82 @@ mod tests {
         assert!(store.sessions[&key].online);
         assert_eq!(store.sessions[&key].generation, 2);
     }
+
+    #[test]
+    fn capacity_auto_evicts_oldest_offline_session_and_snapshot_merges_spill() {
+        let mut store = LiveStore::default();
+        let (tx, _rx) = mpsc::channel(16);
+        let mut keys = Vec::new();
+        for idx in 0..MAX_LIVE_SESSIONS {
+            let header = json!({
+                "peekVersion":"2.1.1",
+                "platform":"ios",
+                "startedAt": format!("2026-11-27T01:0{idx}:00Z")
+            });
+            let key = store
+                .begin(
+                    "dev-1",
+                    &format!("run-{idx}"),
+                    &format!("conn-{idx}"),
+                    header,
+                    tx.clone(),
+                    CancellationToken::new(),
+                )
+                .unwrap();
+            keys.push(key);
+        }
+        // 将第 1 条（最早）设为离线，第 9 次新连接应自动淘汰该离线运行而不报错
+        store.disconnect(&keys[0], "conn-0");
+        let ninth_header =
+            json!({"peekVersion":"2.1.1","platform":"ios","startedAt":"2026-11-27T02:00:00Z"});
+        let (ninth_key, evicted) = store
+            .begin_with_eviction(
+                "dev-1",
+                "run-8",
+                "conn-8",
+                ninth_header,
+                tx.clone(),
+                CancellationToken::new(),
+            )
+            .unwrap();
+        assert_eq!(evicted.as_deref(), Some(keys[0].as_str()));
+        assert!(!store.sessions.contains_key(&keys[0]));
+        assert!(store.sessions.contains_key(&ninth_key));
+
+        // 8 个会话全在线时再连第 9 个，仍应受容量上限拒绝
+        let tenth_header =
+            json!({"peekVersion":"2.1.1","platform":"ios","startedAt":"2026-11-27T02:05:00Z"});
+        let rejected = store.begin_with_eviction(
+            "dev-1",
+            "run-9",
+            "conn-9",
+            tenth_header,
+            tx,
+            CancellationToken::new(),
+        );
+        assert_eq!(rejected.err().as_deref(), Some("liveCapacity"));
+
+        // 验证冷存储导出合并：向冷区写入一条早期记录后，snapshot_session(true) 应完整包含冷热两层
+        let session = store.sessions.get_mut(&ninth_key).unwrap();
+        session.staging = None;
+        let old_raw = json!({"id":"cold-1","source":"dio","startedAt":"2026-11-27T02:00:01Z","request":{"method":"GET","url":"https://api.example.test/old"}}).to_string();
+        let old_entry = StoredEntry::parse(&old_raw).unwrap();
+        session.spill.push(
+            old_entry.row,
+            old_entry.search,
+            old_entry.started_at_micros,
+            old_entry.response_fields,
+            &old_entry.raw,
+        );
+        let hot_raw = json!({"id":"hot-1","source":"dio","startedAt":"2026-11-27T02:00:02Z","request":{"method":"GET","url":"https://api.example.test/hot"}}).to_string();
+        session
+            .current
+            .upsert(StoredEntry::parse(&hot_raw).unwrap());
+        let merged = session.snapshot_session(true, 1024 * 1024);
+        assert_eq!(merged.entries.len(), 2);
+        assert!(merged.entry("cold-1").is_some());
+        assert!(merged.entry("hot-1").is_some());
+    }
 }
 pub struct PendingBody {
     pub session_id: String,
@@ -96,9 +172,85 @@ pub fn session_key(device_id: &str, network_id: &str) -> String {
     format!("live-{hash}")
 }
 
+impl LiveSession {
+    /// 构建可导出的完整会话快照；开启 `include_spill` 时将磁盘冷存记录按 `seq` 合并进结果（严守文件容量上限）。
+    pub fn snapshot_session(&mut self, include_spill: bool, max_bytes: usize) -> Session {
+        if !include_spill || self.spill.is_empty() {
+            return self.current.clone();
+        }
+        let budget_bytes = max_bytes.saturating_sub(self.current.raw_bytes);
+        let budget_entries = MAX_ENTRIES.saturating_sub(self.current.entries.len());
+        let cold_entries = self.spill.export_entries(budget_entries, budget_bytes);
+        if cold_entries.is_empty() {
+            return self.current.clone();
+        }
+        let mut merged = Session::empty(
+            self.current.header.clone(),
+            self.current.raw_header.to_string(),
+        );
+        merged.skipped = self.current.skipped;
+        let mut combined = Vec::with_capacity(cold_entries.len() + self.current.entries.len());
+        combined.extend(cold_entries);
+        combined.extend(self.current.entries.iter().cloned());
+        combined.sort_by_key(|entry| entry.row.seq);
+        for entry in combined {
+            let seq = entry.row.seq;
+            let pinned = entry.row.pinned;
+            merged.upsert_with_inherited(entry, Some((seq, pinned)));
+        }
+        merged
+    }
+}
+
 impl LiveStore {
+    /// 是否存在可被自动回收的离线会话（用于容量满时的准入判定）。
+    pub fn has_evictable_offline(&self) -> bool {
+        self.sessions.values().any(|session| !session.online)
+    }
+
+    /// 按优先级自动回收一条离线会话：优先同设备空离线 -> 同设备最早离线 -> 全局空离线 -> 全局最早离线。
+    pub fn evict_oldest_offline(&mut self, preferred_device_id: &str) -> Option<String> {
+        let candidate = self
+            .sessions
+            .iter()
+            .filter(|(_, session)| !session.online)
+            .min_by_key(|(key, session)| {
+                let different_device = session.device_id != preferred_device_id;
+                let has_entries = !session.current.entries.is_empty() || !session.spill.is_empty();
+                let started_micros = parse_timestamp_micros(&session.current.header.started_at);
+                (
+                    different_device,
+                    has_entries,
+                    started_micros,
+                    session.version,
+                    (*key).clone(),
+                )
+            })
+            .map(|(key, _)| key.clone())?;
+        self.cancel_pending(&candidate, "sessionNotFound");
+        if let Some(removed) = self.sessions.remove(&candidate) {
+            removed.cancel.cancel();
+        }
+        Some(candidate)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn begin(
+        &mut self,
+        device_id: &str,
+        network_id: &str,
+        connection_id: &str,
+        header: Value,
+        sender: mpsc::Sender<Value>,
+        cancel: CancellationToken,
+    ) -> Result<String> {
+        self.begin_with_eviction(device_id, network_id, connection_id, header, sender, cancel)
+            .map(|(key, _)| key)
+    }
+
+    /// 建立或复用实时会话；容量触顶时自动回收最早离线会话并返回 `(当前会话 key, 被回收离线会话 key)`。
+    #[allow(clippy::too_many_arguments)]
+    pub fn begin_with_eviction(
         &mut self,
         device_id: &str,
         network_id: &str,
@@ -106,7 +258,7 @@ impl LiveStore {
         mut header: Value,
         sender: mpsc::Sender<Value>,
         cancel: CancellationToken,
-    ) -> Result<String> {
+    ) -> Result<(String, Option<String>)> {
         if network_id.is_empty() || network_id.len() > 256 {
             return Err("invalidSessionId".into());
         }
@@ -118,8 +270,12 @@ impl LiveStore {
         header["formatVersion"] = 1.into();
         let raw = header.to_string();
         let key = session_key(device_id, network_id);
+        let mut evicted_key = None;
         if !self.sessions.contains_key(&key) && self.sessions.len() >= MAX_LIVE_SESSIONS {
-            return Err("liveCapacity".into());
+            evicted_key = self.evict_oldest_offline(device_id);
+            if evicted_key.is_none() {
+                return Err("liveCapacity".into());
+            }
         }
         if let Some(session) = self.sessions.get_mut(&key) {
             session.cancel.cancel();
@@ -153,7 +309,7 @@ impl LiveStore {
             );
         }
         self.cancel_pending(&key, "bodyStale");
-        Ok(key)
+        Ok((key, evicted_key))
     }
     pub fn active_mut(&mut self, key: &str, connection_id: &str) -> Option<&mut LiveSession> {
         self.sessions
@@ -183,7 +339,13 @@ impl LiveStore {
             let evicted = target.evict_prefix_extract(count);
             session.evicted += evicted.len() as u64;
             for item in evicted {
-                spill.push(item.row, item.search, item.started_at_micros, &item.raw);
+                spill.push(
+                    item.row,
+                    item.search,
+                    item.started_at_micros,
+                    item.response_fields,
+                    &item.raw,
+                );
             }
         }
         session.version += 1;

@@ -220,7 +220,7 @@ pub fn capture(
     scope: Option<&crate::query::Scope>,
 ) -> Result<Bundle> {
     // Lock order matches normal network/diagnostic operations; never serialize under these locks.
-    let store = remote.store.lock().map_err(|_| "internalError")?;
+    let mut store = remote.store.lock().map_err(|_| "internalError")?;
     let diagnostics = remote.diagnostics.lock().map_err(|_| "internalError")?;
     let mut bundle = Bundle::default();
     let include_network = |id: &str| match scope {
@@ -238,17 +238,23 @@ pub fn capture(
             });
         }
     }
-    for (id, session) in &store.sessions {
+    let live_export_budget = if scope.is_some() {
+        crate::session::MAX_FILE_BYTES
+    } else {
+        // 整工作区快照时平均控制单个实时会话冷存并入预算，确保恢复不触发 libraryFull
+        crate::session::MAX_FILE_BYTES.min(MAX_LIBRARY_BYTES / 4)
+    };
+    for (id, session) in &mut store.sessions {
         if include_network(id) {
+            let merged = session.snapshot_session(true, live_export_budget);
             bundle.networks.push(NetworkSnapshot {
                 key: id.clone(),
-                filename: session
-                    .current
+                filename: merged
                     .header
                     .name
                     .clone()
                     .unwrap_or_else(|| "Network".into()),
-                session: Arc::new(session.current.clone()),
+                session: Arc::new(merged),
                 origin: NetworkOrigin {
                     source_device_id: Some(session.device_id.clone()),
                     source_network_id: Some(session.network_id.clone()),

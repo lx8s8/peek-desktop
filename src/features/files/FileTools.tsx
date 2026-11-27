@@ -13,6 +13,8 @@ export function FileTools({
   scope,
   hasLogs,
   networkId,
+  liveOnline = false,
+  spilledCount = 0,
   entryId,
   onError,
   onNotice,
@@ -22,6 +24,8 @@ export function FileTools({
   scope: Scope | null;
   hasLogs: boolean;
   networkId?: string;
+  liveOnline?: boolean;
+  spilledCount?: number;
   entryId?: string;
   onError: (message: string) => void;
   onNotice: (message: string) => void;
@@ -207,12 +211,38 @@ export function FileTools({
                 </Button>
               </header>
               <p className="muted">{t("exportBounds")}</p>
+              {spilledCount > 0 && (
+                <p className="muted" role="status">
+                  {t("exportIncludesSpillHint", { count: spilledCount })}
+                </p>
+              )}
               {feedback && (
                 <p role={feedback.error ? "alert" : "status"}>
                   {feedback.text}
                 </p>
               )}
               <div className="file-actions">
+                {liveOnline && networkId && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const report = await api.prefetchBodies(networkId);
+                        notify(
+                          report.totalCandidates === 0
+                            ? t("prefetchBodiesNone")
+                            : t("prefetchBodiesDone", {
+                                fetched: report.fetched,
+                                total: report.totalCandidates,
+                                failed: report.failed,
+                              }),
+                        );
+                      })
+                    }
+                  >
+                    {t("prefetchBodiesAction")}
+                  </Button>
+                )}
                 <Button
                   disabled={!networkId || busy}
                   onClick={() => commands.dispatch("export.har")}
