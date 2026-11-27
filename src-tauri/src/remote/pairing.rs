@@ -137,11 +137,11 @@ impl SecretVault for SystemVault {
                 return Ok(Some(value));
             }
             // 首次升级时静默从旧版 Windows Credential Manager 迁移已配对设备，突破 2560B UTF-16 容量限制
-            if let Ok(entry) = keyring::Entry::new("local.peek.desktop", "pairings-v1") {
-                if let Ok(legacy) = entry.get_password() {
-                    let _ = file_vault.write(&legacy);
-                    return Ok(Some(legacy));
-                }
+            if let Ok(entry) = keyring::Entry::new("local.peek.desktop", "pairings-v1")
+                && let Ok(legacy) = entry.get_password()
+            {
+                let _ = file_vault.write(&legacy);
+                return Ok(Some(legacy));
             }
             Ok(None)
         }
