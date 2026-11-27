@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Installer smoke test is restricted to an ephemeral GitHub runner' }
 $installer = @(Get-ChildItem release-artifacts -Filter *.exe)
 if ($installer.Count -ne 1) { throw 'Expected one Windows installer' }
@@ -25,6 +25,10 @@ foreach ($extension in @('peek', 'peekbundle')) {
 }
 $uninstall = @(Get-ChildItem -LiteralPath $directory -Filter '*uninstall*.exe')
 if ($uninstall.Count -ne 1) { throw 'Uninstaller was not installed' }
+# 验证同目录重复覆盖安装可顺利覆盖且保持主程序与文件关联完好
+$overwrite = Start-Process -FilePath $installer[0].FullName -ArgumentList "/S /D=$directory" -Wait -PassThru
+if ($overwrite.ExitCode -ne 0) { throw "Overwrite install exited with $($overwrite.ExitCode)" }
+if (-not (Test-Path -LiteralPath $exe)) { throw 'Application executable missing after overwrite install' }
 $process = Start-Process -FilePath $uninstall[0].FullName -ArgumentList '/S' -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Uninstaller exited with $($process.ExitCode)" }
 if (Test-Path -LiteralPath $exe) { throw 'Application executable remains after uninstall' }

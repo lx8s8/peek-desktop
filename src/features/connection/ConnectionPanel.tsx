@@ -2,7 +2,7 @@ import { commands } from "../../lib/commands/dispatcher";
 import { useCommand, useModalCommands } from "../../lib/commands/react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Pencil, Radio, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Copy, Pencil, Radio, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api, desktop } from "../../lib/ipc/client";
@@ -27,10 +27,14 @@ export function ConnectionPanel({
   onChange: () => Promise<void>;
   onError: (error: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [panelError, setPanelError] = useState("");
+  const [highlightDevices, setHighlightDevices] = useState(false);
   const actionBusy = useRef(false);
+  const devicesSectionRef = useRef<HTMLDivElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
   const initialPrefs = useRef(readListenerPrefs());
   const [host, setHost] = useState<"127.0.0.1" | "0.0.0.0">(
     initialPrefs.current.host,
@@ -153,15 +157,52 @@ export function ConnectionPanel({
       trigger.current?.focus();
     };
   }, [open]);
+  const maxDevices = remote.pairing?.maxDevices ?? 16;
+  const pairedCount = remote.pairing?.devices.length ?? 0;
+  const atCapacity = remote.listening && pairedCount >= maxDevices;
+  const formatPanelError = (code: string) =>
+    i18n.exists(code)
+      ? String(t(code))
+      : String(t("unexpected", { error: code }));
+  const focusPairedDevices = () => {
+    devicesSectionRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "nearest",
+    });
+    setHighlightDevices(true);
+    window.setTimeout(() => setHighlightDevices(false), 1600);
+  };
+  useEffect(() => {
+    if (!open) {
+      setPanelError("");
+      setHighlightDevices(false);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!atCapacity && panelError === "pairingCapacity") {
+      setPanelError("");
+    }
+  }, [atCapacity, panelError]);
   async function act(action: () => Promise<unknown>) {
     if (actionBusy.current) return;
     actionBusy.current = true;
     setBusy(true);
+    setPanelError("");
     try {
       await action();
       await onChange();
     } catch (error) {
-      onError(String(error));
+      const code = String(error);
+      setPanelError(code);
+      onError(code);
+      if (code === "pairingCapacity") {
+        focusPairedDevices();
+      } else {
+        alertRef.current?.scrollIntoView?.({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }
     } finally {
       actionBusy.current = false;
       setBusy(false);
@@ -378,6 +419,32 @@ export function ConnectionPanel({
                 >
                   {t("newPairingCode")}
                 </Button>
+                {(atCapacity || panelError) && (
+                  <div
+                    ref={alertRef}
+                    className="connection-inline-alert"
+                    role="alert"
+                  >
+                    <AlertTriangle size={14} aria-hidden="true" />
+                    <span className="connection-inline-alert-text">
+                      {atCapacity || panelError === "pairingCapacity"
+                        ? t("pairingCapacityBanner", {
+                            count: pairedCount,
+                            max: maxDevices,
+                          })
+                        : formatPanelError(panelError)}
+                    </span>
+                    {(atCapacity || panelError === "pairingCapacity") && (
+                      <button
+                        type="button"
+                        className="connection-inline-alert-btn"
+                        onClick={focusPairedDevices}
+                      >
+                        {t("pairingManageDevices")}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {remote.listening && remote.pairing?.code && expires > 0 ? (
                   <>
                     <strong className="pairing-code">
@@ -398,11 +465,22 @@ export function ConnectionPanel({
                     )}
                   </>
                 ) : (
-                  <p className="muted">{t("pairingHint")}</p>
+                  !atCapacity && <p className="muted">{t("pairingHint")}</p>
                 )}
               </div>
-              <h3>{t("pairedDevices")}</h3>
-              <div className="paired-devices">
+              <div className="paired-devices-heading" ref={devicesSectionRef}>
+                <h3>{t("pairedDevices")}</h3>
+                {remote.pairing && (
+                  <span
+                    className={`paired-quota-pill${atCapacity ? " is-full" : ""}`}
+                  >
+                    {pairedCount} / {maxDevices}
+                  </span>
+                )}
+              </div>
+              <div
+                className={`paired-devices${highlightDevices ? " is-highlighted" : ""}`}
+              >
                 {remote.pairing?.devices.map((device) => {
                   const display = resolveDeviceDisplay(
                     device.id,

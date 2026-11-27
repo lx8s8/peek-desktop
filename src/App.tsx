@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Circle,
   Command,
+  Download,
   FileSearch,
   FolderOpen,
   Globe2,
@@ -44,6 +45,7 @@ import { FileTools } from "./features/files/FileTools";
 import { useFileOpen } from "./features/files/useFileOpen";
 import { useFileDrop } from "./features/files/useFileDrop";
 import { AboutPanel } from "./features/about/AboutPanel";
+import { useAutoUpdateCheck } from "./features/about/useAutoUpdateCheck";
 import { ConnectionPanel } from "./features/connection/ConnectionPanel";
 import { SessionSidebar } from "./features/connection/SessionSidebar";
 import {
@@ -314,7 +316,17 @@ export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [openUpdateNonce, setOpenUpdateNonce] = useState(0);
   const autoStartAttempted = useRef(false);
+  const {
+    availableUpdate,
+    bannerVisible: updateBannerVisible,
+    autoCheck: autoCheckUpdates,
+    setAutoCheck: setAutoCheckUpdates,
+    dismissBanner: dismissUpdateBanner,
+    skipVersion: skipUpdateVersion,
+    syncResult: syncUpdateResult,
+  } = useAutoUpdateCheck();
   const [replayTarget, setReplayTarget] = useState<{
     sessionId: string;
     entry: EntryRow;
@@ -1427,7 +1439,13 @@ export default function App() {
               )}
             </Button>
           )}
-          <AboutPanel />
+          <AboutPanel
+            availableUpdate={availableUpdate}
+            autoCheck={autoCheckUpdates}
+            onAutoCheckChange={setAutoCheckUpdates}
+            onUpdateResult={syncUpdateResult}
+            openUpdateNonce={openUpdateNonce}
+          />
           <Button
             size="icon"
             variant="ghost"
@@ -1448,6 +1466,48 @@ export default function App() {
           </Button>
         </div>
       </header>
+      {updateBannerVisible && availableUpdate?.latestVersion && (
+        <div className="update-banner" role="status">
+          <span className="update-banner-main">
+            <Download size={13} aria-hidden="true" />
+            <span>
+              {t(
+                availableUpdate.canInstall
+                  ? "updateBannerText"
+                  : "updateBannerManualText",
+                { version: availableUpdate.latestVersion },
+              )}
+            </span>
+          </span>
+          <div className="update-banner-actions">
+            <button
+              type="button"
+              className="update-banner-primary"
+              onClick={() => {
+                dismissUpdateBanner();
+                setOpenUpdateNonce((value) => value + 1);
+              }}
+            >
+              {t("updateBannerAction")}
+            </button>
+            <button
+              type="button"
+              className="update-banner-skip"
+              onClick={() => skipUpdateVersion(availableUpdate.latestVersion)}
+            >
+              {t("updateBannerSkip")}
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("dismiss")}
+              onClick={dismissUpdateBanner}
+            >
+              <X />
+            </Button>
+          </div>
+        </div>
+      )}
       {notice && (
         <div
           className={`notice ${notice.error ? "warning" : ""}`}

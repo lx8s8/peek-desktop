@@ -361,3 +361,42 @@ export function readBizErrorRule(): BizErrorRule {
 export function writeBizErrorRule(rule: BizErrorRule) {
   writePreference(BIZ_ERROR_RULE_KEY, JSON.stringify(rule));
 }
+
+export interface UpdatePrefs {
+  autoCheck: boolean;
+  dismissedVersion: string | null;
+}
+
+export const DEFAULT_UPDATE_PREFS: UpdatePrefs = {
+  autoCheck: true,
+  dismissedVersion: null,
+};
+
+const UPDATE_PREFS_KEY = "updatePrefs";
+
+/** 读取自动检测更新偏好与用户已忽略的新版本号。 */
+export function readUpdatePrefs(): UpdatePrefs {
+  try {
+    const raw = readPreference(UPDATE_PREFS_KEY, "");
+    if (!raw) return { ...DEFAULT_UPDATE_PREFS };
+    const parsed = JSON.parse(raw) as Partial<UpdatePrefs>;
+    return {
+      autoCheck:
+        typeof parsed.autoCheck === "boolean"
+          ? parsed.autoCheck
+          : DEFAULT_UPDATE_PREFS.autoCheck,
+      dismissedVersion:
+        typeof parsed.dismissedVersion === "string" &&
+        parsed.dismissedVersion.trim()
+          ? parsed.dismissedVersion.trim()
+          : null,
+    };
+  } catch {
+    return { ...DEFAULT_UPDATE_PREFS };
+  }
+}
+
+/** 持久化保存自动检测更新偏好。 */
+export function writeUpdatePrefs(prefs: UpdatePrefs) {
+  writePreference(UPDATE_PREFS_KEY, JSON.stringify(prefs));
+}

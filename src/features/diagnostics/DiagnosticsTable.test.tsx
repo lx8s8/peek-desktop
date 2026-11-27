@@ -259,3 +259,20 @@ it("opens a fingerprint group as original members and can return to the retained
   fireEvent.click(screen.getByRole("button", { name: "返回分组" }));
   await screen.findByText("repeated exception");
 });
+
+it("keeps advanced filters collapsed by default and offers a floating jump-to-latest button when paused", async () => {
+  render(<Harness />);
+  await screen.findByText("first");
+  expect(screen.queryByLabelText("来源")).toBeNull();
+
+  // 展开更多筛选
+  fireEvent.click(screen.getByRole("button", { name: /更多筛选/ }));
+  expect(screen.getByLabelText("来源")).toBeTruthy();
+
+  // 选中日志后自动暂停跟随，右下角出现悬浮回底按钮，点击后恢复跟随
+  fireEvent.click(screen.getByText("first"));
+  const fab = screen.getByRole("button", { name: "回到最新" });
+  expect(fab).toBeTruthy();
+  fireEvent.click(fab);
+  expect(screen.queryByRole("button", { name: "回到最新" })).toBeNull();
+});

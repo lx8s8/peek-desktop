@@ -351,12 +351,23 @@ impl Remote {
             .local_addr()
             .map_err(|_| "listenerBindFailed")?
             .port();
-        let vault = self.vault.clone();
-        let pairing = tokio::task::spawn_blocking(move || Pairing::load(vault))
-            .await
-            .map_err(|_| "internalError")??;
-        let server_id = pairing.server_id().to_owned();
-        *self.pairing.lock().map_err(|_| "internalError")? = Some(pairing);
+        let existing_server_id = self
+            .pairing
+            .lock()
+            .map_err(|_| "internalError")?
+            .as_ref()
+            .map(|p| p.server_id().to_owned());
+        let server_id = if let Some(server_id) = existing_server_id {
+            server_id
+        } else {
+            let vault = self.vault.clone();
+            let pairing = tokio::task::spawn_blocking(move || Pairing::load(vault))
+                .await
+                .map_err(|_| "internalError")??;
+            let server_id = pairing.server_id().to_owned();
+            *self.pairing.lock().map_err(|_| "internalError")? = Some(pairing);
+            server_id
+        };
         let addresses = if host == "127.0.0.1" {
             vec![format!("127.0.0.1:{port}")]
         } else {

@@ -320,6 +320,7 @@ export interface RemoteSnapshot {
     serverId: string;
     code: string | null;
     expiresInSeconds: number;
+    maxDevices?: number;
     devices: { id: string; name: string; diagnostics: boolean }[];
   } | null;
   sessions: SessionSummary[];

@@ -8,9 +8,21 @@ import { useCommand } from "../../lib/commands/react";
 import { api, desktop } from "../../lib/ipc/client";
 import { LegalDocument, ThirdPartyNotices } from "./LegalDocument";
 import { UpdateCheck } from "./UpdateCheck";
-import type { AppInfo, ProjectLink } from "../../lib/ipc/types";
+import type { AppInfo, ProjectLink, UpdateInfo } from "../../lib/ipc/types";
 
-export function AboutPanel() {
+export function AboutPanel({
+  availableUpdate = null,
+  autoCheck,
+  onAutoCheckChange,
+  onUpdateResult,
+  openUpdateNonce = 0,
+}: {
+  availableUpdate?: UpdateInfo | null;
+  autoCheck?: boolean;
+  onAutoCheckChange?: (enabled: boolean) => void;
+  onUpdateResult?: (info: UpdateInfo) => void;
+  openUpdateNonce?: number;
+} = {}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -21,6 +33,13 @@ export function AboutPanel() {
   const [error, setError] = useState("");
   const trigger = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (openUpdateNonce > 0) {
+      setView("info");
+      setCheckRequest(0);
+      setOpen(true);
+    }
+  }, [openUpdateNonce]);
   useCommand("help.about", () => {
     setView("info");
     setCheckRequest(0);
@@ -125,11 +144,21 @@ export function AboutPanel() {
         ref={trigger}
         variant="ghost"
         size="icon"
+        className="about-trigger"
         aria-label={t("menuAbout")}
-        title={t("menuAbout")}
+        title={
+          availableUpdate?.latestVersion
+            ? t("aboutUpdateAvailableTitle", {
+                version: availableUpdate.latestVersion,
+              })
+            : t("menuAbout")
+        }
         onClick={() => commands.dispatch("help.about")}
       >
         <Info />
+        {availableUpdate?.latestVersion && (
+          <span className="about-update-dot" aria-hidden="true" />
+        )}
       </Button>
       {open &&
         createPortal(
@@ -199,6 +228,10 @@ export function AboutPanel() {
                   </p>
                   <UpdateCheck
                     request={checkRequest}
+                    initialResult={availableUpdate}
+                    autoCheck={autoCheck}
+                    onAutoCheckChange={onAutoCheckChange}
+                    onResultChange={onUpdateResult}
                     onCheck={() => setCheckRequest((value) => value + 1)}
                     onBusyChange={setUpdating}
                   />

@@ -31,14 +31,14 @@ export const remoteZh = {
   pairingHint: "生成四位码后在客户端配对；成功一次即失效。",
   pairedDevices: "已配对设备",
   noPairedDevices: "暂无已配对设备",
-  pairingsLoadOnStart: "启动监听后读取系统中的已配对设备。",
+  pairingsLoadOnStart: "启动监听后读取本机已配对设备。",
   diagnosticsAllowed: "已允许诊断同步",
   diagnosticsDisabled: "诊断同步已关闭",
   disableDiagnostics: "关闭诊断",
   enableDiagnostics: "允许诊断",
   forgetDevice: "忘记设备",
   pairingBoundary:
-    "设备凭据保存在系统凭据库。停止监听会断开连接；忘记设备会撤销其网络与诊断授权。",
+    "设备配对哈希保存在本机受限安全存储中（仅当前用户可读，更新后自动保留）。停止监听会断开连接；忘记设备会撤销其网络与诊断授权。",
   mdns_off: "自动发现未开启，可手动填写地址",
   mdns_active: "自动发现已开启",
   mdns_failed: "自动发现不可用，请手动填写地址",
@@ -86,7 +86,7 @@ export const remoteZh = {
   recentGaps: "最近缺口",
   networkLoss: "设备丢弃 {{dropped}} · 桌面淘汰 {{evicted}}",
   liveEmptyHint: "等待客户端发送请求；断开连接后仍可查看已收到的记录。",
-  credentialsCorrupt: "系统中的配对凭据无法读取，请检查系统凭据库。",
+  credentialsCorrupt: "本机保存的配对凭据无法读取，请检查本地配置存储。",
   listenerBindFailed: "无法监听该端口，请检查端口占用与网络权限。",
   listenerAlreadyRunning: "监听已经启动。",
   liveSessionActive: "设备仍在线，请先断开设备或停止监听再关闭会话。",
@@ -98,7 +98,10 @@ export const remoteZh = {
   bodyFailed: "设备无法返回正文。",
   listenerStopped: "请先启动监听。",
   pairingCapacity: "已达到设备上限，请先忘记一个设备。",
-  credentialsUnavailable: "系统凭据库不可用，无法启动配对。",
+  pairingCapacityBanner:
+    "已配对设备已达上限（{{count}} / {{max}}），无法继续生成配对码，请先在下方忘记不用的设备。",
+  pairingManageDevices: "去清理设备",
+  credentialsUnavailable: "本机凭据存储不可用，无法启动配对。",
   diagnosticEvicted: "日志已被淘汰或运行已关闭。",
   diagnosticNotFound: "诊断运行已关闭。",
   bodyUnavailable: "正文暂不可用，请确认设备在线后重试。",
@@ -142,14 +145,14 @@ export const remoteEn: Record<keyof typeof remoteZh, string> = {
   pairedDevices: "Paired devices",
   noPairedDevices: "No paired devices",
   pairingsLoadOnStart:
-    "Start listening to load paired devices from the system vault.",
+    "Start listening to load paired devices from local secure storage.",
   diagnosticsAllowed: "Diagnostics allowed",
   diagnosticsDisabled: "Diagnostics disabled",
   disableDiagnostics: "Disable diagnostics",
   enableDiagnostics: "Allow diagnostics",
   forgetDevice: "Forget",
   pairingBoundary:
-    "Credentials are stored in the system vault. Stopping disconnects clients; forgetting revokes network and diagnostic access.",
+    "Pairing hashes are stored locally with user-only access and preserved across updates. Stopping disconnects clients; forgetting revokes network and diagnostic access.",
   mdns_off: "Discovery off; enter the address manually",
   mdns_active: "Discovery enabled",
   mdns_failed: "Discovery unavailable; enter the address manually",
@@ -199,7 +202,7 @@ export const remoteEn: Record<keyof typeof remoteZh, string> = {
   liveEmptyHint:
     "Waiting for client requests. Received data remains available after disconnecting.",
   credentialsCorrupt:
-    "Stored pairing credentials cannot be read. Check the system vault.",
+    "Stored pairing credentials cannot be read. Check local credential storage.",
   listenerBindFailed:
     "Cannot listen on this port. Check port use and network permissions.",
   listenerAlreadyRunning: "The listener is already running.",
@@ -213,8 +216,11 @@ export const remoteEn: Record<keyof typeof remoteZh, string> = {
   bodyFailed: "The device could not return the body.",
   listenerStopped: "Start listening first.",
   pairingCapacity: "Device limit reached. Forget a device first.",
+  pairingCapacityBanner:
+    "Paired device limit reached ({{count}} / {{max}}). Forget an unused device below before generating a new pairing code.",
+  pairingManageDevices: "Manage devices",
   credentialsUnavailable:
-    "System credentials unavailable. Pairing cannot start.",
+    "Local credential storage is unavailable. Pairing cannot start.",
   diagnosticEvicted: "The event was evicted or its run was closed.",
   diagnosticNotFound: "The diagnostic run is closed.",
   bodyUnavailable: "Body unavailable. Check the device connection and retry.",

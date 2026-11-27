@@ -36,6 +36,7 @@ pub fn run() {
                 .arguments(&args, &std::env::current_dir()?);
             commands::start_recovery(app)?;
             commands::start_plugins(app)?;
+            commands::start_remote(app)?;
             Ok(())
         })
         .on_menu_event(|app, event| {

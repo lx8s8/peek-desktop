@@ -1305,6 +1305,17 @@ pub fn start_plugins(app: &tauri::App) -> std::result::Result<(), Box<dyn std::e
     Ok(())
 }
 
+/// 在应用启动时为远端配对模块注册受限配置目录（供 macOS 本地 0o600 凭据存储使用）。
+pub fn start_remote(app: &tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use tauri::Manager;
+    let base_dir = app
+        .path()
+        .app_config_dir()
+        .or_else(|_| app.path().app_data_dir())?;
+    crate::remote::pairing::configure_local_vault_dir(base_dir);
+    Ok(())
+}
+
 /// 导出的插件文本与一键安装链接载体。
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

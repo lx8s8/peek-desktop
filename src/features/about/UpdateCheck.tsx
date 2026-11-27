@@ -34,10 +34,18 @@ export function UpdateCheck({
   request,
   onCheck,
   onBusyChange,
+  initialResult = null,
+  autoCheck,
+  onAutoCheckChange,
+  onResultChange,
 }: {
   request: number;
   onCheck: () => void;
   onBusyChange?: (busy: boolean) => void;
+  initialResult?: UpdateInfo | null;
+  autoCheck?: boolean;
+  onAutoCheckChange?: (enabled: boolean) => void;
+  onResultChange?: (info: UpdateInfo) => void;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
@@ -47,6 +55,8 @@ export function UpdateCheck({
   const [result, setResult] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState("");
   const installingRef = useRef(false);
+  const onResultChangeRef = useRef(onResultChange);
+  onResultChangeRef.current = onResultChange;
 
   useEffect(() => {
     installingRef.current = installing;
@@ -79,7 +89,10 @@ export function UpdateCheck({
     void api
       .checkUpdates()
       .then((value) => {
-        if (active) setResult(value);
+        if (active) {
+          setResult(value);
+          onResultChangeRef.current?.(value);
+        }
       })
       .catch((err) => {
         if (active) setError(mapUpdateError(err, "updateCheckFailed"));
@@ -111,7 +124,10 @@ export function UpdateCheck({
     } catch (err) {
       setError(mapUpdateError(err, "updateDownloadFailed"));
       // 后端消费了本次待安装更新对象，保留手动下载入口并要求重新检查后再应用内安装。
-      setResult((prev) => (prev ? { ...prev, canInstall: false } : null));
+      setResult((prev) => {
+        const base = prev ?? initialResult;
+        return base ? { ...base, canInstall: false } : null;
+      });
     } finally {
       setInstalling(false);
       setCancelling(false);
@@ -132,6 +148,8 @@ export function UpdateCheck({
   }
 
   const busy = checking || installing;
+  const displayedResult =
+    result ?? (request === 0 && !checking && !error ? initialResult : null);
   const knownTotal = progress?.total != null && progress.total > 0;
   const percent =
     progress && knownTotal
@@ -140,10 +158,23 @@ export function UpdateCheck({
 
   return (
     <div className="update-check">
-      <Button disabled={!desktop || busy} onClick={onCheck}>
-        <RefreshCw className={checking ? "spin" : ""} />
-        {t(checking ? "checkingUpdates" : "checkUpdates")}
-      </Button>
+      <div className="update-check-bar">
+        <Button disabled={!desktop || busy} onClick={onCheck}>
+          <RefreshCw className={checking ? "spin" : ""} />
+          {t(checking ? "checkingUpdates" : "checkUpdates")}
+        </Button>
+        {onAutoCheckChange && (
+          <label className="checkbox-label update-auto-toggle">
+            <input
+              type="checkbox"
+              checked={autoCheck ?? true}
+              disabled={!desktop || busy}
+              onChange={(event) => onAutoCheckChange(event.target.checked)}
+            />
+            {t("autoCheckUpdates")}
+          </label>
+        )}
+      </div>
       {progress && (
         <div className="update-progress" role="status">
           <div className="update-progress-header">
@@ -188,17 +219,18 @@ export function UpdateCheck({
           {t(error)}
         </p>
       )}
-      {result && (
+      {displayedResult && (
         <div className="update-result" role="status">
           <p>
-            {t(`update_${result.status}`, {
-              version: result.latestVersion ?? result.currentVersion,
+            {t(`update_${displayedResult.status}`, {
+              version:
+                displayedResult.latestVersion ?? displayedResult.currentVersion,
             })}
           </p>
-          {result.status === "available" && (
+          {displayedResult.status === "available" && (
             <>
               <div className="update-links">
-                {result.canInstall ? (
+                {displayedResult.canInstall ? (
                   <Button
                     variant="primary"
                     disabled={busy}
@@ -208,29 +240,29 @@ export function UpdateCheck({
                     {t("installAndRestart")}
                   </Button>
                 ) : (
-                  result.downloadUrl && (
+                  displayedResult.downloadUrl && (
                     <Button
                       variant="primary"
                       disabled={busy}
-                      onClick={() => void open(result.downloadUrl!)}
+                      onClick={() => void open(displayedResult.downloadUrl!)}
                     >
                       {t("downloadUpdate")}
                       <ExternalLink size={13} />
                     </Button>
                   )
                 )}
-                {result.releaseUrl && (
+                {displayedResult.releaseUrl && (
                   <Button
                     disabled={busy}
-                    onClick={() => void open(result.releaseUrl!)}
+                    onClick={() => void open(displayedResult.releaseUrl!)}
                   >
                     {t("viewRelease")}
                     <ExternalLink size={13} />
                   </Button>
                 )}
               </div>
-              {result.notes && (
-                <pre className="update-notes">{result.notes}</pre>
+              {displayedResult.notes && (
+                <pre className="update-notes">{displayedResult.notes}</pre>
               )}
             </>
           )}

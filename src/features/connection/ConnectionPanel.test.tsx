@@ -228,3 +228,44 @@ it("persists listener preferences and optional auto-start flag across mounts", (
       .checked,
   ).toBe(true);
 });
+
+it("shows inline pairing capacity alert and device quota inside the dialog when full", async () => {
+  const onError = vi.fn();
+  vi.mocked(api.pair).mockRejectedValueOnce("pairingCapacity");
+  const fullSnapshot = {
+    ...emptyRemote,
+    listening: true,
+    host: "0.0.0.0",
+    port: 9741,
+    mdns: "active",
+    addresses: ["192.168.1.8:9741"],
+    pairing: {
+      serverId: "synthetic-desktop",
+      code: null,
+      expiresInSeconds: 0,
+      maxDevices: 2,
+      devices: [
+        { id: "dev-1", name: "Phone A", diagnostics: true },
+        { id: "dev-2", name: "Phone B", diagnostics: false },
+      ],
+    },
+  };
+
+  render(
+    <ConnectionPanel
+      remote={fullSnapshot}
+      onChange={async () => {}}
+      onError={onError}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "设备连接" }));
+  expect(screen.getByText("2 / 2")).toBeTruthy();
+  expect(screen.getByRole("alert").textContent).toContain(
+    "已配对设备已达上限（2 / 2）",
+  );
+  expect(screen.getByRole("button", { name: "去清理设备" })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "生成配对码" }));
+  await waitFor(() => expect(onError).toHaveBeenCalledWith("pairingCapacity"));
+  expect(screen.getByRole("alert").textContent).toContain("2 / 2");
+});

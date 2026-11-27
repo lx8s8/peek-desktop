@@ -4,6 +4,17 @@ import { useContextMenu } from "../../lib/commands/native";
 import { useDiagnosticActions } from "./actions";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  ArrowDown,
+  Copy,
+  Download,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { api, desktop } from "../../lib/ipc/client";
@@ -57,6 +68,10 @@ export function DiagnosticsTable({
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState("");
   const [focusedGroup, setFocusedGroup] = useState<ExceptionGroup | null>(null);
+  const activeFacetCount = [view.source, view.tag, view.emitter].filter(
+    Boolean,
+  ).length;
+  const [facetsOpen, setFacetsOpen] = useState(activeFacetCount > 0);
   const scroll = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const revision = useRef(0);
@@ -307,33 +322,51 @@ export function DiagnosticsTable({
         <p>{t("noDiagnosticSdkHint")}</p>
       </div>
     );
+  const newEventsCount =
+    !view.following && run.received > pauseMark.current
+      ? run.received - pauseMark.current
+      : 0;
   return (
     <div className="diagnostics-console">
       <div className="diagnostic-filters">
-        {runs.length > 1 && (
+        <div className="diagnostic-search-row">
+          {runs.length > 1 && (
+            <select
+              className="filter-select diagnostic-run-select"
+              aria-label={t("diagnosticRun")}
+              value={run.id}
+              onChange={(event) =>
+                onViewChange({ runId: event.target.value, fingerprint: null })
+              }
+            >
+              {runs.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.runId} · {t(item.online ? "connected" : "disconnected")}
+                </option>
+              ))}
+            </select>
+          )}
+          <label className="search-field diagnostic-search-field">
+            <Search size={13} aria-hidden="true" />
+            <input
+              data-search
+              aria-label={t("diagnosticSearch")}
+              placeholder={t("diagnosticSearch")}
+              value={view.search}
+              onChange={(event) => onViewChange({ search: event.target.value })}
+            />
+            {view.search && (
+              <button
+                type="button"
+                aria-label={t("dismiss")}
+                onClick={() => onViewChange({ search: "" })}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </label>
           <select
-            aria-label={t("diagnosticRun")}
-            value={run.id}
-            onChange={(event) =>
-              onViewChange({ runId: event.target.value, fingerprint: null })
-            }
-          >
-            {runs.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.runId} · {t(item.online ? "connected" : "disconnected")}
-              </option>
-            ))}
-          </select>
-        )}
-        <div>
-          <input
-            data-search
-            aria-label={t("diagnosticSearch")}
-            placeholder={t("diagnosticSearch")}
-            value={view.search}
-            onChange={(event) => onViewChange({ search: event.target.value })}
-          />
-          <select
+            className={`filter-select${view.level !== "all" ? " is-active" : ""}`}
             aria-label={t("level")}
             value={view.level}
             onChange={(event) => onViewChange({ level: event.target.value })}
@@ -352,119 +385,158 @@ export function DiagnosticsTable({
               </option>
             ))}
           </select>
-        </div>
-        <details
-          className="facet-disclosure"
-          open={!!(view.source || view.tag || view.emitter)}
-        >
-          <summary>
-            {t("advancedFilters")}
-            {!!(view.source || view.tag || view.emitter) && (
-              <span className="filter-count-pill">
-                {[view.source, view.tag, view.emitter].filter(Boolean).length}
-              </span>
+          <button
+            type="button"
+            className={`filter-pill-btn${facetsOpen || activeFacetCount > 0 ? " is-active" : ""}`}
+            aria-expanded={facetsOpen}
+            onClick={() => setFacetsOpen((value) => !value)}
+          >
+            <SlidersHorizontal size={11} aria-hidden="true" />
+            <span>{t("advancedFilters")}</span>
+            {activeFacetCount > 0 && (
+              <span className="filter-pill-badge">{activeFacetCount}</span>
             )}
-          </summary>
-          <div className="facet-filters">
-            {(
-              [
-                ["source", "sources", "allSources"],
-                ["tag", "tags", "allTags"],
-                ["emitter", "emitters", "allEmitters"],
-              ] as const
-            ).map(([field, facet, label]) => (
-              <select
-                key={field}
-                aria-label={t(field)}
-                value={view[field]}
-                onChange={(event) =>
-                  onViewChange({ [field]: event.target.value })
-                }
-              >
-                <option value="">{t(label)}</option>
-                {view[field] && !page.facets[facet].includes(view[field]) && (
-                  <option value={view[field]}>{view[field]}</option>
-                )}
-                {page.facets[facet].map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            ))}
-          </div>
-          {page.facets.limited && (
-            <small className="muted">{t("facetLimit")}</small>
-          )}
-        </details>
-        <div className="review-actions">
-          {exceptions && (
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={view.grouped}
-                onChange={(event) =>
-                  onViewChange({
-                    grouped: event.target.checked,
-                    fingerprint: null,
-                  })
-                }
-              />
-              {t("groupedExceptions")}
-            </label>
-          )}
-          {view.fingerprint && (
-            <Button onClick={() => onViewChange({ fingerprint: null })}>
-              {t("backToGroups")}
-            </Button>
-          )}
-          {!grouped && (
-            <Button
-              aria-pressed={view.following}
-              onClick={() => commands.dispatch("view.follow")}
-            >
-              {t(view.following ? "pauseFollow" : "followLatest")}
-              {!view.following && run.received > pauseMark.current
-                ? ` · ${t("newEvents", { count: run.received - pauseMark.current })}`
-                : ""}
-            </Button>
-          )}
+          </button>
         </div>
-        {!grouped && (
-          <div className="review-actions">
-            <Button
-              onClick={() => commands.dispatch("edit.copyMessage")}
-              disabled={!selection.length}
-            >
-              {t("copyMessage")}
-            </Button>
-            <Button
-              onClick={() => commands.dispatch("diagnostics.export")}
-              disabled={!desktop || !selection.length}
-            >
-              {t("exportSelected")}
-            </Button>
-            <Button
-              onClick={() => commands.dispatch("edit.selectWindow")}
-              disabled={!page.rows.length}
-            >
-              {t("selectWindow")}
-            </Button>
-            <span className="muted">
-              {t("selectedCount", { count: selection.length })}
-            </span>
-            {desktop && (
-              <Button aria-haspopup="menu" onClick={contextMenu}>
-                {t("menuActions")}
-              </Button>
+
+        {facetsOpen && (
+          <div className="diagnostic-facets-row">
+            <div className="facet-filters">
+              {(
+                [
+                  ["source", "sources", "allSources"],
+                  ["tag", "tags", "allTags"],
+                  ["emitter", "emitters", "allEmitters"],
+                ] as const
+              ).map(([field, facet, label]) => (
+                <select
+                  key={field}
+                  className={`filter-select${view[field] ? " is-active" : ""}`}
+                  aria-label={t(field)}
+                  value={view[field]}
+                  onChange={(event) =>
+                    onViewChange({ [field]: event.target.value })
+                  }
+                >
+                  <option value="">{t(label)}</option>
+                  {view[field] && !page.facets[facet].includes(view[field]) && (
+                    <option value={view[field]}>{view[field]}</option>
+                  )}
+                  {page.facets[facet].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              ))}
+            </div>
+            {page.facets.limited && (
+              <small className="muted">{t("facetLimit")}</small>
             )}
           </div>
         )}
-        {notice && <span role="status">{notice}</span>}
+
+        <div className="diagnostic-controls-row">
+          <div className="diagnostic-controls-left">
+            {exceptions && (
+              <label className="stream-toggle" title={t("groupWindow")}>
+                <input
+                  type="checkbox"
+                  checked={view.grouped}
+                  onChange={(event) =>
+                    onViewChange({
+                      grouped: event.target.checked,
+                      fingerprint: null,
+                    })
+                  }
+                />
+                <span>{t("groupedExceptions")}</span>
+              </label>
+            )}
+            {view.fingerprint && (
+              <Button
+                size="sm"
+                onClick={() => onViewChange({ fingerprint: null })}
+              >
+                {t("backToGroups")}
+              </Button>
+            )}
+            {!grouped && (
+              <div className="diagnostic-selection-bar">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => commands.dispatch("edit.copyMessage")}
+                  disabled={!selection.length}
+                >
+                  <Copy size={11} aria-hidden="true" />
+                  {t("copyMessage")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => commands.dispatch("diagnostics.export")}
+                  disabled={!desktop || !selection.length}
+                >
+                  <Download size={11} aria-hidden="true" />
+                  {t("exportSelected")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => commands.dispatch("edit.selectWindow")}
+                  disabled={!page.rows.length}
+                >
+                  {t("selectWindow")}
+                </Button>
+                <span className="diagnostic-selected-count">
+                  {t("selectedCount", { count: selection.length })}
+                </span>
+                {desktop && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-haspopup="menu"
+                    onClick={contextMenu}
+                  >
+                    <MoreHorizontal size={12} aria-hidden="true" />
+                    {t("menuActions")}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="diagnostic-controls-right">
+            {!grouped && (
+              <Button
+                size="sm"
+                aria-pressed={view.following}
+                className={view.following ? "is-following" : ""}
+                onClick={() => commands.dispatch("view.follow")}
+              >
+                {view.following ? <Pause size={12} /> : <Play size={12} />}
+                {t(view.following ? "pauseFollow" : "followLatest")}
+                {newEventsCount > 0
+                  ? ` · ${t("newEvents", { count: newEventsCount })}`
+                  : ""}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
-      {exceptions && <div className="inline-note">{t("groupWindow")}</div>}
-      {!view.following && !grouped && (
-        <div className="inline-note">{t("pausedHint")}</div>
+      {notice && (
+        <div className="inline-note stream-notice" role="status">
+          <span>{notice}</span>
+          <button
+            type="button"
+            className="inline-dismiss"
+            aria-label={t("dismiss")}
+            onClick={() => setNotice("")}
+          >
+            <X size={12} />
+          </button>
+        </div>
       )}
       <div
         className="diagnostic-table"
@@ -549,152 +621,177 @@ export function DiagnosticsTable({
             </div>
           ))}
         </div>
-        <div
-          className="table-scroll"
-          ref={scroll}
-          aria-busy={loading}
-          onWheel={(event) => {
-            if (event.deltaY < 0) pause();
-          }}
-          onScroll={() => {
-            const element = scroll.current;
-            if (
-              element &&
-              view.following &&
-              !ignoreScroll.current &&
-              element.scrollHeight - element.scrollTop - element.clientHeight >
-                72
-            )
-              pause();
-          }}
-        >
-          {failed ? (
-            <div className="table-empty">
-              <Button onClick={() => setRetry((value) => value + 1)}>
-                {t("retry")}
-              </Button>
-            </div>
-          ) : page.total === 0 ? (
-            <div className="table-empty">
-              <h2>{t(loading ? "loading" : "noLogs")}</h2>
-              <p>{!loading && t("noLogsHint")}</p>
-            </div>
-          ) : (
-            <div
-              className="virtual-space"
-              style={{ height: virtualizer.getTotalSize() }}
-            >
-              {items.map((item) => {
-                if (grouped) {
-                  const group = page.groups[item.index - page.offset];
-                  return group ? (
+        <div className="diagnostic-viewport-wrap">
+          <div
+            className="table-scroll"
+            ref={scroll}
+            aria-busy={loading}
+            onWheel={(event) => {
+              if (event.deltaY < 0) pause();
+            }}
+            onScroll={() => {
+              const element = scroll.current;
+              if (
+                element &&
+                view.following &&
+                !ignoreScroll.current &&
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight >
+                  72
+              )
+                pause();
+            }}
+          >
+            {failed ? (
+              <div className="table-empty">
+                <Button onClick={() => setRetry((value) => value + 1)}>
+                  {t("retry")}
+                </Button>
+              </div>
+            ) : page.total === 0 ? (
+              <div className="table-empty">
+                <h2>{t(loading ? "loading" : "noLogs")}</h2>
+                <p>{!loading && t("noLogsHint")}</p>
+              </div>
+            ) : (
+              <div
+                className="virtual-space"
+                style={{ height: virtualizer.getTotalSize() }}
+              >
+                {items.map((item) => {
+                  if (grouped) {
+                    const group = page.groups[item.index - page.offset];
+                    return group ? (
+                      <button
+                        role="row"
+                        tabIndex={-1}
+                        key={group.fingerprint}
+                        className={`table-row diagnostic-grid group-grid ${group.fingerprint === focusedGroup?.fingerprint ? "selected" : ""}`}
+                        aria-selected={
+                          group.fingerprint === focusedGroup?.fingerprint
+                        }
+                        style={{ transform: `translateY(${item.start}px)` }}
+                        onClick={() =>
+                          onViewChange({ fingerprint: group.fingerprint })
+                        }
+                      >
+                        <span role="gridcell">{group.exceptionType}</span>
+                        <span role="gridcell" title={group.message}>
+                          {group.message}
+                        </span>
+                        <span role="gridcell">{group.count}</span>
+                        <span role="gridcell" title={group.firstAt}>
+                          {new Date(group.firstAt).toLocaleTimeString(
+                            i18n.language,
+                            { hour12: false },
+                          )}
+                        </span>
+                        <span
+                          role="gridcell"
+                          title={`${t("firstOccurrence")}: ${group.firstAt}\n${t("lastOccurrence")}: ${group.lastAt}`}
+                        >
+                          {new Date(group.lastAt).toLocaleTimeString(
+                            i18n.language,
+                            { hour12: false },
+                          )}
+                        </span>
+                      </button>
+                    ) : null;
+                  }
+                  const row = page.rows[item.index - page.offset];
+                  return row ? (
                     <button
+                      key={row.eventId}
                       role="row"
                       tabIndex={-1}
-                      key={group.fingerprint}
-                      className={`table-row diagnostic-grid group-grid ${group.fingerprint === focusedGroup?.fingerprint ? "selected" : ""}`}
-                      aria-selected={
-                        group.fingerprint === focusedGroup?.fingerprint
-                      }
+                      aria-rowindex={item.index + 2}
+                      aria-selected={selectedIds.has(row.eventId)}
+                      className={`table-row diagnostic-grid ${selectedIds.has(row.eventId) ? "selected" : ""}`}
                       style={{ transform: `translateY(${item.start}px)` }}
-                      onClick={() =>
-                        onViewChange({ fingerprint: group.fingerprint })
-                      }
+                      onContextMenu={() => {
+                        if (!selectedIds.has(row.eventId))
+                          select(row, item.index);
+                      }}
+                      onClick={(event) => {
+                        ++navigation.current;
+                        pause();
+                        if (event.shiftKey) void selectRange(item.index);
+                        else
+                          select(
+                            row,
+                            item.index,
+                            event.metaKey || event.ctrlKey,
+                          );
+                      }}
                     >
-                      <span role="gridcell">{group.exceptionType}</span>
-                      <span role="gridcell" title={group.message}>
-                        {group.message}
-                      </span>
-                      <span role="gridcell">{group.count}</span>
-                      <span role="gridcell" title={group.firstAt}>
-                        {new Date(group.firstAt).toLocaleTimeString(
+                      <span role="gridcell" title={row.occurredAt}>
+                        {new Date(row.occurredAt).toLocaleTimeString(
                           i18n.language,
                           { hour12: false },
                         )}
                       </span>
                       <span
                         role="gridcell"
-                        title={`${t("firstOccurrence")}: ${group.firstAt}\n${t("lastOccurrence")}: ${group.lastAt}`}
+                        className={`log-level level-${row.level}`}
+                        title={t(`level_${row.level}`)}
                       >
-                        {new Date(group.lastAt).toLocaleTimeString(
-                          i18n.language,
-                          { hour12: false },
+                        {row.level.toUpperCase()}
+                      </span>
+                      <span role="gridcell" title={row.message}>
+                        {row.truncated && (
+                          <span title={t("truncatedEvent")}>† </span>
                         )}
+                        {row.message}
+                      </span>
+                      <span
+                        role="gridcell"
+                        title={[row.source, row.tag, row.emitterId]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      >
+                        {[row.source, row.tag].filter(Boolean).join(" · ")}
                       </span>
                     </button>
-                  ) : null;
-                }
-                const row = page.rows[item.index - page.offset];
-                return row ? (
-                  <button
-                    key={row.eventId}
-                    role="row"
-                    tabIndex={-1}
-                    aria-rowindex={item.index + 2}
-                    aria-selected={selectedIds.has(row.eventId)}
-                    className={`table-row diagnostic-grid ${selectedIds.has(row.eventId) ? "selected" : ""}`}
-                    style={{ transform: `translateY(${item.start}px)` }}
-                    onContextMenu={() => {
-                      if (!selectedIds.has(row.eventId))
-                        select(row, item.index);
-                    }}
-                    onClick={(event) => {
-                      ++navigation.current;
-                      pause();
-                      if (event.shiftKey) void selectRange(item.index);
-                      else
-                        select(row, item.index, event.metaKey || event.ctrlKey);
-                    }}
-                  >
-                    <span role="gridcell" title={row.occurredAt}>
-                      {new Date(row.occurredAt).toLocaleTimeString(
-                        i18n.language,
-                        { hour12: false },
-                      )}
-                    </span>
-                    <span
-                      role="gridcell"
-                      className={`log-level level-${row.level}`}
-                      title={t(`level_${row.level}`)}
+                  ) : (
+                    <div
+                      key={item.index}
+                      className="table-row placeholder"
+                      style={{ transform: `translateY(${item.start}px)` }}
                     >
-                      {row.level.toUpperCase()}
-                    </span>
-                    <span role="gridcell" title={row.message}>
-                      {row.truncated && (
-                        <span title={t("truncatedEvent")}>† </span>
-                      )}
-                      {row.message}
-                    </span>
-                    <span
-                      role="gridcell"
-                      title={[row.source, row.tag, row.emitterId]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    >
-                      {[row.source, row.tag].filter(Boolean).join(" · ")}
-                    </span>
-                  </button>
-                ) : (
-                  <div
-                    key={item.index}
-                    className="table-row placeholder"
-                    style={{ transform: `translateY(${item.start}px)` }}
-                  >
-                    {t("loading")}
-                  </div>
-                );
-              })}
-            </div>
+                      {t("loading")}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {!view.following && !grouped && page.total > 0 && (
+            <button
+              type="button"
+              className="stream-jump-fab"
+              onClick={() => commands.dispatch("view.follow")}
+            >
+              <ArrowDown size={13} aria-hidden="true" />
+              <span>
+                {newEventsCount > 0
+                  ? `${t("streamJumpLatest")} (+${newEventsCount})`
+                  : t("streamJumpLatest")}
+              </span>
+            </button>
           )}
         </div>
       </div>
-      <div className="diagnostic-stats">
+      <div className="diagnostic-stats diagnostic-footer">
         <span>
           {t("retainedLogs", { count: run.count })} ·{" "}
           {t(run.online ? "connected" : "disconnected")} · {page.total}{" "}
           {t("matches")}
         </span>
-        <span>
+        {!view.following && !grouped && (
+          <span className="diagnostic-paused-note">{t("pausedHint")}</span>
+        )}
+        <span className="diagnostic-stats-right">
           {t("diagnosticStats", {
             received: run.received,
             duplicates: run.duplicates,
@@ -713,7 +810,6 @@ export function DiagnosticsTable({
             ))}
           </details>
         )}
-        <small>{t("readOnlyLogs")}</small>
       </div>
     </div>
   );
